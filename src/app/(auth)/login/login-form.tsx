@@ -1,9 +1,7 @@
 "use client";
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -12,7 +10,6 @@ import { loginAction } from "@/server/actions";
 import Link from "next/link";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
-  const router = useRouter();
   const [error, setError] = React.useState<string | null>(null);
   const { register, handleSubmit, formState } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
 
@@ -22,11 +19,8 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       className="grid gap-4"
       onSubmit={handleSubmit(async (values) => {
         setError(null);
-        const res = await loginAction(values);
+        const res = await loginAction(values, redirectTo);
         if (!res.ok) return setError(res.error);
-        toast.success("Welcome back");
-        router.replace(redirectTo);
-        router.refresh();
       })}
     >
       {error && <p role="alert" className="rounded-xl bg-red/10 px-4 py-3 text-sm font-medium text-destructive">{error}</p>}

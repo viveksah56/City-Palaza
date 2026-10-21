@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { BarChart3, Boxes, ScanLine } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/session";
+import { safeInternalRedirect } from "@/lib/auth/redirects";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "./login-form";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -9,8 +10,8 @@ export const metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const requestedNext = (await searchParams).next;
-  const redirectTo = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/dashboard";
-  if (await getSessionUser()) redirect("/dashboard");
+  const redirectTo = safeInternalRedirect(requestedNext);
+  if (await getSessionUser()) redirect(redirectTo);
   return (
     <main className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1.08fr)_minmax(440px,0.92fr)]">
       <section className="relative hidden flex-col justify-between overflow-hidden bg-sidebar px-12 py-10 text-sidebar-foreground lg:flex xl:px-16 xl:py-12">

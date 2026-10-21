@@ -5,6 +5,7 @@ export const REFRESH_COOKIE = "cp_refresh";
 export const ACCESS_TOKEN_TTL_MINUTES = 15;
 export const REFRESH_TOKEN_TTL_DAYS = 30;
 export const DEFAULT_PAGE_SIZE = 20;
+export const LOW_STOCK_NOTIFICATIONS_CACHE_TAG = "low-stock-notifications";
 
 export const PAYMENT_METHODS = ["CASH", "CARD", "BANK_TRANSFER", "ESEWA", "KHALTI", "OTHER"] as const;
 export const PAYMENT_STATUSES = ["PAID", "PARTIAL", "PENDING", "REFUNDED"] as const;

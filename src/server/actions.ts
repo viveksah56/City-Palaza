@@ -4,7 +4,7 @@ import {PERMISSION} from "@/lib/rbac/permission";
  * Every mutation enters here: assert permission → validate with Zod → call a service
  * (which owns the DB transaction) → revalidate.
  */
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ProductStatus, UserStatus } from "@prisma/client";
@@ -13,6 +13,8 @@ import { run, DomainError, type ActionResult } from "@/lib/errors";
 import { assertPermission } from "@/lib/auth/guards";
 import { TAXONOMY_CACHE_TAG, TAXONOMY_KIND } from "@/lib/constants/categories";
 import { createSession, destroySession, getSessionUser } from "@/lib/auth/session";
+import { safeInternalRedirect } from "@/lib/auth/redirects";
+import { LOW_STOCK_NOTIFICATIONS_CACHE_TAG } from "@/lib/constants";
 import { consumePasswordReset, createPasswordReset } from "@/lib/auth/password-reset";
 import { getDummyHash, verifyPassword } from "@/lib/auth/password";
 import { requestMeta, writeAudit } from "@/lib/audit";
@@ -28,8 +30,8 @@ import * as employees from "./employees.service";
 import { updateSettings } from "./settings.service";
 
 // ---------- auth ----------
-export async function loginAction(raw: unknown): Promise<ActionResult> {
-  return run(async () => {
+export async function loginAction(raw: unknown, requestedRedirect?: unknown): Promise<ActionResult> {
+  const result = await run(async () => {
     const { email, password } = loginSchema.parse(raw);
     const user = await prisma.user.findUnique({ where: { email } });
     const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
@@ -41,6 +43,8 @@ export async function loginAction(raw: unknown): Promise<ActionResult> {
     await writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` });
     return undefined;
   });
+  if (result.ok) redirect(safeInternalRedirect(requestedRedirect));
+  return result;
 }
 
 export async function logoutAction() {
@@ -75,6 +79,7 @@ export async function createProductAction(raw: unknown) {
   return run(async () => {
     const actor = await assertPermission(PERMISSION.PRODUCT_CREATE);
     const res = await products.createProduct(actor, raw);
+    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/products");
     revalidatePath("/inventory");
     return res;
@@ -84,6 +89,7 @@ export async function updateProductAction(id: string, raw: unknown) {
   return run(async () => {
     const actor = await assertPermission(PERMISSION.PRODUCT_UPDATE);
     await products.updateProduct(actor, id, raw);
+    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/products");
     revalidatePath(`/products/${id}`);
     return undefined;
@@ -94,6 +100,7 @@ export async function setProductStatusAction(id: string, status: ProductStatus) 
     const actor = await assertPermission(PERMISSION.PRODUCT_UPDATE);
     z.enum(["ACTIVE", "INACTIVE", "DISCONTINUED"]).parse(status);
     await products.setProductStatus(actor, id, status);
+    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/products");
     revalidatePath(`/products/${id}`);
     return undefined;
@@ -103,6 +110,7 @@ export async function deleteProductAction(id: string) {
   return run(async () => {
     const actor = await assertPermission(PERMISSION.PRODUCT_DELETE);
     await products.deleteProduct(actor, id);
+    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/products");
     return undefined;
   });
@@ -145,6 +153,7 @@ export async function addStockAction(raw: unknown) {
       reason: v.reason,
       reference: v.reference,
     });
+    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/inventory");
     revalidatePath("/products");
     revalidatePath("/dashboard");
@@ -163,6 +172,7 @@ export async function adjustStockAction(raw: unknown) {
       serials: splitSerials(v.serialsText),
       reason: v.reason,
     });
+    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/inventory");
     revalidatePath("/products");
     revalidatePath("/dashboard");
@@ -175,6 +185,7 @@ export async function createSaleAction(raw: unknown) {
   return run(async () => {
     const actor = await assertPermission(PERMISSION.SALE_CREATE);
     const res = await sales.createSale(actor, raw);
+    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/sales");
     revalidatePath("/products");
     revalidatePath("/inventory");
@@ -187,6 +198,7 @@ export async function voidSaleAction(raw: unknown) {
   return run(async () => {
     const actor = await assertPermission(PERMISSION.SALE_VOID);
     await sales.voidSale(actor, raw);
+    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/sales", "layout");
     revalidatePath("/inventory");
     revalidatePath("/products");

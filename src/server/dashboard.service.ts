@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { unstable_cache } from "next/cache";
+import { LOW_STOCK_NOTIFICATIONS_CACHE_TAG } from "@/lib/constants";
 import { resolveRange, type DateRange } from "@/lib/dates";
 import { D } from "@/lib/money";
 import { stockStatus } from "@/lib/stock";
@@ -72,9 +74,11 @@ export async function getEmployeeDashboard(userId: string) {
   };
 }
 
-export async function getNotifications() {
-  const low = await reports.getLowStockProducts(5);
-  const [{ count } = { count: 0 }] = await prisma.$queryRaw<{ count: number }[]>`
-    SELECT COUNT(*)::int AS count FROM "Product" WHERE "status"='ACTIVE' AND "quantity" <= "minStock"`;
-  return { lowStockCount: count, items: low };
-}
+export const getNotifications = unstable_cache(async () => {
+  const [items, rows] = await Promise.all([
+    reports.getLowStockProducts(5),
+    prisma.$queryRaw<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count FROM "Product" WHERE "status"='ACTIVE' AND "quantity" <= "minStock"`,
+  ]);
+  return { lowStockCount: rows[0]?.count ?? 0, items };
+}, [LOW_STOCK_NOTIFICATIONS_CACHE_TAG], { revalidate: 30, tags: [LOW_STOCK_NOTIFICATIONS_CACHE_TAG] });
