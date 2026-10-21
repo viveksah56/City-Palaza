@@ -8,9 +8,11 @@ import { Field } from "@/components/ui/field";
 import { loginSchema, type LoginValues } from "@/validations/employee";
 import { loginAction } from "@/server/actions";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [error, setError] = React.useState<string | null>(null);
+  const router = useRouter();
   const { register, handleSubmit, formState } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
 
   return (
@@ -20,7 +22,11 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       onSubmit={handleSubmit(async (values) => {
         setError(null);
         const res = await loginAction(values, redirectTo);
-        if (!res.ok) return setError(res.error);
+        if (!res.ok) {
+          setError(res.error);
+          return;
+        }
+        router.replace(res.data.redirectTo);
       })}
     >
       {error && <p role="alert" className="rounded-xl bg-red/10 px-4 py-3 text-sm font-medium text-destructive">{error}</p>}

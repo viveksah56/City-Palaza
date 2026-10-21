@@ -30,8 +30,8 @@ import * as employees from "./employees.service";
 import { updateSettings } from "./settings.service";
 
 // ---------- auth ----------
-export async function loginAction(raw: unknown, requestedRedirect?: unknown): Promise<ActionResult> {
-  const result = await run(async () => {
+export async function loginAction(raw: unknown, requestedRedirect?: unknown): Promise<ActionResult<{ redirectTo: string }>> {
+  return run(async () => {
     const { email, password } = loginSchema.parse(raw);
     const user = await prisma.user.findUnique({ where: { email } });
     const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
@@ -41,10 +41,8 @@ export async function loginAction(raw: unknown, requestedRedirect?: unknown): Pr
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     await createSession({ userId: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }, { ip: meta.ip, userAgent: meta.ua });
     await writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` });
-    return undefined;
+    return { redirectTo: safeInternalRedirect(requestedRedirect) };
   });
-  if (result.ok) redirect(safeInternalRedirect(requestedRedirect));
-  return result;
 }
 
 export async function logoutAction() {
