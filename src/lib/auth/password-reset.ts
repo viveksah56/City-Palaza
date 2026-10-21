@@ -38,7 +38,7 @@ export async function createPasswordReset(email: string) {
 
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + RESET_TTL_MINUTES * 60_000);
-  await prisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
+  await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
   await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: digest(token), expiresAt } });
 
   const appUrl = process.env.APP_URL?.replace(/\/$/, "");
@@ -52,12 +52,11 @@ export async function createPasswordReset(email: string) {
 
 export async function consumePasswordReset(token: string, password: string) {
   const tokenHash = digest(token);
+  const reset = await prisma.passwordResetToken.findUnique({ where: { tokenHash }, select: { id: true, userId: true, expiresAt: true, usedAt: true } });
+  if (!reset || reset.usedAt || reset.expiresAt <= new Date()) throw new Error("This reset link is invalid or has expired.");
   const passwordHash = await hashPassword(password);
 
   await prisma.$transaction(async (tx) => {
-    const reset = await tx.passwordResetToken.findUnique({ where: { tokenHash }, select: { id: true, userId: true, expiresAt: true, usedAt: true } });
-    if (!reset || reset.usedAt || reset.expiresAt <= new Date()) throw new Error("This reset link is invalid or has expired.");
-
     const claimed = await tx.passwordResetToken.updateMany({ where: { id: reset.id, usedAt: null, expiresAt: { gt: new Date() } }, data: { usedAt: new Date() } });
     if (claimed.count !== 1) throw new Error("This reset link is invalid or has expired.");
 
