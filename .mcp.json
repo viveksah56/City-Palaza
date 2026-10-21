@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "next-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "next-devtools-mcp@latest"
+      ]
+    },
+    "vercel-frontend-agent": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@vercel/agent-skills@latest"
+      ]
+    }
+  }
+}

@@ -1,0 +1,363 @@
+// CityPalaza – single-store stock & sales management.
+// Money = Decimal(12,2). Stock lives in Product.quantity but is ONLY changed through
+// src/server/inventory.service.ts, which writes an InventoryTransaction for every change.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum TrackingType {
+  QUANTITY
+  SERIALIZED
+  IMEI
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+}
+
+enum SerialStatus {
+  IN_STOCK
+  SOLD
+  RETURNED
+  DAMAGED
+  LOST
+}
+
+enum InventoryTransactionType {
+  INITIAL_STOCK
+  PURCHASE
+  SALE
+  RETURN
+  ADJUSTMENT
+  DAMAGE
+  LOST
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  ESEWA
+  KHALTI
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIAL
+  PENDING
+  REFUNDED
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOIDED
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+// ---------- Access control ----------
+// Runtime checks use the centralized map in src/lib/rbac/permission.ts.
+// These tables mirror it (synced by the seed) so permissions can be reported on / extended later.
+model Role {
+  key         UserRole         @id
+  name        String
+  description String?
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  key         String           @id
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleKey       UserRole
+  permissionKey String
+  role          Role       @relation(fields: [roleKey], references: [key], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleKey, permissionKey])
+}
+
+model User {
+  id           String     @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String     @unique
+  passwordHash String
+  phone        String?
+  role         UserRole   @default(EMPLOYEE)
+  roleRef      Role       @relation(fields: [role], references: [key])
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  sessions              Session[]
+  sales                 Sale[]                 @relation("SaleEmployee")
+  voidedSales           Sale[]                 @relation("SaleVoidedBy")
+  inventoryTransactions InventoryTransaction[]
+  auditLogs             AuditLog[]
+  passwordResetTokens   PasswordResetToken[]
+
+  @@index([status])
+  @@index([role])
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenId String?  @unique
+  expiresAt      DateTime
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+// ---------- Catalogue ----------
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  sku             String        @unique
+  barcode         String?       @unique
+  name            String
+  /// Human-readable sellable variant, e.g. "Black · 256 GB". Each variant is its own Product/SKU/stock ledger.
+  variantLabel    String?
+  description     String?
+  categoryId      String
+  category        Category      @relation(fields: [categoryId], references: [id])
+  brandId         String?
+  brand           Brand?        @relation(fields: [brandId], references: [id])
+  purchasePrice   Decimal       @db.Decimal(12, 2)
+  sellingPrice    Decimal       @db.Decimal(12, 2)
+  /// Standing promotional discount in percent, applied automatically at sale time.
+  discountPercent Decimal       @default(0) @db.Decimal(5, 2)
+  /// Current stock. Never negative (CHECK constraint + atomic guarded updates).
+  quantity        Int           @default(0)
+  minStock        Int           @default(5)
+  maxStock        Int?
+  trackingType    TrackingType  @default(QUANTITY)
+  status          ProductStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  serials               ProductSerial[]
+  saleItems             SaleItem[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@index([name])
+  @@index([variantLabel])
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([status])
+  @@index([quantity])
+  @@index([createdAt])
+}
+
+/// One row per physical device for IMEI / SERIALIZED products.
+model ProductSerial {
+  id         String       @id @default(cuid())
+  productId  String
+  product    Product      @relation(fields: [productId], references: [id])
+  serial     String       @unique
+  status     SerialStatus @default(IN_STOCK)
+  saleItemId String?
+  saleItem   SaleItem?    @relation(fields: [saleItemId], references: [id])
+  notes      String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([productId, status])
+  @@index([saleItemId])
+}
+
+// ---------- Inventory ----------
+model InventoryTransaction {
+  id               String                   @id @default(cuid())
+  productId        String
+  product          Product                  @relation(fields: [productId], references: [id])
+  type             InventoryTransactionType
+  /// Signed change (+ in, - out)
+  quantity         Int
+  previousQuantity Int
+  newQuantity      Int
+  referenceType    String?
+  referenceId      String?
+  reason           String?
+  userId           String
+  user             User                     @relation(fields: [userId], references: [id])
+  createdAt        DateTime                 @default(now())
+
+  @@index([productId, createdAt])
+  @@index([type])
+  @@index([referenceId])
+  @@index([createdAt])
+}
+
+// ---------- Sales ----------
+model Customer {
+  id             String    @id @default(cuid())
+  name           String
+  phone          String?   @unique
+  email          String?
+  address        String?
+  lastPurchaseAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  sales          Sale[]
+
+  @@index([name])
+  @@index([lastPurchaseAt])
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  saleNumber    String        @unique
+  employeeId    String
+  employee      User          @relation("SaleEmployee", fields: [employeeId], references: [id])
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  subtotal      Decimal       @db.Decimal(12, 2)
+  discount      Decimal       @default(0) @db.Decimal(12, 2)
+  tax           Decimal       @default(0) @db.Decimal(12, 2)
+  total         Decimal       @db.Decimal(12, 2)
+  discountType  DiscountType?
+  discountValue Decimal?      @db.Decimal(12, 2)
+  taxRate       Decimal       @default(0) @db.Decimal(5, 2)
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(PAID)
+  amountPaid    Decimal       @default(0) @db.Decimal(12, 2)
+  status        SaleStatus    @default(COMPLETED)
+  notes         String?
+  voidedAt      DateTime?
+  voidedById    String?
+  voidedBy      User?         @relation("SaleVoidedBy", fields: [voidedById], references: [id])
+  voidReason    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         SaleItem[]
+
+  @@index([employeeId, createdAt])
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([paymentMethod])
+}
+
+/// Historical snapshot: later price changes never alter past sales or profit.
+model SaleItem {
+  id          String          @id @default(cuid())
+  saleId      String
+  sale        Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id])
+  productName String
+  sku         String
+  quantity    Int
+  unitPrice   Decimal         @db.Decimal(12, 2) // historical selling price
+  unitCost    Decimal         @db.Decimal(12, 2) // historical purchase price
+  discount    Decimal         @default(0) @db.Decimal(12, 2) // total line discount (promo + allocated sale discount)
+  tax         Decimal         @default(0) @db.Decimal(12, 2)
+  subtotal    Decimal         @db.Decimal(12, 2) // unitPrice * quantity
+  total       Decimal         @db.Decimal(12, 2) // subtotal - discount + tax
+  serials     ProductSerial[]
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+// ---------- System ----------
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actor       User?    @relation(fields: [actorId], references: [id])
+  action      String
+  entityType  String
+  entityId    String?
+  description String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([action])
+  @@index([entityType, entityId])
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+/// Gap-free counters (e.g. sale numbers). Incremented inside the sale transaction.
+model Counter {
+  key   String @id
+  value Int    @default(0)
+}
