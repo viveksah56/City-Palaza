@@ -48,6 +48,7 @@ const production = process.env.NODE_ENV === "production";
 if (production && process.env.ALLOW_PRODUCTION_ACCOUNT_SEED !== "true") {
   throw new Error("Production account seeding is disabled. Set ALLOW_PRODUCTION_ACCOUNT_SEED=true for an intentional first seed.");
 }
+const resetProductionPasswords = production && process.env.ALLOW_PRODUCTION_ACCOUNT_PASSWORD_RESET === "true";
 
 const prisma = createPrismaClient();
 
@@ -64,8 +65,12 @@ async function main() {
 
     for (const [index, account] of accounts.entries()) {
       const existing = await tx.user.findUnique({ where: { email: account.email }, select: { id: true } });
-      if (existing && production) {
-        throw new Error(`Account ${account.email} already exists. Production seeding never changes an existing account.`);
+      if (existing && production && !resetProductionPasswords) {
+        throw new Error(`Account ${account.email} already exists. Set ALLOW_PRODUCTION_ACCOUNT_PASSWORD_RESET=true to intentionally reset its password.`);
+      }
+      if (existing && production && resetProductionPasswords) {
+        await tx.user.update({ where: { email: account.email }, data: { passwordHash: hashes[index] } });
+        continue;
       }
       await tx.user.upsert({
         where: { email: account.email },

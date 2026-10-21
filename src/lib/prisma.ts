@@ -1,6 +1,14 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
+function resolveConnectionString(connectionString: string): string {
+  const url = new URL(connectionString);
+  if (url.hostname.endsWith(".pooler.supabase.com") && url.searchParams.get("sslmode") === "require") {
+    url.searchParams.set("uselibpqcompat", "true");
+  }
+  return url.toString();
+}
+
 export function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL must be defined");
@@ -9,7 +17,7 @@ export function createPrismaClient() {
 
   const client = new PrismaClient({
     adapter: new PrismaPg({
-      connectionString,
+      connectionString: resolveConnectionString(connectionString),
       max: Number(process.env.DB_POOL_MAX ?? 5),
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 30_000,
