@@ -15,8 +15,7 @@ import { DEFAULT_SETTINGS } from "@/server/settings.service";
 import { addStock } from "@/server/inventory.service";
 import { createSale, voidSale } from "@/server/sales.service";
 
-config({ path: process.env.NODE_ENV === "production" ? ".env.production" : ".env" });
-config({ path: ".env.local" });
+config({ path: process.env.NODE_ENV === "production" ? ".env.prod" : ".env" });
 
 const prisma = createPrismaClient();
 

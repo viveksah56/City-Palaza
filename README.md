@@ -30,7 +30,7 @@ npm run dev                       # http://localhost:3000
 
 **Bulk product import:** open **Products → Bulk upload**, download the CSV template, and upload up to 250 rows at a time. Categories and brands are added when missing; opening stock and IMEI/serial entries are created through the inventory ledger. Each batch validates before writing and rolls back completely if a row has an error. Existing SKUs are never overwritten.
 
-**Production:** configure the private `.env.production` file on the production host with the transaction-pool `DATABASE_URL`, session-pool `DIRECT_URL`, a unique `AUTH_SECRET`, and the public `APP_URL`. Keep that file out of Git. Password recovery sends a single-use, 30-minute link through SMTP configured with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM`. `npm run start:prod` starts Next.js with `.env.production`; Vercel deployments should use Vercel project environment variables. Set the production account seed credentials and `ALLOW_PRODUCTION_ACCOUNT_SEED=true`, then run `npm run db:setup:prod` for an intentional first setup. Production seeding creates missing accounts and refuses to change existing accounts.
+**Production:** configure the production environment with the transaction-pool `DATABASE_URL`, session-pool `DIRECT_URL`, a unique `AUTH_SECRET`, and the public `APP_URL`. Self-hosted deployments can load these values from a private `.env.prod` file; Vercel deployments must use Vercel project environment variables. Keep `.env` and `.env.prod` out of Git. Password recovery sends a single-use, 30-minute link through SMTP configured with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM`. `npm run start:prod` starts Next.js with `.env.prod`. Set the production account seed credentials and `ALLOW_PRODUCTION_ACCOUNT_SEED=true` only for an intentional first setup, then run `npm run db:setup:prod`. Production seeding creates missing accounts and refuses to change existing accounts.
 
 Seed users from `db:seed`: `admin@citypalaza.local` (ADMIN), `sita@`, `ram@`, `anita@citypalaza.local` (EMPLOYEE).
 
@@ -106,7 +106,7 @@ Rules the code follows: Server Components by default (client components only for
 ### Security
 - **Auth:** HTTP-only, `SameSite=Lax`, `Secure` (prod) cookies containing signed access and rotating refresh tokens that reference a server-side `Session` row. Nothing sensitive in `localStorage`. Sessions expire, are deleted on logout, and are revoked immediately when an account is disabled or its password is reset. Password recovery stores only a SHA-256 digest of a random single-use token. Passwords use bcrypt (cost 12) and strength rules.
 - **RBAC:** `lib/rbac/permissions.ts` defines all 35 permissions and the role map. UI uses it for navigation and `PermissionGate`; **every** Server Action calls `assertPermission()` and every route handler calls `can()`. Pages call `requirePermission()` (redirects to `/forbidden`). Employees never receive purchase prices (omitted in the DTO, not merely hidden) and can only open their own sales.
-- Security headers in `next.config.ts`; secrets stay in private environment files (`.env` and `.env.production` are git-ignored).
+- Security headers in `next.config.ts`; secrets stay in private, git-ignored `.env` / `.env.prod` files or the production host's environment settings.
 
 ### Money, stock and concurrency
 - All money is `NUMERIC(12,2)` in PostgreSQL and `decimal.js` in code (half-up rounding). Nothing is computed with floats; the browser's totals are display-only previews.

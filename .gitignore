@@ -3,6 +3,7 @@ src/generated/prisma
 .next
 out
 .env
+.env.prod
 .env.production
 .env.local
 .env.*.local
