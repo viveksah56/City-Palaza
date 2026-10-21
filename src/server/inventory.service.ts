@@ -37,7 +37,7 @@ export async function changeStock(tx: Tx, c: StockChange): Promise<number> {
   if (!c.reason && !c.referenceId) throw new DomainError("VALIDATION", "A reason or reference is required for every stock change.");
 
   const rows = await tx.$queryRaw<{ quantity: number }[]>`
-    UPDATE "Product"
+    UPDATE "citypalaza_database"."Product"
        SET "quantity" = "quantity" + ${c.delta}::int, "updatedAt" = NOW()
      WHERE "id" = ${c.productId} AND "quantity" + ${c.delta}::int >= 0
  RETURNING "quantity"`;

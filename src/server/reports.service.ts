@@ -32,7 +32,7 @@ export async function getSalesSummary(p: Period, employeeId?: string): Promise<S
            COALESCE(SUM(s."discount"),0)::text AS discount,
            COALESCE(SUM(s."tax"),0)::text AS tax,
            COALESCE(SUM(s."total"),0)::text AS total
-      FROM "Sale" s WHERE ${saleWhere(p, employeeId)}`;
+      FROM "citypalaza_database"."Sale" s WHERE ${saleWhere(p, employeeId)}`;
   const row = r!;
   return {
     count: row.count,
@@ -55,7 +55,7 @@ export async function getSalesOverTime(p: Period, employeeId?: string): Promise<
     SELECT date_trunc(${unit}, (s."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}) AS bucket,
            to_char(date_trunc(${unit}, (s."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}), ${fmt}) AS label,
            SUM(s."total")::text AS value
-      FROM "Sale" s WHERE ${saleWhere(p, employeeId)}
+      FROM "citypalaza_database"."Sale" s WHERE ${saleWhere(p, employeeId)}
      GROUP BY 1, 2 ORDER BY 1`;
   return rows.map((r) => ({ label: r.label, value: num(r.value) }));
 }
@@ -63,10 +63,10 @@ export async function getSalesOverTime(p: Period, employeeId?: string): Promise<
 export async function getSalesByCategory(p: Period, employeeId?: string) {
   const rows = await prisma.$queryRaw<{ name: string; revenue: string; units: number }[]>`
     SELECT c."name", SUM(si."subtotal" - si."discount")::text AS revenue, SUM(si."quantity")::int AS units
-      FROM "SaleItem" si
-      JOIN "Sale" s ON s."id" = si."saleId"
-      JOIN "Product" pr ON pr."id" = si."productId"
-      JOIN "Category" c ON c."id" = pr."categoryId"
+      FROM "citypalaza_database"."SaleItem" si
+      JOIN "citypalaza_database"."Sale" s ON s."id" = si."saleId"
+      JOIN "citypalaza_database"."Product" pr ON pr."id" = si."productId"
+      JOIN "citypalaza_database"."Category" c ON c."id" = pr."categoryId"
      WHERE ${saleWhere(p, employeeId)}
      GROUP BY c."name" ORDER BY SUM(si."subtotal" - si."discount") DESC`;
   return rows.map((r) => ({ name: r.name, revenue: r.revenue, units: r.units }));
@@ -76,7 +76,7 @@ export async function getTopProducts(p: Period, limit = 10, employeeId?: string)
   const rows = await prisma.$queryRaw<{ name: string; sku: string; units: number; revenue: string }[]>`
     SELECT si."productName" AS name, si."sku", SUM(si."quantity")::int AS units,
            SUM(si."subtotal" - si."discount")::text AS revenue
-      FROM "SaleItem" si JOIN "Sale" s ON s."id" = si."saleId"
+      FROM "citypalaza_database"."SaleItem" si JOIN "citypalaza_database"."Sale" s ON s."id" = si."saleId"
      WHERE ${saleWhere(p, employeeId)}
      GROUP BY si."productId", si."productName", si."sku"
      ORDER BY SUM(si."quantity") DESC, SUM(si."subtotal" - si."discount") DESC
@@ -87,7 +87,7 @@ export async function getTopProducts(p: Period, limit = 10, employeeId?: string)
 export async function getPaymentDistribution(p: Period, employeeId?: string) {
   const rows = await prisma.$queryRaw<{ method: string; count: number; total: string }[]>`
     SELECT s."paymentMethod"::text AS method, COUNT(*)::int AS count, SUM(s."total")::text AS total
-      FROM "Sale" s WHERE ${saleWhere(p, employeeId)}
+      FROM "citypalaza_database"."Sale" s WHERE ${saleWhere(p, employeeId)}
      GROUP BY 1 ORDER BY SUM(s."total") DESC`;
   return rows;
 }
@@ -98,7 +98,7 @@ export async function getProfitSummary(p: Period, employeeId?: string) {
     SELECT COALESCE(SUM(si."subtotal" - si."discount"),0)::text AS revenue,
            COALESCE(SUM(si."unitCost" * si."quantity"),0)::text AS cost,
            COALESCE(SUM(si."subtotal" - si."discount" - si."unitCost" * si."quantity"),0)::text AS profit
-      FROM "SaleItem" si JOIN "Sale" s ON s."id" = si."saleId"
+      FROM "citypalaza_database"."SaleItem" si JOIN "citypalaza_database"."Sale" s ON s."id" = si."saleId"
      WHERE ${saleWhere(p, employeeId)}`;
   const row = r!;
   const margin = D(row.revenue).isZero() ? "0.0" : D(row.profit).div(row.revenue).times(100).toFixed(1);
@@ -112,7 +112,7 @@ export async function getProfitOverTime(p: Period): Promise<SeriesPoint[]> {
     SELECT to_char(date_trunc(${unit}, (s."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}), ${fmt}) AS label,
            SUM(si."subtotal" - si."discount" - si."unitCost" * si."quantity")::text AS value,
            date_trunc(${unit}, (s."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}) AS bucket
-      FROM "SaleItem" si JOIN "Sale" s ON s."id" = si."saleId"
+      FROM "citypalaza_database"."SaleItem" si JOIN "citypalaza_database"."Sale" s ON s."id" = si."saleId"
      WHERE ${saleWhere(p)} GROUP BY 3, 1 ORDER BY 3`;
   return rows.map((r) => ({ label: r.label, value: num(r.value) }));
 }
@@ -122,7 +122,7 @@ export async function getProfitByProduct(p: Period, limit = 15) {
     SELECT si."productName" AS name, si."sku", SUM(si."quantity")::int AS units,
            SUM(si."subtotal" - si."discount")::text AS revenue,
            SUM(si."subtotal" - si."discount" - si."unitCost" * si."quantity")::text AS profit
-      FROM "SaleItem" si JOIN "Sale" s ON s."id" = si."saleId"
+      FROM "citypalaza_database"."SaleItem" si JOIN "citypalaza_database"."Sale" s ON s."id" = si."saleId"
      WHERE ${saleWhere(p)}
      GROUP BY si."productId", si."productName", si."sku"
      ORDER BY SUM(si."subtotal" - si."discount" - si."unitCost" * si."quantity") DESC LIMIT ${limit}`;
@@ -140,10 +140,10 @@ export async function getEmployeePerformance(p: Period) {
            COALESCE(SUM(si."subtotal" - si."discount" - si."unitCost" * si."quantity"),0)::text AS profit,
            CASE WHEN COUNT(DISTINCT s."id") = 0 THEN '0.00'
                 ELSE (SUM(si."total") / COUNT(DISTINCT s."id"))::numeric(14,2)::text END AS average
-      FROM "User" u
-      JOIN "Sale" s ON s."employeeId" = u."id" AND s."status" = 'COMPLETED'
+      FROM "citypalaza_database"."User" u
+      JOIN "citypalaza_database"."Sale" s ON s."employeeId" = u."id" AND s."status" = 'COMPLETED'
                    AND s."createdAt" >= ${p.from} AND s."createdAt" < ${p.to}
-      JOIN "SaleItem" si ON si."saleId" = s."id"
+      JOIN "citypalaza_database"."SaleItem" si ON si."saleId" = s."id"
      GROUP BY u."id", u."firstName", u."lastName"
      ORDER BY SUM(si."subtotal" - si."discount") DESC`;
 }
@@ -151,7 +151,7 @@ export async function getEmployeePerformance(p: Period) {
 export async function getSalesByEmployee(p: Period) {
   return prisma.$queryRaw<{ name: string; count: number; total: string }[]>`
     SELECT u."firstName" || ' ' || u."lastName" AS name, COUNT(*)::int AS count, SUM(s."total")::text AS total
-      FROM "Sale" s JOIN "User" u ON u."id" = s."employeeId"
+      FROM "citypalaza_database"."Sale" s JOIN "citypalaza_database"."User" u ON u."id" = s."employeeId"
      WHERE ${saleWhere(p)} GROUP BY u."id", u."firstName", u."lastName" ORDER BY SUM(s."total") DESC`;
 }
 
@@ -165,7 +165,7 @@ export async function getInventorySummary() {
            COALESCE(SUM("quantity" * "sellingPrice"),0)::text AS retail,
            COUNT(*) FILTER (WHERE "quantity" > 0 AND "quantity" <= "minStock")::int AS low,
            COUNT(*) FILTER (WHERE "quantity" <= 0)::int AS out
-      FROM "Product" WHERE "status" = 'ACTIVE'`;
+      FROM "citypalaza_database"."Product" WHERE "status" = 'ACTIVE'`;
   const row = r!;
   return {
     products: row.products,
@@ -180,7 +180,7 @@ export async function getInventorySummary() {
 
 export function getLowStockProducts(limit = 50) {
   return prisma.$queryRaw<{ id: string; name: string; sku: string; quantity: number; minStock: number }[]>`
-    SELECT "id", "name", "sku", "quantity", "minStock" FROM "Product"
+    SELECT "id", "name", "sku", "quantity", "minStock" FROM "citypalaza_database"."Product"
      WHERE "status" = 'ACTIVE' AND "quantity" > 0 AND "quantity" <= "minStock"
      ORDER BY "quantity" ASC, "name" ASC LIMIT ${limit}`;
 }

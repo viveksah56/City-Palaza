@@ -10,25 +10,25 @@ const prisma = new PrismaClient();
 
 const statements = [
   `DO $$ BEGIN
-     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_quantity_non_negative') THEN
-       ALTER TABLE "Product" ADD CONSTRAINT product_quantity_non_negative CHECK ("quantity" >= 0);
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = 'citypalaza_database' AND conname = 'product_quantity_non_negative') THEN
+       ALTER TABLE "citypalaza_database"."Product" ADD CONSTRAINT product_quantity_non_negative CHECK ("quantity" >= 0);
      END IF;
    END $$;`,
   `DO $$ BEGIN
-     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_prices_non_negative') THEN
-       ALTER TABLE "Product" ADD CONSTRAINT product_prices_non_negative CHECK ("purchasePrice" >= 0 AND "sellingPrice" >= 0);
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = 'citypalaza_database' AND conname = 'product_prices_non_negative') THEN
+       ALTER TABLE "citypalaza_database"."Product" ADD CONSTRAINT product_prices_non_negative CHECK ("purchasePrice" >= 0 AND "sellingPrice" >= 0);
      END IF;
    END $$;`,
   `DO $$ BEGIN
-     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'saleitem_quantity_positive') THEN
-       ALTER TABLE "SaleItem" ADD CONSTRAINT saleitem_quantity_positive CHECK ("quantity" > 0);
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = 'citypalaza_database' AND conname = 'saleitem_quantity_positive') THEN
+       ALTER TABLE "citypalaza_database"."SaleItem" ADD CONSTRAINT saleitem_quantity_positive CHECK ("quantity" > 0);
      END IF;
    END $$;`,
 ];
 
 const optional = [
   `CREATE EXTENSION IF NOT EXISTS pg_trgm;`,
-  `CREATE INDEX IF NOT EXISTS product_name_trgm_idx ON "Product" USING gin ("name" gin_trgm_ops);`,
+  `CREATE INDEX IF NOT EXISTS product_name_trgm_idx ON "citypalaza_database"."Product" USING gin ("name" gin_trgm_ops);`,
 ];
 
 async function main() {

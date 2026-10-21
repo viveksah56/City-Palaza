@@ -78,7 +78,7 @@ export const getNotifications = unstable_cache(async () => {
   const [items, rows] = await Promise.all([
     reports.getLowStockProducts(5),
     prisma.$queryRaw<{ count: number }[]>`
-      SELECT COUNT(*)::int AS count FROM "Product" WHERE "status"='ACTIVE' AND "quantity" <= "minStock"`,
+      SELECT COUNT(*)::int AS count FROM "citypalaza_database"."Product" WHERE "status"='ACTIVE' AND "quantity" <= "minStock"`,
   ]);
   return { lowStockCount: rows[0]?.count ?? 0, items };
 }, [LOW_STOCK_NOTIFICATIONS_CACHE_TAG], { revalidate: 30, tags: [LOW_STOCK_NOTIFICATIONS_CACHE_TAG] });

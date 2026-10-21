@@ -17,7 +17,7 @@ import { readSettings } from "./settings.service";
 
 async function nextCounter(tx: Tx, key: string): Promise<number> {
   const rows = await tx.$queryRaw<{ value: number }[]>`
-    INSERT INTO "Counter" ("key", "value") VALUES (${key}, 1)
+    INSERT INTO "citypalaza_database"."Counter" ("key", "value") VALUES (${key}, 1)
     ON CONFLICT ("key") DO UPDATE SET "value" = "Counter"."value" + 1
     RETURNING "value"`;
   return rows[0]!.value;

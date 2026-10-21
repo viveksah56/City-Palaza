@@ -10,29 +10,38 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas   = ["citypalaza_database"]
 }
 
 enum UserRole {
   ADMIN
   EMPLOYEE
+
+  @@schema("citypalaza_database")
 }
 
 enum UserStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+
+  @@schema("citypalaza_database")
 }
 
 enum TrackingType {
   QUANTITY
   SERIALIZED
   IMEI
+
+  @@schema("citypalaza_database")
 }
 
 enum ProductStatus {
   ACTIVE
   INACTIVE
   DISCONTINUED
+
+  @@schema("citypalaza_database")
 }
 
 enum SerialStatus {
@@ -41,6 +50,8 @@ enum SerialStatus {
   RETURNED
   DAMAGED
   LOST
+
+  @@schema("citypalaza_database")
 }
 
 enum InventoryTransactionType {
@@ -51,6 +62,8 @@ enum InventoryTransactionType {
   ADJUSTMENT
   DAMAGE
   LOST
+
+  @@schema("citypalaza_database")
 }
 
 enum PaymentMethod {
@@ -60,6 +73,8 @@ enum PaymentMethod {
   ESEWA
   KHALTI
   OTHER
+
+  @@schema("citypalaza_database")
 }
 
 enum PaymentStatus {
@@ -67,16 +82,22 @@ enum PaymentStatus {
   PARTIAL
   PENDING
   REFUNDED
+
+  @@schema("citypalaza_database")
 }
 
 enum SaleStatus {
   COMPLETED
   VOIDED
+
+  @@schema("citypalaza_database")
 }
 
 enum DiscountType {
   PERCENT
   FIXED
+
+  @@schema("citypalaza_database")
 }
 
 // ---------- Access control ----------
@@ -88,12 +109,16 @@ model Role {
   description String?
   users       User[]
   permissions RolePermission[]
+
+  @@schema("citypalaza_database")
 }
 
 model Permission {
   key         String           @id
   description String?
   roles       RolePermission[]
+
+  @@schema("citypalaza_database")
 }
 
 model RolePermission {
@@ -103,6 +128,7 @@ model RolePermission {
   permission    Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
 
   @@id([roleKey, permissionKey])
+  @@schema("citypalaza_database")
 }
 
 model User {
@@ -128,6 +154,7 @@ model User {
 
   @@index([status])
   @@index([role])
+  @@schema("citypalaza_database")
 }
 
 model Session {
@@ -142,6 +169,7 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+  @@schema("citypalaza_database")
 }
 
 model PasswordResetToken {
@@ -155,6 +183,7 @@ model PasswordResetToken {
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
+  @@schema("citypalaza_database")
 }
 
 // ---------- Catalogue ----------
@@ -167,6 +196,8 @@ model Category {
   products    Product[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@schema("citypalaza_database")
 }
 
 model Brand {
@@ -178,6 +209,8 @@ model Brand {
   products    Product[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@schema("citypalaza_database")
 }
 
 model Product {
@@ -216,6 +249,7 @@ model Product {
   @@index([status])
   @@index([quantity])
   @@index([createdAt])
+  @@schema("citypalaza_database")
 }
 
 /// One row per physical device for IMEI / SERIALIZED products.
@@ -233,6 +267,7 @@ model ProductSerial {
 
   @@index([productId, status])
   @@index([saleItemId])
+  @@schema("citypalaza_database")
 }
 
 // ---------- Inventory ----------
@@ -256,6 +291,7 @@ model InventoryTransaction {
   @@index([type])
   @@index([referenceId])
   @@index([createdAt])
+  @@schema("citypalaza_database")
 }
 
 // ---------- Sales ----------
@@ -272,6 +308,7 @@ model Customer {
 
   @@index([name])
   @@index([lastPurchaseAt])
+  @@schema("citypalaza_database")
 }
 
 model Sale {
@@ -306,6 +343,7 @@ model Sale {
   @@index([createdAt])
   @@index([status, createdAt])
   @@index([paymentMethod])
+  @@schema("citypalaza_database")
 }
 
 /// Historical snapshot: later price changes never alter past sales or profit.
@@ -328,6 +366,7 @@ model SaleItem {
 
   @@index([saleId])
   @@index([productId])
+  @@schema("citypalaza_database")
 }
 
 // ---------- System ----------
@@ -348,16 +387,21 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([action])
   @@index([entityType, entityId])
+  @@schema("citypalaza_database")
 }
 
 model Setting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+
+  @@schema("citypalaza_database")
 }
 
 /// Gap-free counters (e.g. sale numbers). Incremented inside the sale transaction.
 model Counter {
   key   String @id
   value Int    @default(0)
+
+  @@schema("citypalaza_database")
 }
