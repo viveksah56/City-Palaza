@@ -4,9 +4,6 @@ src/generated/prisma
 out
 .env
 .env.prod
-.env.production
-.env.local
-.env.migration
 .env.*.local
 *.dump
 prod_data*.sql

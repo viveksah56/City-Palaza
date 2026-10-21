@@ -3,7 +3,7 @@
  */
 import { config } from "dotenv";
 
-config({ path: process.env.SEED_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.production" : ".env.local") });
+config({ path: process.env.SEED_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.prod" : ".env") });
 
 if (process.env.NODE_ENV === "production") {
   console.error("Refusing to seed in production.");

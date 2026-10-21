@@ -7,7 +7,7 @@
 import { config } from "dotenv";
 import { createPrismaClient } from "@/lib/prisma";
 
-config({ path: process.env.PRISMA_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.production" : ".env.local") });
+config({ path: process.env.PRISMA_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.prod" : ".env") });
 
 const prisma = createPrismaClient();
 

@@ -10,7 +10,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "@/lib/rbac/permission";
 import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "@/lib/constants/roles";
 
-config({ path: process.env.SEED_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.production" : ".env.local") });
+config({ path: process.env.SEED_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.prod" : ".env") });
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Refusing to seed accounts in production.");

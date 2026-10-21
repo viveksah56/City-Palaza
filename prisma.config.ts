@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 import { defineConfig, env } from "prisma/config";
 
-const envFile = process.env.PRISMA_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.production" : ".env.local");
+const envFile = process.env.PRISMA_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.prod" : ".env");
 config({ path: envFile });
 
 const args = process.argv.slice(2);
