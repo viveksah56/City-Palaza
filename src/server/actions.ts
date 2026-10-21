@@ -32,16 +32,30 @@ import { updateSettings } from "./settings.service";
 // ---------- auth ----------
 export async function loginAction(raw: unknown, requestedRedirect?: unknown): Promise<ActionResult<{ redirectTo: string }>> {
   return run(async () => {
-    const { email, password } = loginSchema.parse(raw);
-    const user = await prisma.user.findUnique({ where: { email } });
-    const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
-    if (!user || !ok) throw new DomainError("UNAUTHENTICATED", "Email or password is incorrect.");
-    if (user.status !== "ACTIVE") throw new DomainError("FORBIDDEN", "This account is disabled. Ask an admin to reactivate it.");
-    const meta = await requestMeta();
-    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-    await createSession({ userId: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }, { ip: meta.ip, userAgent: meta.ua });
-    await writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` });
-    return { redirectTo: safeInternalRedirect(requestedRedirect) };
+    let stage = "input validation";
+    try {
+      const { email, password } = loginSchema.parse(raw);
+      stage = "user lookup";
+      const user = await prisma.user.findUnique({ where: { email } });
+      const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
+      if (!user || !ok) throw new DomainError("UNAUTHENTICATED", "Email or password is incorrect.");
+      if (user.status !== "ACTIVE") throw new DomainError("FORBIDDEN", "This account is disabled. Ask an admin to reactivate it.");
+      stage = "session creation";
+      const meta = await requestMeta();
+      await createSession({ userId: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }, { ip: meta.ip, userAgent: meta.ua });
+      stage = "post-login bookkeeping";
+      const bookkeeping = await Promise.allSettled([
+        prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
+        writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` }),
+      ]);
+      for (const result of bookkeeping) {
+        if (result.status === "rejected") console.error("[login bookkeeping error]", result.reason);
+      }
+      return { redirectTo: safeInternalRedirect(requestedRedirect) };
+    } catch (error) {
+      if (!(error instanceof DomainError)) console.error(`[login failure: ${stage}]`, error);
+      throw error;
+    }
   });
 }
 
