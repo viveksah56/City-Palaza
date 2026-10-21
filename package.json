@@ -16,6 +16,7 @@
     "db:seed:users": "node --import tsx prisma/seed-users.ts",
     "db:seed:accounts": "node --import tsx prisma/seed-users.ts",
     "db:seed:accounts:prod": "node --env-file=.env.production --import tsx prisma/seed-users.ts",
+    "db:setup:prod": "node --env-file=.env.production node_modules/prisma/build/index.js db push && node --env-file=.env.production --import tsx scripts/apply-constraints.ts && npm run db:seed:accounts:prod",
     "db:setup": "prisma db push && tsx scripts/apply-constraints.ts && tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "test": "vitest run",
