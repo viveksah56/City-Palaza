@@ -53,17 +53,11 @@ async function main() {
   const hashes = await Promise.all(accounts.map(({ password }) => hashPassword(password)));
 
   await prisma.$transaction(async (tx) => {
-    for (const key of PERMISSIONS) await tx.permission.upsert({ where: { key }, create: { key }, update: {} });
+    await tx.permission.createMany({ data: PERMISSIONS.map((key) => ({ key })), skipDuplicates: true });
     for (const role of ROLE_VALUES) {
       await tx.role.upsert({ where: { key: role }, create: { key: role, name: ROLE_LABELS[role] }, update: { name: ROLE_LABELS[role] } });
       await tx.rolePermission.deleteMany({ where: { roleKey: role } });
-      for (const permissionKey of ROLE_PERMISSIONS[role]) {
-        await tx.rolePermission.upsert({
-          where: { roleKey_permissionKey: { roleKey: role as UserRole, permissionKey } },
-          create: { roleKey: role as UserRole, permissionKey },
-          update: {},
-        });
-      }
+      await tx.rolePermission.createMany({ data: Array.from(ROLE_PERMISSIONS[role], (permissionKey) => ({ roleKey: role as UserRole, permissionKey })) });
     }
 
     for (const [index, account] of accounts.entries()) {
@@ -93,7 +87,7 @@ async function main() {
         },
       });
     }
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   console.log(`Seeded ${accounts.length} account(s): ${accounts.map(({ role, email }) => `${role} ${email}`).join(", ")}`);
 }
