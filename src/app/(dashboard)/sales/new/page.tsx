@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SalesTerminal } from "@/features/sales/sales-terminal";
 import { ROLE } from "@/lib/constants/roles";
 import { getSettings } from "@/server/settings.service";
+import { QueryProvider } from "@/components/providers/query-provider";
 
 export const metadata: Metadata = { title: "New sale" };
 
@@ -14,7 +15,7 @@ export default async function NewSalePage() {
   return (
     <>
       <PageHeader title="New sale" description="Add products, pick payment, complete." />
-      <SalesTerminal currency={s.currency} taxRate={s.taxRate} discountLimit={s.employeeDiscountLimit} isAdmin={hasRole(user.role, ROLE.ADMIN)} />
+      <QueryProvider><SalesTerminal currency={s.currency} taxRate={s.taxRate} discountLimit={s.employeeDiscountLimit} isAdmin={hasRole(user.role, ROLE.ADMIN)} /></QueryProvider>
     </>
   );
 }

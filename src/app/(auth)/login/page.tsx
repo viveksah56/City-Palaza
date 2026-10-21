@@ -9,6 +9,8 @@ import { LoginForm } from "./login-form";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const COPYRIGHT_YEAR = new Date().getFullYear();
+
 export const metadata: Metadata = { title: "Sign in" };
 
 export default function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
@@ -57,7 +59,7 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
           </div>
         </div>
 
-        <p className="relative text-xs text-sidebar-muted">© {new Date().getFullYear()} CityPalaza · Store management</p>
+        <p className="relative text-xs text-sidebar-muted">© {COPYRIGHT_YEAR} CityPalaza · Store management</p>
       </section>
 
       <section className="relative flex min-h-dvh items-center justify-center px-5 py-10 sm:px-8">

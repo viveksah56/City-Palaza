@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -169,5 +170,5 @@ function AppShellContent({ nav, user, shopName, notifications, logoutAction, chi
 }
 
 export function AppShell(props: ShellProps) {
-  return <SidebarProvider><AppShellContent {...props} /></SidebarProvider>;
+  return <TooltipProvider delayDuration={450} skipDelayDuration={150}><SidebarProvider><AppShellContent {...props} /></SidebarProvider></TooltipProvider>;
 }

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Theme = "light" | "dark";
 
@@ -41,22 +41,24 @@ export function ThemeToggle() {
   const Icon = theme === "dark" ? Sun : Moon;
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Switch to ${nextTheme} theme`}
-          onClick={() => {
-            setCurrentTheme(nextTheme);
-            setTheme(nextTheme);
-          }}
-        >
-          <Icon aria-hidden />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Switch to {nextTheme} theme</TooltipContent>
-    </Tooltip>
+    <TooltipProvider delayDuration={450} skipDelayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Switch to ${nextTheme} theme`}
+            onClick={() => {
+              setCurrentTheme(nextTheme);
+              setTheme(nextTheme);
+            }}
+          >
+            <Icon aria-hidden />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Switch to {nextTheme} theme</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

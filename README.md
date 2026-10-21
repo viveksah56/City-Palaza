@@ -26,7 +26,7 @@ npm run db:setup                  # = prisma db push + constraints + dev seed
 npm run dev                       # http://localhost:3000
 ```
 
-**Create the two staff accounts:** set `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_EMPLOYEE_EMAIL`, and `SEED_EMPLOYEE_PASSWORD` in `.env`, then run `npm run db:seed:accounts`. Local runs update these two accounts to match the current `.env` credentials. No passwords are stored in source code.
+**Create the two staff accounts:** set `SEED_ADMIN_EMAIL=admin@gmail.com`, `SEED_ADMIN_PASSWORD`, `SEED_EMPLOYEE_EMAIL=employee@citypalaza.com`, and `SEED_EMPLOYEE_PASSWORD` in the private, git-ignored `.env` file, then run `npm run db:seed:accounts`. Local runs update these two accounts to match the current `.env` credentials. The passwords are intentionally kept out of this README and source control; use the credentials supplied by the project owner when configuring the private environment file. Production seeding creates missing accounts only and never changes existing account passwords.
 
 **Bulk product import:** open **Products → Bulk upload**, download the CSV template, and upload up to 250 rows at a time. Categories and brands are added when missing; opening stock and IMEI/serial entries are created through the inventory ledger. Each batch validates before writing and rolls back completely if a row has an error. Existing SKUs are never overwritten.
 

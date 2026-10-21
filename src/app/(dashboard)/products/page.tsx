@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/shared/states";
 import { Pagination } from "@/components/shared/data-table";
 import { ProductTable } from "@/features/products/product-table";
 import { ProductImportDialog } from "@/features/products/product-import-dialog";
+import { QueryProvider } from "@/components/providers/query-provider";
 import { ProductCreateDialog } from "@/features/products/product-create-dialog";
 import { getBrands, getCategories, listProducts, parseProductQuery } from "@/server/products.service";
 import { getSettings } from "@/server/settings.service";
@@ -38,7 +39,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         actions={
           <>
             {hasPermission(user.role, PERMISSION.CATEGORY_VIEW) && <Button asChild variant="outline"><Link href="/products/categories"><Tags /> Categories &amp; brands</Link></Button>}
-            {hasPermission(user.role, PERMISSION.PRODUCT_CREATE) && <ProductImportDialog />}
+            {hasPermission(user.role, PERMISSION.PRODUCT_CREATE) && <QueryProvider><ProductImportDialog /></QueryProvider>}
             {hasPermission(user.role, PERMISSION.PRODUCT_CREATE) && <ProductCreateDialog categories={categories.filter((c) => c.isActive)} brands={brands.filter((b) => b.isActive)} />}
           </>
         }

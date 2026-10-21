@@ -5,8 +5,6 @@ import { DomainError, toActionError } from "@/lib/errors";
 import { assertPermission } from "@/lib/auth/guards";
 import { importProductsCsv } from "@/server/product-import.service";
 
-export const runtime = "nodejs";
-
 export async function POST(request: Request) {
   try {
     const actor = await assertPermission(PERMISSION.PRODUCT_CREATE);
