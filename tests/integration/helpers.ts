@@ -1,4 +1,4 @@
-import { createPrismaClient } from "../../src/lib/prisma-client";
+import { createPrismaClient } from "../../src/lib/prisma";
 
 export const TEST_DB = process.env.TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;

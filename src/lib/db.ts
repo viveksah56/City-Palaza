@@ -1,5 +1,6 @@
-import type { Prisma, PrismaClient } from "../generated/prisma/client";
-import { createPrismaClient } from "./prisma-client";
+import "server-only";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import { createPrismaClient } from "./prisma";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 

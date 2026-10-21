@@ -5,7 +5,10 @@
  *  - trigram index so product-name search stays fast with thousands of rows
  */
 import "dotenv/config";
-import { createPrismaClient } from "../src/lib/prisma-client";
+import dotenv from "dotenv";
+import { createPrismaClient } from "@/lib/prisma";
+
+dotenv.config({ path: ".env.local" });
 
 const prisma = createPrismaClient();
 

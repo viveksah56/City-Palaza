@@ -5,17 +5,18 @@
  */
 import { randomBytes } from "node:crypto";
 import { config } from "dotenv";
-import { createPrismaClient } from "../src/lib/prisma-client";
-import { hashPassword } from "../src/lib/auth/password";
-import { PERMISSIONS, ROLE_PERMISSIONS } from "../src/lib/rbac/permission";
-import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "../src/lib/constants/roles";
-import { imeiFromBody } from "../src/lib/imei";
-import { slugify } from "../src/lib/format";
-import { DEFAULT_SETTINGS } from "../src/server/settings.service";
-import { addStock } from "../src/server/inventory.service";
-import { createSale, voidSale } from "../src/server/sales.service";
+import { createPrismaClient } from "@/lib/prisma";
+import { hashPassword } from "@/lib/auth/password";
+import { PERMISSIONS, ROLE_PERMISSIONS } from "@/lib/rbac/permission";
+import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "@/lib/constants/roles";
+import { imeiFromBody } from "@/lib/imei";
+import { slugify } from "@/lib/format";
+import { DEFAULT_SETTINGS } from "@/server/settings.service";
+import { addStock } from "@/server/inventory.service";
+import { createSale, voidSale } from "@/server/sales.service";
 
 config({ path: process.env.NODE_ENV === "production" ? ".env.production" : ".env" });
+config({ path: ".env.local" });
 
 const prisma = createPrismaClient();
 

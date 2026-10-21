@@ -5,13 +5,14 @@
  * ALLOW_PRODUCTION_ACCOUNT_SEED=true and only creates missing accounts.
  */
 import { config } from "dotenv";
-import { type UserRole } from "../src/generated/prisma/client";
-import { createPrismaClient } from "../src/lib/prisma-client";
-import { hashPassword } from "../src/lib/auth/password";
-import { PERMISSIONS, ROLE_PERMISSIONS } from "../src/lib/rbac/permission";
-import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "../src/lib/constants/roles";
+import { type UserRole } from "@/generated/prisma/client";
+import { createPrismaClient } from "@/lib/prisma";
+import { hashPassword } from "@/lib/auth/password";
+import { PERMISSIONS, ROLE_PERMISSIONS } from "@/lib/rbac/permission";
+import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "@/lib/constants/roles";
 
 config({ path: process.env.SEED_ENV_FILE || (process.env.NODE_ENV === "production" ? ".env.production" : ".env") });
+config({ path: ".env.local" });
 
 type AccountInput = {
   role: Role;
