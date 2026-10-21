@@ -1,4 +1,4 @@
-import type { Prisma } from "../generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma, type Db } from "./db";
 
 export type AuditAction =
