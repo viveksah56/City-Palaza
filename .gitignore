@@ -6,7 +6,10 @@ out
 .env.prod
 .env.production
 .env.local
+.env.migration
 .env.*.local
+*.dump
+prod_data*.sql
 *.tsbuildinfo
 next-env.d.ts
 coverage

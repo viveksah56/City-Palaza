@@ -1,8 +1,7 @@
 /**
  * Seed one administrator and one employee from environment variables.
  * Required: SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_EMPLOYEE_EMAIL,
- * SEED_EMPLOYEE_PASSWORD. Production additionally requires
- * ALLOW_PRODUCTION_ACCOUNT_SEED=true and only creates missing accounts.
+ * SEED_EMPLOYEE_PASSWORD. This script is limited to local development.
  */
 import { config } from "dotenv";
 import { type UserRole } from "@/generated/prisma/client";
@@ -11,7 +10,11 @@ import { hashPassword } from "@/lib/auth/password";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "@/lib/rbac/permission";
 import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "@/lib/constants/roles";
 
-config({ path: process.env.SEED_ENV_FILE || (process.env.NODE_ENV === "production" ? ".env.prod" : ".env") });
+config({ path: process.env.SEED_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.production" : ".env.local") });
+
+if (process.env.NODE_ENV === "production") {
+  throw new Error("Refusing to seed accounts in production.");
+}
 
 type AccountInput = {
   role: Role;
@@ -43,12 +46,6 @@ function accountFromEnv(role: Role): AccountInput {
 const accounts = [accountFromEnv(ROLE.ADMIN), accountFromEnv(ROLE.EMPLOYEE)];
 if (accounts[0].email === accounts[1].email) throw new Error("Admin and employee must use different email addresses.");
 
-const production = process.env.NODE_ENV === "production";
-if (production && process.env.ALLOW_PRODUCTION_ACCOUNT_SEED !== "true") {
-  throw new Error("Production account seeding is disabled. Set ALLOW_PRODUCTION_ACCOUNT_SEED=true for an intentional first seed.");
-}
-const resetProductionPasswords = production && process.env.ALLOW_PRODUCTION_ACCOUNT_PASSWORD_RESET === "true";
-
 const prisma = createPrismaClient();
 
 async function main() {
@@ -63,14 +60,6 @@ async function main() {
     }
 
     for (const [index, account] of accounts.entries()) {
-      const existing = await tx.user.findUnique({ where: { email: account.email }, select: { id: true } });
-      if (existing && production && !resetProductionPasswords) {
-        throw new Error(`Account ${account.email} already exists. Set ALLOW_PRODUCTION_ACCOUNT_PASSWORD_RESET=true to intentionally reset its password.`);
-      }
-      if (existing && production && resetProductionPasswords) {
-        await tx.user.update({ where: { email: account.email }, data: { passwordHash: hashes[index] } });
-        continue;
-      }
       await tx.user.upsert({
         where: { email: account.email },
         create: {
@@ -83,7 +72,7 @@ async function main() {
           passwordHash: hashes[index],
         },
         // Local seeding deliberately resets these two development accounts to the current .env credentials.
-        update: production ? {} : {
+        update: {
           firstName: account.firstName,
           lastName: account.lastName,
           phone: account.phone,
@@ -95,7 +84,7 @@ async function main() {
     }
   }, { maxWait: 10_000, timeout: 30_000 });
 
-  console.log(`Seeded ${accounts.length} account(s): ${accounts.map(({ role, email }) => `${role} ${email}`).join(", ")}`);
+  console.log(`Seeded ${accounts.length} local account(s).`);
 }
 
 main().catch((error: unknown) => {

@@ -17,20 +17,22 @@ CityPalaza is a single-store operations app for administrators and employees. It
 npm install
 
 # 2. Configure
-# Configure the private .env file with DATABASE_URL, DIRECT_URL and a local AUTH_SECRET.
+# Configure the private .env.local file with DATABASE_URL, DIRECT_URL and a local AUTH_SECRET.
 
 # 3. Database (needs a running PostgreSQL)
-npm run db:setup                  # = prisma db push + constraints + dev seed
+npm run db:setup                  # local schema sync + constraints + development seed
 
 # 4. Run
 npm run dev                       # http://localhost:3000
 ```
 
-**Create the two staff accounts:** set `SEED_ADMIN_EMAIL=admin@gmail.com`, `SEED_ADMIN_PASSWORD`, `SEED_EMPLOYEE_EMAIL=employee@citypalaza.com`, and `SEED_EMPLOYEE_PASSWORD` in the private, git-ignored `.env` file, then run `npm run db:seed:accounts`. Local runs update these two accounts to match the current `.env` credentials. The passwords are intentionally kept out of this README and source control; use the credentials supplied by the project owner when configuring the private environment file. Production seeding creates missing accounts only and never changes existing account passwords.
+**Create the two staff accounts:** set `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_EMPLOYEE_EMAIL`, and `SEED_EMPLOYEE_PASSWORD` in the private, git-ignored `.env.local` file, then run `npm run db:seed:accounts`. Local runs update these two accounts to match the current `.env.local` credentials. Passwords are intentionally kept out of this README and source control. Seed commands refuse to run with `NODE_ENV=production` and never print credentials.
 
 **Bulk product import:** open **Products → Bulk upload**, download the CSV template, and upload up to 250 rows at a time. Categories and brands are added when missing; opening stock and IMEI/serial entries are created through the inventory ledger. Each batch validates before writing and rolls back completely if a row has an error. Existing SKUs are never overwritten.
 
-**Production:** configure the production environment with the transaction-pool `DATABASE_URL`, session-pool `DIRECT_URL`, a unique `AUTH_SECRET`, and the public `APP_URL`. Self-hosted deployments can load these values from a private `.env.prod` file; Vercel deployments must use Vercel project environment variables. Keep `.env` and `.env.prod` out of Git. Password recovery sends a single-use, 30-minute link through SMTP configured with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM`. `npm run start:prod` starts Next.js with `.env.prod`. Set the production account seed credentials and `ALLOW_PRODUCTION_ACCOUNT_SEED=true` only for an intentional first setup, then run `npm run db:setup:prod`. Production seeding creates missing accounts and refuses to change existing accounts.
+**Production:** configure the transaction-pool `DATABASE_URL`, session-pool `DIRECT_URL`, a production-only `AUTH_SECRET`, public `APP_URL`, and SMTP settings in the private `.env.production` file or the hosting provider's environment settings. Do not configure `SEED_*` variables in production. `npm run start:prod` starts Next.js with `.env.production`; `npm run db:migrate:prod` applies reviewed Prisma migrations and `npm run db:setup:prod` also applies the database constraints. Destructive Prisma resets are blocked for Supabase URLs. For Vercel, set the same values in project environment settings instead of uploading a local env file.
+
+**Migration source:** `.env.migration` contains only `SOURCE_DIRECT_URL` for read-only exports from the old project. Do not use it for application runtime, migrations, or writes.
 
 Seed users from `db:seed`: `admin@citypalaza.local` (ADMIN), `sita@`, `ram@`, `anita@citypalaza.local` (EMPLOYEE).
 
@@ -44,8 +46,10 @@ Seed users from `db:seed`: `admin@citypalaza.local` (ADMIN), `sita@`, `ram@`, `a
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Unit tests (no database needed) |
 | `npm run test:integration` | DB-backed tests; requires `TEST_DATABASE_URL` (a **disposable** DB: tables are truncated) |
-| `npm run db:push` / `db:constraints` / `db:seed` / `db:seed:accounts` / `db:setup` / `db:studio` | Database tooling |
-| `npm run db:setup:prod` | Sync the production schema, apply constraints, and create the configured admin and employee accounts |
+| `npm run db:push` / `db:constraints` / `db:seed` / `db:seed:accounts` / `db:setup` / `db:studio` | Local database tooling using `.env.local` |
+| `npm run db:migrate:local` | Create and apply local Prisma migrations |
+| `npm run db:migrate:prod` | Apply existing migrations to production using `.env.production` |
+| `npm run db:constraints:prod` / `db:setup:prod` | Apply database constraints in production; no production seed runs |
 
 Integration tests: create an empty database, then
 ```bash
@@ -106,7 +110,7 @@ Rules the code follows: Server Components by default (client components only for
 ### Security
 - **Auth:** HTTP-only, `SameSite=Lax`, `Secure` (prod) cookies containing signed access and rotating refresh tokens that reference a server-side `Session` row. Nothing sensitive in `localStorage`. Sessions expire, are deleted on logout, and are revoked immediately when an account is disabled or its password is reset. Password recovery stores only a SHA-256 digest of a random single-use token. Passwords use bcrypt (cost 12) and strength rules.
 - **RBAC:** `lib/rbac/permissions.ts` defines all 35 permissions and the role map. UI uses it for navigation and `PermissionGate`; **every** Server Action calls `assertPermission()` and every route handler calls `can()`. Pages call `requirePermission()` (redirects to `/forbidden`). Employees never receive purchase prices (omitted in the DTO, not merely hidden) and can only open their own sales.
-- Security headers in `next.config.ts`; secrets stay in private, git-ignored `.env` / `.env.prod` files or the production host's environment settings.
+- Security headers in `next.config.ts`; secrets stay in private, git-ignored `.env.local`, `.env.production`, and `.env.migration` files or the production host's environment settings.
 
 ### Money, stock and concurrency
 - All money is `NUMERIC(12,2)` in PostgreSQL and `decimal.js` in code (half-up rounding). Nothing is computed with floats; the browser's totals are display-only previews.

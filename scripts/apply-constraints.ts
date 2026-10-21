@@ -4,8 +4,10 @@
  *  - prices / quantities are non-negative
  *  - trigram index so product-name search stays fast with thousands of rows
  */
-import "dotenv/config";
+import { config } from "dotenv";
 import { createPrismaClient } from "@/lib/prisma";
+
+config({ path: process.env.PRISMA_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.production" : ".env.local") });
 
 const prisma = createPrismaClient();
 
@@ -44,4 +46,10 @@ async function main() {
   console.log("✔ Database constraints applied");
 }
 
-main().finally(() => prisma.$disconnect());
+main()
+  .catch((error: unknown) => {
+    console.error("Failed to apply database constraints.");
+    console.error(error instanceof Error ? error.message : "Unknown database error.");
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());
