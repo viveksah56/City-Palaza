@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/guards";
 import {PERMISSION, hasPermission} from "@/lib/rbac/permission";
@@ -14,20 +15,21 @@ import { getEmployeeOverview, listEmployees, parseEmployeeQuery } from "@/server
 import { EmployeeCreateDialog } from "@/features/employees/employee-create-dialog";
 import { ReportCard } from "@/components/shared/report-card";
 
-export const metadata = { title: "Employees" };
+export const metadata: Metadata = { title: "Employees" };
 
 export default async function EmployeesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.EMPLOYEE_VIEW);
   const sp = await searchParams;
-  const [result, overview] = await Promise.all([listEmployees(parseEmployeeQuery(sp)), getEmployeeOverview()]);
+  const query = parseEmployeeQuery(sp);
+  const [result, overview] = await Promise.all([listEmployees(query), getEmployeeOverview()]);
   const params = toParams(sp);
   type Row = (typeof result.rows)[number];
   const columns: Column<Row>[] = [
-    { key: "n", header: "Name", cell: (e) => <div><Link href={`/employees/${e.id}`} className="font-medium hover:text-primary hover:underline">{fullName(e)}</Link><p className="text-xs text-muted-foreground">{e.email}</p></div> },
-    { key: "r", header: "Role", cell: (e) => <StatusBadge status={e.role} /> },
-    { key: "s", header: "Status", cell: (e) => <StatusBadge status={e.status} /> },
+    { key: "n", header: "Name", sortKey: "firstName", cell: (e) => <div><Link href={`/employees/${e.id}`} className="font-medium hover:text-primary hover:underline">{fullName(e)}</Link><p className="text-xs text-muted-foreground">{e.email}</p></div> },
+    { key: "r", header: "Role", sortKey: "role", cell: (e) => <StatusBadge status={e.role} /> },
+    { key: "s", header: "Status", sortKey: "status", cell: (e) => <StatusBadge status={e.status} /> },
     { key: "c", header: "Sales", align: "right", cell: (e) => <span className="num">{e._count.sales}</span> },
-    { key: "l", header: "Last sign-in", cell: (e) => (e.lastLoginAt ? formatDateTime(e.lastLoginAt) : "Never") },
+    { key: "l", header: "Last sign-in", sortKey: "lastLoginAt", cell: (e) => (e.lastLoginAt ? formatDateTime(e.lastLoginAt) : "Never") },
   ];
   return (
     <>
@@ -42,7 +44,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
           <SearchInput placeholder="Search name or email" />
           <FilterSelect param="status" label="Status" options={[{ value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }, { value: "SUSPENDED", label: "Suspended" }]} />
         </div>
-        <DataTable columns={columns} rows={result.rows} rowKey={(r) => r.id} empty={<EmptyState title="No employees match" />} />
+        <DataTable columns={columns} rows={result.rows} rowKey={(r) => r.id} url={{ basePath: "/employees", params }} sort={{ key: query.sort, order: query.order }} empty={<EmptyState title="No employees match" />} />
         <Pagination page={result.page} totalPages={result.totalPages} total={result.total} pageSize={result.pageSize} url={{ basePath: "/employees", params }} />
       </Card>
     </>

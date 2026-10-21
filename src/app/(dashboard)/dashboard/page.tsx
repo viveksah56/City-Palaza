@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { AlertTriangle, Banknote, Boxes, Receipt, ShoppingBag, TrendingUp, Wallet, ArrowUpRight } from "lucide-react";
@@ -19,7 +20,7 @@ import { getAdminDashboard, getEmployeeDashboard } from "@/server/dashboard.serv
 import { getSettings } from "@/server/settings.service";
 import { IconButton } from "@/components/shared/icon-button";
 
-export const metadata = { title: "Dashboard" };
+export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.DASHBOARD_VIEW);
@@ -31,13 +32,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Dashboard" description="A live view of sales, stock, and store activity." actions={<><DateRangePicker /><Button asChild variant="outline"><Link href="/sales/new"><ShoppingBag /> New sale</Link></Button></>} />
       <Suspense key={`${range.from.toISOString()}-${range.to.toISOString()}`} fallback={<LoadingSkeleton cards={8} rows={4} />}>
-        <AdminDashboard range={range} />
+        <DashboardServerView range={range} />
       </Suspense>
     </>
   );
 }
 
-async function AdminDashboard({ range }: { range: ReturnType<typeof resolveRange> }) {
+async function DashboardServerView({ range }: { range: ReturnType<typeof resolveRange> }) {
   const [d, s] = await Promise.all([getAdminDashboard(range), getSettings()]);
   const c = s.currency;
   return (

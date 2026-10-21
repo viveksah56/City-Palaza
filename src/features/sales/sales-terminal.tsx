@@ -14,7 +14,7 @@ import { useCart } from "@/stores/cart-store";
 import { calculateSale, type SaleCalculation } from "@/lib/sales-calc";
 import { formatCurrency } from "@/lib/format";
 import { createSaleAction } from "@/server/actions";
-import type { ProductRow } from "@/server/products.service";
+import { useCustomerSearch, useProductSearch } from "./sales-queries";
 import { SaleCart } from "./sale-cart";
 import { SaleSummary } from "./sale-summary";
 import { PaymentMethodSelector, type PaymentMethodValue } from "./payment-method-selector";
@@ -25,12 +25,11 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
   const router = useRouter();
   const cart = useCart();
   const [term, setTerm] = React.useState("");
-  const [results, setResults] = React.useState<ProductRow[]>([]);
-  const [searching, setSearching] = React.useState(false);
+  const [debouncedTerm, setDebouncedTerm] = React.useState("");
   const [customer, setCustomer] = React.useState<Cust | null>(null);
   const [newCust, setNewCust] = React.useState<{ name: string; phone: string } | null>(null);
   const [custTerm, setCustTerm] = React.useState("");
-  const [custResults, setCustResults] = React.useState<Cust[]>([]);
+  const [debouncedCustomerTerm, setDebouncedCustomerTerm] = React.useState("");
   const [discType, setDiscType] = React.useState<"PERCENT" | "FIXED">("PERCENT");
   const [discValue, setDiscValue] = React.useState("");
   const [method, setMethod] = React.useState<PaymentMethodValue>("CASH");
@@ -39,28 +38,22 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
   const [notes, setNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const productSearch = useProductSearch(debouncedTerm);
+  const customerSearch = useCustomerSearch(debouncedCustomerTerm);
+  const results = productSearch.data ?? [];
+  const searching = productSearch.isFetching;
+  const custResults = customerSearch.data ?? [];
 
   React.useEffect(() => { searchRef.current?.focus(); return () => cart.clear(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   React.useEffect(() => {
-    const ctl = new AbortController();
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await fetch(`/api/products/search?q=${encodeURIComponent(term)}`, { signal: ctl.signal });
-        if (r.ok) setResults((await r.json()).products);
-      } catch { /* aborted */ } finally { setSearching(false); }
-    }, 200);
-    return () => { clearTimeout(t); ctl.abort(); };
+    const timer = setTimeout(() => setDebouncedTerm(term.trim()), 200);
+    return () => clearTimeout(timer);
   }, [term]);
 
   React.useEffect(() => {
-    if (!custTerm.trim()) return setCustResults([]);
-    const t = setTimeout(async () => {
-      const r = await fetch(`/api/customers/search?q=${encodeURIComponent(custTerm)}`);
-      if (r.ok) setCustResults((await r.json()).customers);
-    }, 250);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebouncedCustomerTerm(custTerm.trim()), 250);
+    return () => clearTimeout(timer);
   }, [custTerm]);
 
   const discNum = discValue === "" ? 0 : Number(discValue);
@@ -118,7 +111,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
             );
           })}
         </ul>
-        {!searching && results.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">{term ? "No active product matches that search." : "Start typing to find a product."}</p>}
+        {!searching && results.length === 0 && <p role={productSearch.isError ? "alert" : undefined} className={`py-10 text-center text-sm ${productSearch.isError ? "text-destructive" : "text-muted-foreground"}`}>{productSearch.isError ? "Products could not be loaded. Try your search again." : term ? "No active product matches that search." : "Start typing to find a product."}</p>}
       </section>
 
       <aside id="cart" aria-label="Current sale" className="grid scroll-mt-20 content-start gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
@@ -140,7 +133,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
               ) : (
                 <>
                   <Input aria-label="Find customer" placeholder="Find by name or phone — or leave as walk-in" value={custTerm} onChange={(e) => setCustTerm(e.target.value)} />
-                  {custResults.length > 0 && <ul className="overflow-hidden rounded-xl border border-border/60 bg-card">{custResults.map((c) => <li key={c.id}><button type="button" className="w-full px-4 py-2.5 text-left text-sm transition-colors hover:bg-secondary" onClick={() => { setCustomer(c); setCustTerm(""); setCustResults([]); }}>{c.name}{c.phone ? ` · ${c.phone}` : ""}</button></li>)}</ul>}
+                  {custResults.length > 0 && <ul className="overflow-hidden rounded-xl border border-border/60 bg-card">{custResults.map((c) => <li key={c.id}><button type="button" className="w-full px-4 py-2.5 text-left text-sm transition-colors hover:bg-secondary" onClick={() => { setCustomer(c); setCustTerm(""); setDebouncedCustomerTerm(""); }}>{c.name}{c.phone ? ` · ${c.phone}` : ""}</button></li>)}</ul>}
                   <Button size="sm" variant="outline" onClick={() => setNewCust({ name: custTerm, phone: "" })}><UserPlus /> New customer</Button>
                 </>
               )}

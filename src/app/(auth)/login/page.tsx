@@ -1,14 +1,25 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { BarChart3, Boxes, ScanLine } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/session";
 import { safeInternalRedirect } from "@/lib/auth/redirects";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "./login-form";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export const metadata = { title: "Sign in" };
+export const metadata: Metadata = { title: "Sign in" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  return (
+    <Suspense fallback={<LoginSkeleton />}>
+      <LoginContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const requestedNext = (await searchParams).next;
   const redirectTo = safeInternalRedirect(requestedNext);
   if (await getSessionUser()) redirect(redirectTo);
@@ -69,6 +80,25 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p className="mt-6 text-center text-xs text-muted-foreground">Need access? Contact your CityPalaza administrator.</p>
         </div>
       </section>
+    </main>
+  );
+}
+
+function LoginSkeleton() {
+  return (
+    <main aria-busy="true" aria-label="Loading sign-in form" className="flex min-h-dvh items-center justify-center bg-background px-5 py-10">
+      <Card className="w-full max-w-[420px] gap-7 rounded-2xl border-border/80 px-0 py-8 shadow-card sm:py-9">
+        <CardHeader className="gap-3 px-7 sm:px-8">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-9 w-64 max-w-full" />
+          <Skeleton className="h-4 w-full" />
+        </CardHeader>
+        <CardContent className="space-y-5 px-7 sm:px-8">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </CardContent>
+      </Card>
     </main>
   );
 }

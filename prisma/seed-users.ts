@@ -4,8 +4,9 @@
  * SEED_EMPLOYEE_PASSWORD. Production additionally requires
  * ALLOW_PRODUCTION_ACCOUNT_SEED=true and only creates missing accounts.
  */
-import { PrismaClient, type UserRole } from "@prisma/client";
 import { config } from "dotenv";
+import { type UserRole } from "../src/generated/prisma/client";
+import { createPrismaClient } from "../src/lib/prisma-client";
 import { hashPassword } from "../src/lib/auth/password";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "../src/lib/rbac/permission";
 import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "../src/lib/constants/roles";
@@ -47,7 +48,7 @@ if (production && process.env.ALLOW_PRODUCTION_ACCOUNT_SEED !== "true") {
   throw new Error("Production account seeding is disabled. Set ALLOW_PRODUCTION_ACCOUNT_SEED=true for an intentional first seed.");
 }
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   const hashes = await Promise.all(accounts.map(({ password }) => hashPassword(password)));

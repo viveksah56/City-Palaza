@@ -1,9 +1,9 @@
-import { Prisma, type InventoryTransactionType, type TrackingType } from "@prisma/client";
+import { Prisma, type InventoryTransactionType, type TrackingType } from "@/generated/prisma/client";
 import { prisma, type Tx } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { writeAudit } from "@/lib/audit";
 import { normalizeSerials } from "@/lib/imei";
-import { parsePage, paged, type PageQuery } from "@/lib/pagination";
+import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
 import { stockStatus } from "@/lib/stock";
 import { resolveRange } from "@/lib/dates";
@@ -238,13 +238,14 @@ export async function listInventory(q: InventoryQuery) {
   );
 }
 
-export type HistoryQuery = { productId?: string; type?: string; from: Date; to: Date; search?: string } & PageQuery;
+export type HistoryQuery = { productId?: string; type?: string; from: Date; to: Date; search?: string; sort: "createdAt" | "type" | "quantity"; order: SortOrder } & PageQuery;
 
 export function parseHistoryQuery(sp: SearchParams): HistoryQuery {
   const range = resolveRange(first(sp.range), first(sp.from), first(sp.to), { fallback: "last30" });
   const type = first(sp.type);
   return {
     ...parsePage(sp, 25),
+    ...parseSort(sp, ["createdAt", "type", "quantity"] as const, "createdAt"),
     productId: first(sp.productId),
     type: TX_TYPES.includes(type as (typeof TX_TYPES)[number]) ? type : undefined,
     from: range.from,
@@ -263,7 +264,7 @@ export async function listInventoryHistory(q: HistoryQuery) {
   const [rows, total] = await Promise.all([
     prisma.inventoryTransaction.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: { [q.sort]: q.order },
       skip: q.skip,
       take: q.take,
       include: { product: { select: { name: true, sku: true } }, user: { select: { firstName: true, lastName: true } } },

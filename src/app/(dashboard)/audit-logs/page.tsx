@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {PERMISSION} from "@/lib/rbac/permission";
 import { requirePermission } from "@/lib/auth/guards";
 import { toParams, type SearchParams } from "@/lib/url";
@@ -15,18 +16,19 @@ import { listAuditLogs, parseAuditQuery } from "@/server/audit.service";
 import { listEmployeeOptions } from "@/server/employees.service";
 import { ReportCard } from "@/components/shared/report-card";
 
-export const metadata = { title: "Audit logs" };
+export const metadata: Metadata = { title: "Audit logs" };
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await requirePermission(PERMISSION.AUDIT_VIEW);
   const sp = await searchParams;
-  const [result, staff] = await Promise.all([listAuditLogs(parseAuditQuery(sp)), listEmployeeOptions()]);
+  const query = parseAuditQuery(sp);
+  const [result, staff] = await Promise.all([listAuditLogs(query), listEmployeeOptions()]);
   const params = toParams(sp);
   type Row = (typeof result.rows)[number];
   const columns: Column<Row>[] = [
-    { key: "w", header: "When", cell: (a) => <span className="whitespace-nowrap text-muted-foreground">{formatDateTime(a.createdAt)}</span> },
+    { key: "w", header: "When", sortKey: "createdAt", cell: (a) => <span className="whitespace-nowrap text-muted-foreground">{formatDateTime(a.createdAt)}</span> },
     { key: "a", header: "Who", cell: (a) => (a.actor ? fullName(a.actor) : "System") },
-    { key: "x", header: "Action", cell: (a) => <Badge variant="secondary">{a.action.replace(/_/g, " ").toLowerCase()}</Badge> },
+    { key: "x", header: "Action", sortKey: "action", cell: (a) => <Badge variant="secondary">{a.action.replace(/_/g, " ").toLowerCase()}</Badge> },
     { key: "d", header: "What happened", cell: (a) => <span className="block min-w-64 text-sm">{a.description}<span className="block font-mono text-xs text-muted-foreground">{a.entityType}{a.entityId ? ` · ${a.entityId}` : ""}</span></span> },
     { key: "i", header: "IP / device", cell: (a) => <span className="block max-w-48 truncate text-xs text-muted-foreground" title={a.userAgent ?? ""}>{a.ipAddress ?? "—"}</span> },
   ];
@@ -45,7 +47,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <FilterSelect param="actor" label="Person" options={staff.map((s) => ({ value: s.id, label: fullName(s) }))} />
           <DateRangePicker defaultPreset="last7" />
         </div>
-        <DataTable columns={columns} rows={result.rows} rowKey={(r) => r.id} empty={<EmptyState title="No activity in this period" />} />
+        <DataTable columns={columns} rows={result.rows} rowKey={(r) => r.id} url={{ basePath: "/audit-logs", params }} sort={{ key: query.sort, order: query.order }} empty={<EmptyState title="No activity in this period" />} />
         <Pagination page={result.page} totalPages={result.totalPages} total={result.total} pageSize={result.pageSize} url={{ basePath: "/audit-logs", params }} />
       </Card>
     </>

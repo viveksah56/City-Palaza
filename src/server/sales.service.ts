@@ -1,4 +1,4 @@
-import { Prisma, type PaymentMethod, type SaleStatus } from "@prisma/client";
+import { Prisma, type PaymentMethod, type SaleStatus } from "@/generated/prisma/client";
 import { prisma, type Tx } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { writeAudit } from "@/lib/audit";
@@ -8,7 +8,7 @@ import { formatCurrency } from "@/lib/format";
 import { PERMISSION, assertRolePermission, hasPermission } from "@/lib/rbac/permission";
 import type { Role } from "@/lib/constants/roles";
 import { resolveRange } from "@/lib/dates";
-import { parsePage, paged, type PageQuery } from "@/lib/pagination";
+import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { createSaleSchema, voidSaleSchema, type CreateSaleInput } from "@/validations/sale";
@@ -221,14 +221,18 @@ export type SalesQuery = {
   paymentMethod?: PaymentMethod;
   status?: SaleStatus;
   search?: string;
+  sort: "saleNumber" | "createdAt" | "total" | "paymentStatus";
+  order: SortOrder;
 } & PageQuery;
 
 export function parseSalesQuery(sp: SearchParams): SalesQuery {
   const range = resolveRange(first(sp.range), first(sp.from), first(sp.to), { fallback: "last30" });
   const pm = first(sp.payment);
   const st = first(sp.status);
+  const sorting = parseSort(sp, ["saleNumber", "createdAt", "total", "paymentStatus"] as const, "createdAt");
   return {
     ...parsePage(sp),
+    ...sorting,
     from: range.from,
     to: range.to,
     employeeId: first(sp.employee),
@@ -253,7 +257,7 @@ export async function listSales(user: { id: string; role: Role }, q: SalesQuery)
   const [rows, total] = await Promise.all([
     prisma.sale.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: { [q.sort]: q.order },
       skip: q.skip,
       take: q.take,
       include: { employee: { select: { firstName: true, lastName: true } }, customer: { select: { name: true } }, _count: { select: { items: true } } },

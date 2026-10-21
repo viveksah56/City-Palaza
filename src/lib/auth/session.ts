@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { ACCESS_TOKEN_TTL_MINUTES, REFRESH_COOKIE, REFRESH_TOKEN_TTL_DAYS, SESSION_COOKIE } from "@/lib/constants";
 import type { Role } from "@/lib/constants/roles";
 import { randomUUID } from "node:crypto";
-import { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken } from "./token";
+import { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken, type AccessTokenSubject } from "./token";
 
 export type SessionUser = {
   id: string;
@@ -22,16 +22,16 @@ const cookieOptions = (expires: Date) => ({
   expires,
 });
 
-export async function createSession(userId: string, meta: { ip?: string | null; userAgent?: string | null }) {
+export async function createSession(subject: AccessTokenSubject, meta: { ip?: string | null; userAgent?: string | null }) {
   const now = Date.now();
   const expiresAt = new Date(now + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60_000);
   const accessExpiresAt = new Date(now + ACCESS_TOKEN_TTL_MINUTES * 60_000);
   const refreshTokenId = randomUUID();
   const session = await prisma.session.create({
-    data: { userId, expiresAt, refreshTokenId, ipAddress: meta.ip ?? null, userAgent: meta.userAgent?.slice(0, 255) ?? null },
+    data: { userId: subject.userId, expiresAt, refreshTokenId, ipAddress: meta.ip ?? null, userAgent: meta.userAgent?.slice(0, 255) ?? null },
   });
   const [accessToken, refreshToken] = await Promise.all([
-    signAccessToken(session.id, accessExpiresAt),
+    signAccessToken(subject, session.id, accessExpiresAt),
     signRefreshToken(session.id, refreshTokenId, expiresAt),
   ]);
   const jar = await cookies();

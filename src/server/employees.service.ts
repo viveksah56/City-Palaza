@@ -1,20 +1,20 @@
 import {PERMISSION, assertRolePermission} from "@/lib/rbac/permission";
-import type { Prisma, UserStatus } from "@prisma/client";
+import type { Prisma, UserStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { writeAudit } from "@/lib/audit";
 import { hashPassword } from "@/lib/auth/password";
 import { emptyToNull } from "@/validations/common";
 import { employeeCreateSchema, employeeUpdateSchema, passwordResetSchema } from "@/validations/employee";
-import { parsePage, paged, type PageQuery } from "@/lib/pagination";
+import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
 import type { Actor } from "./inventory.service";
 import { ROLE } from "@/lib/constants/roles";
 
-export type EmployeeQuery = { search?: string; status?: UserStatus } & PageQuery;
+export type EmployeeQuery = { search?: string; status?: UserStatus; sort: "firstName" | "role" | "status" | "lastLoginAt"; order: SortOrder } & PageQuery;
 export function parseEmployeeQuery(sp: SearchParams): EmployeeQuery {
   const s = first(sp.status);
-  return { ...parsePage(sp), search: first(sp.search), status: s === "ACTIVE" || s === "INACTIVE" || s === "SUSPENDED" ? s : undefined };
+  return { ...parsePage(sp), ...parseSort(sp, ["firstName", "role", "status", "lastLoginAt"] as const, "firstName"), search: first(sp.search), status: s === "ACTIVE" || s === "INACTIVE" || s === "SUSPENDED" ? s : undefined };
 }
 
 export async function getEmployeeOverview() {
@@ -39,7 +39,7 @@ export async function listEmployees(q: EmployeeQuery) {
     }),
   };
   const [rows, total] = await Promise.all([
-    prisma.user.findMany({ where, orderBy: [{ status: "asc" }, { firstName: "asc" }], skip: q.skip, take: q.take, select: { ...publicSelect, _count: { select: { sales: true } } } }),
+    prisma.user.findMany({ where, orderBy: q.sort === "lastLoginAt" ? { lastLoginAt: { sort: q.order, nulls: "last" } } : { [q.sort]: q.order }, skip: q.skip, take: q.take, select: { ...publicSelect, _count: { select: { sales: true } } } }),
     prisma.user.count({ where }),
   ]);
   return paged(rows, total, q);

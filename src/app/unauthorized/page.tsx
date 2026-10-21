@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export const metadata = { title: "Sign in required" };
+export const metadata: Metadata = { title: "Sign in required" };
 
 export default function UnauthorizedPage() {
   return (

@@ -1,9 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient } from "../../src/lib/prisma-client";
 
 export const TEST_DB = process.env.TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
 
-export const prisma = new PrismaClient();
+export const prisma = createPrismaClient();
 
 export async function resetDb() {
   await prisma.$executeRawUnsafe(

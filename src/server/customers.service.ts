@@ -1,15 +1,15 @@
 import {PERMISSION, assertRolePermission} from "@/lib/rbac/permission";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { customerSchema } from "@/validations/customer";
 import { emptyToNull } from "@/validations/common";
-import { parsePage, paged, type PageQuery } from "@/lib/pagination";
+import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
 import type { Actor } from "./inventory.service";
 
-export type CustomerQuery = { search?: string } & PageQuery;
-export const parseCustomerQuery = (sp: SearchParams): CustomerQuery => ({ ...parsePage(sp), search: first(sp.search) });
+export type CustomerQuery = { search?: string; sort: "name" | "phone" | "email" | "lastPurchaseAt"; order: SortOrder } & PageQuery;
+export const parseCustomerQuery = (sp: SearchParams): CustomerQuery => ({ ...parsePage(sp), ...parseSort(sp, ["name", "phone", "email", "lastPurchaseAt"] as const, "lastPurchaseAt"), search: first(sp.search) });
 
 export async function getCustomerOverview() {
   const [customers, purchasingCustomers] = await Promise.all([
@@ -26,7 +26,9 @@ export async function listCustomers(q: CustomerQuery) {
   const [rows, total] = await Promise.all([
     prisma.customer.findMany({
       where,
-      orderBy: [{ lastPurchaseAt: { sort: "desc", nulls: "last" } }, { name: "asc" }],
+      orderBy: q.sort === "lastPurchaseAt"
+        ? [{ lastPurchaseAt: { sort: q.order, nulls: "last" } }, { name: "asc" }]
+        : { [q.sort]: q.order },
       skip: q.skip,
       take: q.take,
       select: { id: true, name: true, phone: true, email: true, address: true, lastPurchaseAt: true, _count: { select: { sales: true } } },

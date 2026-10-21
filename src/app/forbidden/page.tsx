@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export const metadata = { title: "Access denied" };
+export const metadata: Metadata = { title: "Access denied" };
 
 export default function ForbiddenPage() {
   return (

@@ -7,7 +7,7 @@ import {PERMISSION} from "@/lib/rbac/permission";
 import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { ProductStatus, UserStatus } from "@prisma/client";
+import type { ProductStatus, UserStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { run, DomainError, type ActionResult } from "@/lib/errors";
 import { assertPermission } from "@/lib/auth/guards";
@@ -39,7 +39,7 @@ export async function loginAction(raw: unknown, requestedRedirect?: unknown): Pr
     if (user.status !== "ACTIVE") throw new DomainError("FORBIDDEN", "This account is disabled. Ask an admin to reactivate it.");
     const meta = await requestMeta();
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-    await createSession(user.id, { ip: meta.ip, userAgent: meta.ua });
+    await createSession({ userId: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }, { ip: meta.ip, userAgent: meta.ua });
     await writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` });
     return undefined;
   });

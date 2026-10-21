@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { APP_TIMEZONE } from "@/lib/constants";
 import { D } from "@/lib/money";

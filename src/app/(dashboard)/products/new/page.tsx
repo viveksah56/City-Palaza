@@ -1,10 +1,11 @@
+import type { Metadata } from "next";
 import {PERMISSION} from "@/lib/rbac/permission";
 import { requirePermission } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProductForm } from "@/features/products/product-form";
 import { getBrands, getCategories } from "@/server/products.service";
 
-export const metadata = { title: "Add product" };
+export const metadata: Metadata = { title: "Add product" };
 
 export default async function NewProductPage() {
   await requirePermission(PERMISSION.PRODUCT_CREATE);

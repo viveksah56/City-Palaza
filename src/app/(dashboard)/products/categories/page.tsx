@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requirePermission } from "@/lib/auth/guards";
 import {PERMISSION, hasPermission} from "@/lib/rbac/permission";
 import { PageHeader } from "@/components/shared/page-header";
@@ -6,7 +7,7 @@ import { TAXONOMY_KIND } from "@/lib/constants/categories";
 import { getBrands, getCategories } from "@/server/products.service";
 import { ReportCard } from "@/components/shared/report-card";
 
-export const metadata = { title: "Categories & brands" };
+export const metadata: Metadata = { title: "Categories & brands" };
 
 export default async function CatalogPage() {
   const user = await requirePermission(PERMISSION.CATEGORY_VIEW);

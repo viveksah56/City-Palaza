@@ -4,9 +4,10 @@
  *  - prices / quantities are non-negative
  *  - trigram index so product-name search stays fast with thousands of rows
  */
-import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
+import { createPrismaClient } from "../src/lib/prisma-client";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 const statements = [
   `DO $$ BEGIN

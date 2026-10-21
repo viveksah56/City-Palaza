@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/guards";
 import {PERMISSION, hasPermission} from "@/lib/rbac/permission";
@@ -12,21 +13,22 @@ import { CustomerFormDialog } from "@/features/customers/customer-form-dialog";
 import { getCustomerOverview, listCustomers, parseCustomerQuery } from "@/server/customers.service";
 import { ReportCard } from "@/components/shared/report-card";
 
-export const metadata = { title: "Customers" };
+export const metadata: Metadata = { title: "Customers" };
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.CUSTOMER_VIEW);
   const sp = await searchParams;
-  const [result, overview] = await Promise.all([listCustomers(parseCustomerQuery(sp)), getCustomerOverview()]);
+  const query = parseCustomerQuery(sp);
+  const [result, overview] = await Promise.all([listCustomers(query), getCustomerOverview()]);
   const params = toParams(sp);
   type Row = (typeof result.rows)[number];
   const canEdit = hasPermission(user.role, PERMISSION.CUSTOMER_UPDATE);
   const columns: Column<Row>[] = [
-    { key: "name", header: "Customer", cell: (c) => <Link href={`/customers/${c.id}`} className="font-medium hover:text-primary hover:underline">{c.name}</Link> },
-    { key: "phone", header: "Phone", cell: (c) => c.phone ?? "—" },
-    { key: "email", header: "Email", cell: (c) => c.email ?? "—" },
+    { key: "name", header: "Customer", sortKey: "name", cell: (c) => <Link href={`/customers/${c.id}`} className="font-medium hover:text-primary hover:underline">{c.name}</Link> },
+    { key: "phone", header: "Phone", sortKey: "phone", cell: (c) => c.phone ?? "—" },
+    { key: "email", header: "Email", sortKey: "email", cell: (c) => c.email ?? "—" },
     { key: "orders", header: "Purchases", align: "right", cell: (c) => <span className="num">{c._count.sales}</span> },
-    { key: "last", header: "Last purchase", cell: (c) => (c.lastPurchaseAt ? formatDate(c.lastPurchaseAt) : "—") },
+    { key: "last", header: "Last purchase", sortKey: "lastPurchaseAt", cell: (c) => (c.lastPurchaseAt ? formatDate(c.lastPurchaseAt) : "—") },
     ...(canEdit ? [{ key: "edit", header: <span className="sr-only">Edit</span>, align: "right" as const, cell: (c: Row) => <CustomerFormDialog customer={c} /> }] : []),
   ];
   return (
@@ -39,7 +41,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       </div>
       <Card className="gap-0 py-0">
         <div className="border-b border-border/60 p-4"><SearchInput placeholder="Search name, phone or email" /></div>
-        <DataTable columns={columns} rows={result.rows} rowKey={(r) => r.id} empty={<EmptyState title="No customers found" description="Customers you add at the counter show up here." />} />
+        <DataTable columns={columns} rows={result.rows} rowKey={(r) => r.id} url={{ basePath: "/customers", params }} sort={{ key: query.sort, order: query.order }} empty={<EmptyState title="No customers found" description="Customers you add at the counter show up here." />} />
         <Pagination page={result.page} totalPages={result.totalPages} total={result.total} pageSize={result.pageSize} url={{ basePath: "/customers", params }} />
       </Card>
     </>

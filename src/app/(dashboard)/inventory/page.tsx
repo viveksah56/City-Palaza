@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { History } from "lucide-react";
 import { requirePermission } from "@/lib/auth/guards";
@@ -18,7 +19,7 @@ import { getCategories } from "@/server/products.service";
 import { getInventorySummary } from "@/server/reports.service";
 import { getSettings } from "@/server/settings.service";
 
-export const metadata = { title: "Inventory" };
+export const metadata: Metadata = { title: "Inventory" };
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.INVENTORY_VIEW);

@@ -1,6 +1,8 @@
 "use client";
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { Download, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -9,39 +11,50 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
+import { api } from "@/lib/axios";
 
 type ImportIssue = { row: number; sku?: string; message: string };
+type ImportResponse = { imported?: number; error?: string; issues?: ImportIssue[] };
 
 export function ProductImportDialog() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [file, setFile] = React.useState<File | null>(null);
   const [issues, setIssues] = React.useState<ImportIssue[]>([]);
-  const [submitting, setSubmitting] = React.useState(false);
-
-  async function upload() {
-    if (!file) return toast.error("Choose a CSV file first.");
-    setSubmitting(true);
-    setIssues([]);
-    try {
+  const importMutation = useMutation({
+    mutationFn: async (selectedFile: File): Promise<ImportResponse> => {
       const body = new FormData();
-      body.set("file", file);
-      const response = await fetch("/api/products/bulk", { method: "POST", body });
-      const result = await response.json() as { imported?: number; error?: string; issues?: ImportIssue[] };
-      if (!response.ok) {
-        setIssues(result.issues ?? []);
-        toast.error(result.error ?? "Upload failed.");
-        return;
-      }
+      body.set("file", selectedFile);
+      const response = await api.post<ImportResponse>("/products/bulk", body);
+      return response.data;
+    },
+    onSuccess: async (result) => {
       toast.success(`${result.imported ?? 0} products imported`);
       setOpen(false);
       setFile(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+      ]);
       router.refresh();
-    } catch {
+    },
+    onError: (error: unknown) => {
+      if (axios.isAxiosError<ImportResponse>(error)) {
+        const result = error.response?.data;
+        setIssues(result?.issues ?? []);
+        toast.error(result?.error ?? "Upload failed.");
+        return;
+      }
       toast.error("Upload failed. Check your connection and try again.");
-    } finally {
-      setSubmitting(false);
-    }
+    },
+  });
+  const submitting = importMutation.isPending;
+
+  function upload() {
+    if (!file) return toast.error("Choose a CSV file first.");
+    setIssues([]);
+    importMutation.mutate(file);
   }
 
   return (

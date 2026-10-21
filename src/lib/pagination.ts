@@ -2,6 +2,13 @@ import { DEFAULT_PAGE_SIZE } from "./constants";
 import { first, type SearchParams } from "./url";
 
 export type PageQuery = { page: number; pageSize: number; skip: number; take: number };
+export type SortOrder = "asc" | "desc";
+
+export function parseSort<const T extends readonly string[]>(sp: SearchParams, allowed: T, fallback: T[number]): { sort: T[number]; order: SortOrder } {
+  const requested = first(sp.sort);
+  const sort = allowed.find((key) => key === requested) ?? fallback;
+  return { sort, order: first(sp.order) === "asc" ? "asc" : "desc" };
+}
 
 export function parsePage(sp: SearchParams, defaultSize = DEFAULT_PAGE_SIZE): PageQuery {
   const page = Math.max(1, Number.parseInt(first(sp.page) ?? "1", 10) || 1);

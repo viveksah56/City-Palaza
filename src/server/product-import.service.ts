@@ -1,5 +1,5 @@
 import {PERMISSION, assertRolePermission} from "@/lib/rbac/permission";
-import { Prisma, type TrackingType } from "@prisma/client";
+import { Prisma, type TrackingType } from "@/generated/prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { DomainError } from "@/lib/errors";

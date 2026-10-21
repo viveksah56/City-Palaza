@@ -1,6 +1,6 @@
 import {PERMISSION, assertRolePermission} from "@/lib/rbac/permission";
 import { unstable_cache } from "next/cache";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma, type Db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import type { Actor } from "./inventory.service";

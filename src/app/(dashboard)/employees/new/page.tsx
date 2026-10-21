@@ -1,9 +1,10 @@
+import type { Metadata } from "next";
 import {PERMISSION} from "@/lib/rbac/permission";
 import { requirePermission } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmployeeForm } from "@/features/employees/employee-form";
 
-export const metadata = { title: "Add employee" };
+export const metadata: Metadata = { title: "Add employee" };
 
 export default async function NewEmployeePage() {
   await requirePermission(PERMISSION.EMPLOYEE_CREATE);

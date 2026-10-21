@@ -1,5 +1,5 @@
 "use client";
-import type { ProductStatus } from "@prisma/client";
+import type { ProductStatus } from "@/generated/prisma/client";
 import { Ban, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";

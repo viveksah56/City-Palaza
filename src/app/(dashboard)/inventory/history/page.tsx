@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {PERMISSION} from "@/lib/rbac/permission";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/guards";
@@ -15,7 +16,7 @@ import { EmptyState } from "@/components/shared/states";
 import { listInventoryHistory, parseHistoryQuery } from "@/server/inventory.service";
 import { ReportCard } from "@/components/shared/report-card";
 
-export const metadata = { title: "Stock history" };
+export const metadata: Metadata = { title: "Stock history" };
 
 const TYPE_VARIANT = { INITIAL_STOCK: "secondary", PURCHASE: "success", SALE: "muted", RETURN: "warning", ADJUSTMENT: "secondary", DAMAGE: "destructive", LOST: "destructive" } as const;
 
@@ -27,10 +28,10 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   const params = toParams(sp);
   type Row = (typeof result.rows)[number];
   const columns: Column<Row>[] = [
-    { key: "when", header: "When", cell: (t) => <span className="whitespace-nowrap text-muted-foreground">{formatDateTime(t.createdAt)}</span> },
+    { key: "when", header: "When", sortKey: "createdAt", cell: (t) => <span className="whitespace-nowrap text-muted-foreground">{formatDateTime(t.createdAt)}</span> },
     { key: "product", header: "Product", cell: (t) => <div><Link href={`/products/${t.productId}`} className="font-medium hover:underline">{t.product.name}</Link><p className="font-mono text-xs text-muted-foreground">{t.product.sku}</p></div> },
-    { key: "type", header: "Type", cell: (t) => <Badge variant={TYPE_VARIANT[t.type]}>{t.type.replace("_", " ").toLowerCase()}</Badge> },
-    { key: "qty", header: "Change", align: "right", cell: (t) => <span className={`num font-medium ${t.quantity < 0 ? "text-destructive" : "text-success"}`}>{t.quantity > 0 ? "+" : ""}{t.quantity}</span> },
+    { key: "type", header: "Type", sortKey: "type", cell: (t) => <Badge variant={TYPE_VARIANT[t.type]}>{t.type.replace("_", " ").toLowerCase()}</Badge> },
+    { key: "qty", header: "Change", sortKey: "quantity", align: "right", cell: (t) => <span className={`num font-medium ${t.quantity < 0 ? "text-destructive" : "text-success"}`}>{t.quantity > 0 ? "+" : ""}{t.quantity}</span> },
     { key: "bal", header: "Before → after", align: "right", cell: (t) => <span className="num text-muted-foreground">{t.previousQuantity} → {t.newQuantity}</span> },
     { key: "reason", header: "Reason / reference", cell: (t) => <span className="text-sm">{t.reason ?? "—"}{t.referenceId && t.referenceType?.startsWith("SALE") ? <> · <Link className="text-primary hover:underline" href={`/sales/${t.referenceId}`}>view sale</Link></> : null}</span> },
     { key: "by", header: "By", cell: (t) => <span className="whitespace-nowrap">{fullName(t.user)}</span> },
@@ -49,7 +50,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
           <FilterSelect param="type" label="Type" options={TX_TYPES.map((t) => ({ value: t, label: t.replace("_", " ").toLowerCase() }))} />
           <DateRangePicker defaultPreset="last30" />
         </div>
-        <DataTable columns={columns} rows={result.rows} rowKey={(r) => r.id} empty={<EmptyState title="No stock movements in this period" />} />
+        <DataTable columns={columns} rows={result.rows} rowKey={(r) => r.id} url={{ basePath: "/inventory/history", params }} sort={{ key: q.sort, order: q.order }} empty={<EmptyState title="No stock movements in this period" />} />
         <Pagination page={result.page} totalPages={result.totalPages} total={result.total} pageSize={result.pageSize} url={{ basePath: "/inventory/history", params }} />
       </Card>
     </>

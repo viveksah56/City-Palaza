@@ -1,6 +1,6 @@
 import {PERMISSION, assertRolePermission} from "@/lib/rbac/permission";
 import { unstable_cache } from "next/cache";
-import { Prisma, type ProductStatus, type TrackingType } from "@prisma/client";
+import { Prisma, type ProductStatus, type TrackingType } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { writeAudit } from "@/lib/audit";

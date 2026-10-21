@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Tags } from "lucide-react";
 import { requirePermission } from "@/lib/auth/guards";
@@ -18,7 +19,7 @@ import { getSettings } from "@/server/settings.service";
 import { getInventorySummary } from "@/server/reports.service";
 import { ReportCard } from "@/components/shared/report-card";
 
-export const metadata = { title: "Products" };
+export const metadata: Metadata = { title: "Products" };
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.PRODUCT_VIEW);

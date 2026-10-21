@@ -4,8 +4,8 @@
  * randomly and printed once.
  */
 import { randomBytes } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
 import { config } from "dotenv";
+import { createPrismaClient } from "../src/lib/prisma-client";
 import { hashPassword } from "../src/lib/auth/password";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "../src/lib/rbac/permission";
 import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "../src/lib/constants/roles";
@@ -17,7 +17,7 @@ import { createSale, voidSale } from "../src/server/sales.service";
 
 config({ path: process.env.NODE_ENV === "production" ? ".env.production" : ".env" });
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 if (process.env.NODE_ENV === "production" && process.env.ALLOW_SEED !== "true") {
   console.error("Refusing to seed in production (set ALLOW_SEED=true to override).");

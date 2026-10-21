@@ -66,6 +66,7 @@ export function DataTable<T>({
     ) : flexRender(header.column.columnDef.header, header.getContext());
     return { id: header.id, content, alignRight: c.align === "right", className: c.className };
   }));
+  const sortableColumns = columns.filter((column): column is Column<T> & { sortKey: string } => Boolean(column.sortKey));
   const displayRows = table.getRowModel().rows.map((row) => {
     const cells = row.getVisibleCells().map((cell) => {
       const content = flexRender(cell.column.columnDef.cell, cell.getContext());
@@ -80,7 +81,27 @@ export function DataTable<T>({
     };
   });
 
-  return <SelectableTable headers={headers} rows={displayRows} />;
+  return (
+    <>
+      {url && sortableColumns.length > 0 && (
+        <nav aria-label="Sort records" className="flex gap-1 overflow-x-auto border-b border-border/60 px-4 py-2 md:hidden">
+          {sortableColumns.map((column) => {
+            const active = sort?.key === column.sortKey;
+            const Icon = !active ? ChevronsUpDown : sort?.order === "asc" ? ArrowUp : ArrowDown;
+            return (
+              <Button key={column.key} asChild size="sm" variant={active ? "secondary" : "ghost"} className="shrink-0">
+                <Link href={buildHref(url.basePath, url.params, { sort: column.sortKey, order: active && sort?.order === "asc" ? "desc" : "asc", page: undefined })} aria-label={`Sort by ${typeof column.header === "string" ? column.header : column.key}`}>
+                  {typeof column.header === "string" ? column.header : column.key}
+                  <Icon aria-hidden className="size-3.5" />
+                </Link>
+              </Button>
+            );
+          })}
+        </nav>
+      )}
+      <SelectableTable headers={headers} rows={displayRows} />
+    </>
+  );
 }
 
 export function Pagination({ page, totalPages, total, pageSize, url }: { page: number; totalPages: number; total: number; pageSize: number; url: UrlState }) {

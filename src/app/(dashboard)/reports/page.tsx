@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { requirePermission } from "@/lib/auth/guards";
 import {PERMISSION, hasPermission, type Permission} from "@/lib/rbac/permission";
 import { resolveRange } from "@/lib/dates";
@@ -7,8 +9,9 @@ import { PageHeader } from "@/components/shared/page-header";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { cn } from "@/lib/utils";
 import { SalesReport, ProfitReport, InventoryReport, EmployeeReport } from "@/features/reports/report-sections";
+import { LoadingSkeleton } from "@/components/shared/states";
 
-export const metadata = { title: "Reports" };
+export const metadata: Metadata = { title: "Reports" };
 
 const TABS: { key: string; label: string; permission: Permission }[] = [
   { key: "sales", label: "Sales", permission: PERMISSION.REPORT_SALES },
@@ -17,7 +20,15 @@ const TABS: { key: string; label: string; permission: Permission }[] = [
   { key: "employees", label: "Employee performance", permission: PERMISSION.REPORT_SALES },
 ];
 
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+export default function ReportsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  return (
+    <Suspense fallback={<LoadingSkeleton rows={5} cards={4} />}>
+      <ReportsContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function ReportsContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.REPORT_VIEW);
   const sp = await searchParams;
   const tabs = TABS.filter((t) => hasPermission(user.role, t.permission));

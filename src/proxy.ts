@@ -1,67 +1,79 @@
-import { randomUUID } from "node:crypto";
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { ACCESS_TOKEN_TTL_MINUTES, REFRESH_COOKIE, REFRESH_TOKEN_TTL_DAYS, SESSION_COOKIE } from "@/lib/constants";
-import { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken } from "@/lib/auth/token";
+import { NextResponse, type NextRequest } from "next/server";
+import { REFRESH_COOKIE, SESSION_COOKIE } from "@/lib/constants";
+import { verifyAccessToken } from "@/lib/auth/token";
+import { hasPermission, PERMISSION, type Permission } from "@/lib/rbac/permission";
 
-const cookieOptions = (expires: Date) => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-  expires,
-});
+const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
+  ["/dashboard", PERMISSION.DASHBOARD_VIEW],
+  ["/sales", PERMISSION.SALE_VIEW],
+  ["/products", PERMISSION.PRODUCT_VIEW],
+  ["/inventory", PERMISSION.INVENTORY_VIEW],
+  ["/customers", PERMISSION.CUSTOMER_VIEW],
+  ["/employees", PERMISSION.EMPLOYEE_VIEW],
+  ["/reports", PERMISSION.REPORT_VIEW],
+  ["/settings", PERMISSION.SETTINGS_VIEW],
+  ["/audit-logs", PERMISSION.AUDIT_VIEW],
+];
 
-function unauthenticated(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "UNAUTHENTICATED", message: "Your session has expired. Please sign in again." }, { status: 401 });
-  }
-  const login = new URL("/login", request.url);
-  login.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
-  return NextResponse.redirect(login);
+function routePermission(pathname: string): Permission | null {
+  const exactPermissions: Readonly<Record<string, Permission>> = {
+    "/sales/new": PERMISSION.SALE_CREATE,
+    "/products/new": PERMISSION.PRODUCT_CREATE,
+    "/products/categories": PERMISSION.CATEGORY_VIEW,
+    "/products/brands": PERMISSION.BRAND_VIEW,
+    "/employees/new": PERMISSION.EMPLOYEE_CREATE,
+    "/inventory/history": PERMISSION.INVENTORY_HISTORY_VIEW,
+  };
+  const exact = exactPermissions[pathname];
+  if (exact) return exact;
+  if (pathname === "/api/products/search") return PERMISSION.PRODUCT_VIEW;
+  if (pathname === "/api/customers/search") return PERMISSION.CUSTOMER_VIEW;
+  if (/^\/api\/products\/[^/]+\/serials$/.test(pathname)) return PERMISSION.SALE_CREATE;
+  if (pathname === "/api/products/bulk") return PERMISSION.PRODUCT_CREATE;
+  if (/^\/api\/sales\/[^/]+\/receipt$/.test(pathname)) return PERMISSION.SALE_VIEW;
+  return ROUTE_PERMISSIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))?.[1] ?? null;
 }
 
-export async function proxy(request: NextRequest) {
-  const access = request.cookies.get(SESSION_COOKIE)?.value;
-  if (access) {
-    const token = await verifyAccessToken(access);
-    if (token && token.expiresAt.getTime() > Date.now() + 30_000) return NextResponse.next();
+function isApiRequest(request: NextRequest): boolean {
+  return request.nextUrl.pathname.startsWith("/api/");
+}
+
+function internalDestination(request: NextRequest): string {
+  const destination = request.nextUrl.clone();
+  destination.searchParams.delete("_rsc");
+  return `${destination.pathname}${destination.search}`;
+}
+
+function denyUnauthenticated(request: NextRequest): NextResponse {
+  if (isApiRequest(request)) {
+    return NextResponse.json({ error: "UNAUTHENTICATED", message: "Your session has expired. Please sign in again." }, { status: 401 });
   }
 
-  const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
-  const refreshToken = refresh ? await verifyRefreshToken(refresh) : null;
-  if (!refreshToken) return unauthenticated(request);
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("next", internalDestination(request));
+  return NextResponse.redirect(loginUrl);
+}
 
-  const session = await prisma.session.findUnique({
-    where: { id: refreshToken.sessionId },
-    select: { id: true, refreshTokenId: true, expiresAt: true, user: { select: { status: true } } },
-  });
-  const now = new Date();
-  if (!session || session.refreshTokenId !== refreshToken.tokenId || session.expiresAt <= now || session.user.status !== "ACTIVE") {
-    return unauthenticated(request);
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  if (request.nextUrl.pathname === "/api/auth/refresh") return NextResponse.next();
+  const accessToken = request.cookies.get(SESSION_COOKIE)?.value;
+  const claims = accessToken ? await verifyAccessToken(accessToken) : null;
+  if (!claims) {
+    if (request.cookies.has(REFRESH_COOKIE) && !isApiRequest(request)) {
+      const refreshUrl = new URL("/api/auth/refresh", request.url);
+      refreshUrl.searchParams.set("next", internalDestination(request));
+      return NextResponse.redirect(refreshUrl);
+    }
+    return denyUnauthenticated(request);
   }
 
-  const accessExpiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MINUTES * 60_000);
-  const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60_000);
-  const refreshTokenId = randomUUID();
-  const updated = await prisma.session.updateMany({
-    where: { id: session.id, refreshTokenId: refreshToken.tokenId, expiresAt: { gt: now } },
-    data: { refreshTokenId, expiresAt: refreshExpiresAt },
-  });
-  if (updated.count !== 1) return unauthenticated(request);
+  const permission = routePermission(request.nextUrl.pathname);
+  if (permission && !hasPermission(claims.role, permission)) {
+    if (isApiRequest(request)) return NextResponse.json({ error: "FORBIDDEN", message: "You don't have permission to access this resource." }, { status: 403 });
+    return NextResponse.redirect(new URL("/forbidden", request.url));
+  }
 
-  const [nextAccess, nextRefresh] = await Promise.all([
-    signAccessToken(session.id, accessExpiresAt),
-    signRefreshToken(session.id, refreshTokenId, refreshExpiresAt),
-  ]);
-  request.cookies.set(SESSION_COOKIE, nextAccess);
-  request.cookies.set(REFRESH_COOKIE, nextRefresh);
-  const headers = new Headers(request.headers);
-  headers.set("cookie", request.cookies.toString());
-  const response = NextResponse.next({ request: { headers } });
-  response.cookies.set(SESSION_COOKIE, nextAccess, cookieOptions(accessExpiresAt));
-  response.cookies.set(REFRESH_COOKIE, nextRefresh, cookieOptions(refreshExpiresAt));
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

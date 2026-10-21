@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requirePermission } from "@/lib/auth/guards";
@@ -21,7 +22,7 @@ import { getSalesSummary } from "@/server/reports.service";
 import { ReportCard } from "@/components/shared/report-card";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 
-export const metadata = { title: "Sales" };
+export const metadata: Metadata = { title: "Sales" };
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.SALE_VIEW);
@@ -53,7 +54,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           <FilterSelect param="payment" label="Payment" options={PAYMENT_METHODS.map((m) => ({ value: m, label: PAYMENT_METHOD_LABELS[m] }))} />
           <FilterSelect param="status" label="Status" options={[{ value: "COMPLETED", label: "Completed" }, { value: "VOIDED", label: "Voided" }]} />
         </div>
-        <SaleTable rows={result.rows} currency={settings.currency} showEmployee={all} empty={<EmptyState title="No sales in this period" description="Try a wider date range, or make a sale." action={<Button asChild><Link href="/sales/new">New sale</Link></Button>} />} />
+        <SaleTable rows={result.rows} currency={settings.currency} showEmployee={all} sort={query.sort} order={query.order} url={{ basePath: "/sales", params }} empty={<EmptyState title="No sales in this period" description="Try a wider date range, or make a sale." action={<Button asChild><Link href="/sales/new">New sale</Link></Button>} />} />
         <Pagination page={result.page} totalPages={result.totalPages} total={result.total} pageSize={result.pageSize} url={{ basePath: "/sales", params }} />
       </Card>
     </>

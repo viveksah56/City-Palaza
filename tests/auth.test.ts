@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { signSessionToken, verifySessionToken } from "@/lib/auth/token";
+import { ROLE } from "@/lib/constants/roles";
 import { loginSchema, employeeCreateSchema } from "@/validations/employee";
 
 describe("authentication primitives", () => {
@@ -12,14 +13,14 @@ describe("authentication primitives", () => {
   });
 
   it("signs and verifies a session token", async () => {
-    const t = await signSessionToken("sess_1", new Date(Date.now() + 60_000));
+    const t = await signSessionToken({ userId: "user_1", firstName: "Test", lastName: "Employee", email: "employee@example.com", role: ROLE.EMPLOYEE }, "sess_1", new Date(Date.now() + 60_000));
     expect(await verifySessionToken(t)).toBe("sess_1");
   });
 
   it("rejects tampered and expired tokens", async () => {
-    const t = await signSessionToken("sess_1", new Date(Date.now() + 60_000));
+    const t = await signSessionToken({ userId: "user_1", firstName: "Test", lastName: "Employee", email: "employee@example.com", role: ROLE.EMPLOYEE }, "sess_1", new Date(Date.now() + 60_000));
     expect(await verifySessionToken(t.slice(0, -2) + "xx")).toBeNull();
-    const expired = await signSessionToken("sess_1", new Date(Date.now() - 10_000));
+    const expired = await signSessionToken({ userId: "user_1", firstName: "Test", lastName: "Employee", email: "employee@example.com", role: ROLE.EMPLOYEE }, "sess_1", new Date(Date.now() - 10_000));
     expect(await verifySessionToken(expired)).toBeNull();
     expect(await verifySessionToken("garbage")).toBeNull();
   });
