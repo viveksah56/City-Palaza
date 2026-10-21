@@ -48,7 +48,7 @@ Seed users from `db:seed`: `admin@citypalaza.local` (ADMIN), `sita@`, `ram@`, `a
 | `npm run test:integration` | DB-backed tests; requires `TEST_DATABASE_URL` (a **disposable** DB: tables are truncated) |
 | `npm run db:push` / `db:constraints` / `db:seed` / `db:seed:accounts` / `db:setup` / `db:studio` | Local database tooling using `.env` |
 | `npm run db:migrate:local` | Create and apply local Prisma migrations |
-| `npm run db:migrate:prod` | Apply existing migrations to production using `.env.production` |
+| `npm run db:migrate:prod` | Apply existing migrations to production using `.env.prod` |
 | `npm run db:constraints:prod` / `db:setup:prod` | Apply database constraints in production; no production seed runs |
 
 Integration tests: create an empty database, then
