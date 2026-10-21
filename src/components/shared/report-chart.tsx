@@ -1,56 +1,41 @@
 "use client";
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
+
+import * as React from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type ChartPoint = { label: string; value: number };
-const TIP = { background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 14, color: "var(--foreground)", boxShadow: "var(--shadow-pop)", fontSize: 13, padding: "8px 12px" } as const;
-const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"];
+type ChartType = "line" | "bar" | "hbar" | "pie";
 
-function fmt(v: number, kind: "currency" | "number") {
-  const s = new Intl.NumberFormat("en-IN", { maximumFractionDigits: kind === "currency" ? 0 : 0 }).format(v);
-  return kind === "currency" ? `Rs ${s}` : s;
-}
+const ChartContent = React.lazy(() => import("./report-chart-content").then((module) => ({ default: module.ReportChartContent })));
 
-export function ReportChart({ type, data, kind = "currency", height = 260, label }: { type: "line" | "bar" | "hbar" | "pie"; data: ChartPoint[]; kind?: "currency" | "number"; height?: number; label: string }) {
-  if (data.length === 0) {
-    return <div className="grid place-items-center text-sm text-muted-foreground" style={{ height }}>No data for this period</div>;
-  }
+export function ReportChart({ type, data, kind = "currency", height = 260, label }: { type: ChartType; data: ChartPoint[]; kind?: "currency" | "number"; height?: number; label: string }) {
+  const [visible, setVisible] = React.useState(false);
+  const hostRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const host = hostRef.current;
+    if (!host || visible) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "240px" });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [visible]);
+
   return (
-    <div role="img" aria-label={label} style={{ height }} className="w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        {type === "line" ? (
-          <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" strokeOpacity={0.7} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} minTickGap={24} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} width={56} tickFormatter={(v: number) => new Intl.NumberFormat("en-IN", { notation: "compact" }).format(v)} />
-            <Tooltip cursor={{ fill: "var(--secondary)", opacity: 0.5 }} contentStyle={TIP} labelStyle={{ fontWeight: 600 }} formatter={(v: number) => fmt(v, kind)} />
-            <Line type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={3} strokeLinecap="round" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} name={label} />
-          </LineChart>
-        ) : type === "bar" ? (
-          <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" strokeOpacity={0.7} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} interval={0} tickFormatter={(v: string) => (v.length > 10 ? `${v.slice(0, 9)}…` : v)} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} width={56} tickFormatter={(v: number) => new Intl.NumberFormat("en-IN", { notation: "compact" }).format(v)} />
-            <Tooltip cursor={{ fill: "var(--secondary)", opacity: 0.5 }} contentStyle={TIP} labelStyle={{ fontWeight: 600 }} formatter={(v: number) => fmt(v, kind)} />
-            <Bar dataKey="value" fill="var(--chart-1)" radius={[8, 8, 0, 0]} maxBarSize={44} name={label} />
-          </BarChart>
-        ) : type === "hbar" ? (
-          <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" strokeOpacity={0.7} />
-            <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
-            <YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} width={130} tickFormatter={(v: string) => (v.length > 20 ? `${v.slice(0, 19)}…` : v)} />
-            <Tooltip cursor={{ fill: "var(--secondary)", opacity: 0.5 }} contentStyle={TIP} labelStyle={{ fontWeight: 600 }} formatter={(v: number) => fmt(v, kind)} />
-            <Bar dataKey="value" fill="var(--chart-1)" radius={[0, 8, 8, 0]} maxBarSize={22} name={label} />
-          </BarChart>
-        ) : (
-          <PieChart>
-            <Pie data={data} dataKey="value" nameKey="label" innerRadius="62%" outerRadius="88%" paddingAngle={3} cornerRadius={6} stroke="none">
-              {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-            </Pie>
-            <Tooltip cursor={{ fill: "var(--secondary)", opacity: 0.5 }} contentStyle={TIP} labelStyle={{ fontWeight: 600 }} formatter={(v: number) => fmt(v, kind)} />
-            <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-          </PieChart>
-        )}
-      </ResponsiveContainer>
+    <div ref={hostRef} role="img" aria-label={label} aria-busy={!visible} style={{ minHeight: height }} className="w-full">
+      {visible ? (
+        <React.Suspense fallback={<ChartSkeleton height={height} />}>
+          <ChartContent type={type} data={data} kind={kind} height={height} label={label} />
+        </React.Suspense>
+      ) : <ChartSkeleton height={height} />}
     </div>
   );
+}
+
+function ChartSkeleton({ height }: { height: number }) {
+  return <div aria-hidden="true" className="flex items-end gap-3 px-4 pb-6" style={{ height }}><Skeleton className="h-1/3 flex-1" /><Skeleton className="h-2/3 flex-1" /><Skeleton className="h-1/2 flex-1" /><Skeleton className="h-5/6 flex-1" /><Skeleton className="h-2/5 flex-1" /></div>;
 }

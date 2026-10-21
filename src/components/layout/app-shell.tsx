@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, BarChart3, Bell, Boxes, ChevronRight, LayoutDashboard, LogOut, MoreHorizontal, ScrollText, Settings, ShoppingCart, Smartphone, UserCog, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Boxes, ChevronRight, LayoutDashboard, MoreHorizontal, ScrollText, Settings, ShoppingCart, Smartphone, UserCog, Users, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { SignOutConfirmation } from "./sign-out-confirmation";
 
 const ICONS: Record<string, LucideIcon> = { LayoutDashboard, ShoppingCart, Smartphone, Boxes, Users, BarChart3, UserCog, ScrollText, Settings };
 
@@ -20,7 +21,7 @@ export type ShellProps = {
   user: { name: string; email: string; roleLabel: string };
   shopName: string;
   notifications: { count: number; items: { id: string; name: string; quantity: number }[] };
-  logoutAction: () => Promise<void>;
+  logoutAction: () => Promise<void | { ok: false }>;
   children: React.ReactNode;
 };
 
@@ -140,12 +141,7 @@ function AppShellContent({ nav, user, shopName, notifications, logoutAction, chi
                 <DropdownMenuItem asChild><Link href="/inventory?stock=low">Show all stock alerts</Link></DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <form action={logoutAction}>
-              <Button type="submit" variant="outline" size="sm" className="gap-2 px-2.5 sm:px-3" aria-label="Sign out" title="Sign out">
-                <LogOut className="size-4" aria-hidden />
-                <span className="hidden sm:inline">Sign out</span>
-              </Button>
-            </form>
+            <SignOutConfirmation action={logoutAction} />
           </div>
         </header>
 

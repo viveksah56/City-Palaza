@@ -48,9 +48,13 @@ export async function loginAction(raw: unknown, requestedRedirect?: unknown): Pr
 }
 
 export async function logoutAction() {
-  const user = await getSessionUser();
-  if (user) await writeAudit(prisma, { actorId: user.id, action: "LOGOUT", entityType: "User", entityId: user.id, description: `${user.email} signed out` });
-  await destroySession();
+  try {
+    const user = await getSessionUser();
+    if (user) await writeAudit(prisma, { actorId: user.id, action: "LOGOUT", entityType: "User", entityId: user.id, description: `${user.email} signed out` });
+    await destroySession();
+  } catch {
+    return { ok: false as const };
+  }
   redirect("/login");
 }
 
