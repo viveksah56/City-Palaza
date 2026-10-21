@@ -1,10 +1,12 @@
-# CityPalaza – Stock & Sales Management
+# CityPalaza — Inventory & Sales Management
 
-A single-store stock and sales system for the **CityPalaza** mobile & electronics shop, built entirely inside **Next.js (App Router) + TypeScript**: no separate backend. It models the real shop workflow:
+Inventory, sales, and role-based staff management for CityPalaza’s mobile and electronics store, built with Next.js App Router, TypeScript, Prisma, and PostgreSQL.
+
+CityPalaza is a single-store operations app for administrators and employees. It models the real shop workflow:
 
 > Admin adds products and stock → employees sell at the counter → every sale changes inventory inside a database transaction → historical purchase/selling prices are preserved → reports derive sales, stock and profit from those records.
 
-**Stack:** Next.js 15 (App Router, Server Components, Server Actions, Route Handlers) · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui (Radix, CityPalaza theme) · Lucide · React Hook Form + Zod · PostgreSQL + Prisma · Recharts · date-fns · Sonner · Zustand (cart only) · decimal.js · jose + bcryptjs.
+**Stack:** Next.js 16 (App Router, Server Components, Server Actions, Route Handlers and Proxy) · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui · Lucide · React Hook Form + Zod · PostgreSQL + Prisma · Recharts · date-fns · Sonner · Zustand (cart only) · decimal.js · jose + bcryptjs.
 
 ---
 
@@ -15,7 +17,7 @@ A single-store stock and sales system for the **CityPalaza** mobile & electronic
 npm install
 
 # 2. Configure
-# Configure the private .env file with DATABASE_URL for citypalaza_database and a local AUTH_SECRET.
+# Configure the private .env file with DATABASE_URL, DIRECT_URL and a local AUTH_SECRET.
 
 # 3. Database (needs a running PostgreSQL)
 npm run db:setup                  # = prisma db push + constraints + dev seed
@@ -43,6 +45,7 @@ Seed users from `db:seed`: `admin@citypalaza.local` (ADMIN), `sita@`, `ram@`, `a
 | `npm test` | Unit tests (no database needed) |
 | `npm run test:integration` | DB-backed tests; requires `TEST_DATABASE_URL` (a **disposable** DB: tables are truncated) |
 | `npm run db:push` / `db:constraints` / `db:seed` / `db:seed:accounts` / `db:setup` / `db:studio` | Database tooling |
+| `npm run db:setup:prod` | Sync the production schema, apply constraints, and create the configured admin and employee accounts |
 
 Integration tests: create an empty database, then
 ```bash
@@ -73,6 +76,8 @@ Highlights
 src/
   app/
     (auth)/login            sign-in
+    (auth)/forgot-password  request a reset link
+    (auth)/reset-password   set a new password with a single-use token
     (dashboard)/…           dashboard, products, inventory, sales, customers, reports,
                             employees, audit-logs, settings   (loading.tsx / error.tsx / not-found.tsx)
     api/                    route handlers: product & customer search, serial lookup, receipt download
@@ -134,7 +139,7 @@ Skip-free semantic landmarks, labelled form controls with `aria-describedby`-sty
 
 ## Data model (Prisma)
 
-`User` · `Role` · `Permission` · `RolePermission` · `Session` · `Category` · `Brand` · `Product` · `ProductSerial` · `InventoryTransaction` · `Customer` · `Sale` · `SaleItem` · `AuditLog` · `Setting` · `Counter`
+`User` · `Role` · `Permission` · `RolePermission` · `Session` · `PasswordResetToken` · `Category` · `Brand` · `Product` · `ProductSerial` · `InventoryTransaction` · `Customer` · `Sale` · `SaleItem` · `AuditLog` · `Setting` · `Counter`
 
 Indexed for scale: SKU, barcode (unique); product name, category, brand, status, quantity; sale number (unique), employee+date, customer, createdAt, status+date, payment method; inventory product+date, type, reference ID; audit date/actor/action/entity.
 
@@ -155,4 +160,3 @@ Services take an `Actor` and a transaction client, and every stock/price change 
 - No login rate-limiting or 2FA yet (add at the reverse proxy or in `loginAction`).
 - Customer returns reuse *void*; a dedicated partial-return flow is a natural next feature.
 - Partial/pending payments are recorded (`amountPaid`) but there is no payment-collection ledger yet.
-- Upgrading to Next.js 16: rename nothing in this codebase except `revalidateTag(tag)` → `revalidateTag(tag, "max")`.

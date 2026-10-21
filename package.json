@@ -2,7 +2,7 @@
   "name": "citypalaza",
   "version": "1.0.0",
   "private": true,
-  "description": "Stock and sales management system for the CityPalaza mobile & electronics shop",
+  "description": "Inventory, sales, and role-based staff management for CityPalaza's mobile and electronics store",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
