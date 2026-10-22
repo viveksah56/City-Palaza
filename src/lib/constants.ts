@@ -3,7 +3,10 @@ export const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Kathmandu";
 export const SESSION_COOKIE = "cp_session";
 export const REFRESH_COOKIE = "cp_refresh";
 export const ACCESS_TOKEN_TTL_MINUTES = 15;
-export const REFRESH_TOKEN_TTL_DAYS = 30;
+const configuredSessionMaxAgeHours = Number(process.env.SESSION_MAX_AGE_HOURS);
+export const SESSION_MAX_AGE_HOURS = Number.isInteger(configuredSessionMaxAgeHours) && configuredSessionMaxAgeHours > 0
+  ? configuredSessionMaxAgeHours
+  : 24;
 export const DEFAULT_PAGE_SIZE = 20;
 export const LOW_STOCK_NOTIFICATIONS_CACHE_TAG = "low-stock-notifications";
 

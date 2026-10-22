@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
-import { ACCESS_TOKEN_TTL_MINUTES, REFRESH_COOKIE, REFRESH_TOKEN_TTL_DAYS, SESSION_COOKIE } from "@/lib/constants";
+import { ACCESS_TOKEN_TTL_MINUTES, REFRESH_COOKIE, SESSION_COOKIE } from "@/lib/constants";
 import { safeInternalRedirect } from "@/lib/auth/redirects";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/lib/auth/token";
 
@@ -27,12 +27,12 @@ async function rotateRefreshToken(): Promise<boolean> {
   });
   if (!session || session.refreshTokenId !== verified.tokenId || session.expiresAt <= now || session.user.status !== "ACTIVE") return false;
 
-  const accessExpiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MINUTES * 60_000);
-  const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60_000);
+  const accessExpiresAt = new Date(Math.min(Date.now() + ACCESS_TOKEN_TTL_MINUTES * 60_000, session.expiresAt.getTime()));
+  const refreshExpiresAt = session.expiresAt;
   const refreshTokenId = randomUUID();
   const updated = await prisma.session.updateMany({
     where: { id: session.id, refreshTokenId: verified.tokenId, expiresAt: { gt: now } },
-    data: { refreshTokenId, expiresAt: refreshExpiresAt },
+    data: { refreshTokenId },
   });
   if (updated.count !== 1) return false;
 
