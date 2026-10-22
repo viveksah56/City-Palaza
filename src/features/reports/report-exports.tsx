@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import type { DateRange } from "@/lib/dates";
 import { APP_TIMEZONE } from "@/lib/constants";
 
-export function DashboardExports({ range }: { range?: DateRange }) {
+export function ReportExports({ range, scope, reportTab }: { range?: DateRange; scope: "sales" | "report"; reportTab?: string }) {
   const params = new URLSearchParams();
+  params.set("scope", scope);
+  if (reportTab) params.set("tab", reportTab);
   if (range) {
     params.set("range", range.preset);
     if (range.preset === "custom") {
@@ -20,10 +22,10 @@ export function DashboardExports({ range }: { range?: DateRange }) {
   return (
     <div className="flex items-center gap-1.5">
       <Button asChild variant="outline" size="sm">
-        <a href={`/api/reports/dashboard-export${pdfQuery}`}><FileText aria-hidden /> <span className="sr-only sm:not-sr-only">PDF</span></a>
+        <a href={`/api/reports/export${pdfQuery}`}><FileText aria-hidden /> <span className="sr-only sm:not-sr-only">PDF</span></a>
       </Button>
       <Button asChild variant="outline" size="sm">
-        <a href={`/api/reports/dashboard-export${excelQuery}`}><FileSpreadsheet aria-hidden /> <span className="sr-only sm:not-sr-only">Excel</span></a>
+        <a href={`/api/reports/export${excelQuery}`}><FileSpreadsheet aria-hidden /> <span className="sr-only sm:not-sr-only">Excel</span></a>
       </Button>
     </div>
   );

@@ -21,6 +21,9 @@ import { getSettings } from "@/server/settings.service";
 import { getSalesSummary } from "@/server/reports.service";
 import { ReportCard } from "@/components/shared/report-card";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
+import { ReportExports } from "@/features/reports/report-exports";
+import { resolveRange } from "@/lib/dates";
+import { first } from "@/lib/url";
 
 export const metadata: Metadata = { title: "Sales" };
 
@@ -29,6 +32,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const all = hasPermission(user.role, PERMISSION.SALE_VIEW_ALL);
   const query = parseSalesQuery(sp);
+  const range = resolveRange(first(sp.range), first(sp.from), first(sp.to), { fallback: "last30" });
   const [result, settings, staff, overview] = await Promise.all([
     listSales(user, query), getSettings(), all ? listEmployeeOptions() : Promise.resolve([]),
     getSalesSummary({ from: query.from, to: query.to }, all ? undefined : user.id),
@@ -39,7 +43,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       <PageHeader
         title={all ? "Sales" : "My sales"}
         description={all ? "Every sale across the shop." : "Sales you’ve made."}
-        actions={hasPermission(user.role, PERMISSION.SALE_CREATE) ? <Button asChild><Link href="/sales/new"><Plus /> New sale</Link></Button> : undefined}
+        actions={<><ReportExports range={range} scope="sales" />{hasPermission(user.role, PERMISSION.SALE_CREATE) && <Button asChild><Link href="/sales/new"><Plus /> New sale</Link></Button>}</>}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
         <ReportCard label="Completed sales" value={overview.count} hint="In the selected period" />

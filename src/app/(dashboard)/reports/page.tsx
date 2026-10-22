@@ -10,6 +10,7 @@ import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { cn } from "@/lib/utils";
 import { SalesReport, ProfitReport, InventoryReport, EmployeeReport } from "@/features/reports/report-sections";
 import { LoadingSkeleton } from "@/components/shared/states";
+import { ReportExports } from "@/features/reports/report-exports";
 
 export const metadata: Metadata = { title: "Reports" };
 
@@ -37,7 +38,7 @@ async function ReportsContent({ searchParams }: { searchParams: Promise<SearchPa
   const params = toParams(sp);
   return (
     <>
-      <PageHeader title="Reports" description="Built from recorded sales and stock, so past figures don’t change when prices do." actions={tab !== "inventory" ? <DateRangePicker defaultPreset="last30" /> : undefined} />
+      <PageHeader title="Reports" description="Built from recorded sales and stock, so past figures don’t change when prices do." actions={<>{tab !== "inventory" && <DateRangePicker defaultPreset="last30" />}<ReportExports range={tab === "inventory" ? undefined : range} scope="report" reportTab={tab} /></>} />
       <div role="tablist" aria-label="Report type" className="scrollbar-none mb-8 inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-secondary p-1">
         {tabs.map((t) => (
           <Link key={t.key} role="tab" aria-selected={tab === t.key} href={buildHref("/reports", params, { tab: t.key })} className={cn("whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-200", tab === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{t.label}</Link>

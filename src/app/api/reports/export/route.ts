@@ -7,7 +7,7 @@ import { PERMISSION } from "@/lib/rbac/permission";
 import { first } from "@/lib/url";
 import { resolveRange } from "@/lib/dates";
 import { getSettings } from "@/server/settings.service";
-import { getDashboardExportData, type DashboardExportData } from "@/server/dashboard-export.service";
+import { getReportExportData, getSalesExportData, type ReportExportData, type ReportTab } from "@/server/report-export.service";
 import { DomainError } from "@/lib/errors";
 
 function safeCell(value: string | number): string | number {
@@ -15,7 +15,7 @@ function safeCell(value: string | number): string | number {
   return /^[=+\-@]/.test(value) ? `'${value}` : value;
 }
 
-async function createWorkbook(data: DashboardExportData): Promise<Buffer> {
+async function createWorkbook(data: ReportExportData): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "CityPalaza";
   workbook.created = new Date();
@@ -45,7 +45,7 @@ async function createWorkbook(data: DashboardExportData): Promise<Buffer> {
   return Buffer.from(result);
 }
 
-async function createPdf(data: DashboardExportData): Promise<Buffer> {
+async function createPdf(data: ReportExportData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 48, bufferPages: true, info: { Title: data.title, Author: "CityPalaza" } });
     const chunks: Buffer[] = [];
@@ -88,17 +88,22 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
     if (format !== "pdf" && format !== "xlsx") return NextResponse.json({ error: "Choose PDF or Excel format." }, { status: 400 });
+    const scope = url.searchParams.get("scope");
+    if (scope !== "sales" && scope !== "report") return NextResponse.json({ error: "Choose a valid report type." }, { status: 400 });
+    const tabValue = url.searchParams.get("tab") ?? "sales";
+    if (scope === "report" && !["sales", "profit", "inventory", "employees"].includes(tabValue)) return NextResponse.json({ error: "Choose a valid report tab." }, { status: 400 });
     const range = resolveRange(first(url.searchParams.get("range") ?? undefined), first(url.searchParams.get("from") ?? undefined), first(url.searchParams.get("to") ?? undefined), { fallback: "last7" });
     if (range.to.getTime() - range.from.getTime() > 366 * 86_400_000) return NextResponse.json({ error: "Choose a period of one year or less." }, { status: 400 });
-    const [user, settings] = await Promise.all([
-      assertPermission(PERMISSION.DASHBOARD_VIEW),
-      getSettings(),
-    ]);
-    const data = await getDashboardExportData(user, range, settings.currency);
+    const user = await assertPermission(scope === "sales" ? PERMISSION.SALE_VIEW : PERMISSION.REPORT_VIEW);
+    const settings = await getSettings();
+    const data = scope === "sales"
+      ? await getSalesExportData(user, range, settings.currency)
+      : await getReportExportData(user, range, settings.currency, tabValue as ReportTab);
     const file = format === "pdf" ? await createPdf(data) : await createWorkbook(data);
     const extension = format === "pdf" ? "pdf" : "xlsx";
     const contentType = format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    const filename = `citypalaza-dashboard-${new Date().toISOString().slice(0, 10)}.${extension}`;
+    const reportName = scope === "report" ? `${tabValue}-report` : "sales-report";
+    const filename = `citypalaza-${reportName}-${new Date().toISOString().slice(0, 10)}.${extension}`;
     return new Response(new Uint8Array(file), {
       headers: {
         "Content-Type": contentType,
@@ -111,7 +116,7 @@ export async function GET(request: Request) {
     unstable_rethrow(error);
     if (error instanceof DomainError && error.code === "UNAUTHENTICATED") return NextResponse.json({ error: error.message }, { status: 401 });
     if (error instanceof DomainError && error.code === "FORBIDDEN") return NextResponse.json({ error: error.message }, { status: 403 });
-    console.error("[dashboard export error]", error);
+    console.error("[report export error]", error);
     return NextResponse.json({ error: "Unable to generate this report right now." }, { status: 500 });
   }
 }
