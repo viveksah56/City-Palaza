@@ -9,3 +9,7 @@ export const TAXONOMY_CACHE_TAG = {
   [TAXONOMY_KIND.CATEGORY]: "categories",
   [TAXONOMY_KIND.BRAND]: "brands",
 } as const;
+
+export const PRODUCT_CATEGORY_SELECTION = {
+  CUSTOM: "__custom_category__",
+} as const;

@@ -99,6 +99,7 @@ function parseRows(source: string): { products: ParsedProduct[]; issues: ImportI
     const quantityRaw = String(record.quantity ?? "").trim();
     const quantity = quantityRaw ? Number(quantityRaw) : trackingType === "QUANTITY" ? 0 : serials.length;
     if (!Number.isSafeInteger(quantity) || quantity < 0) issues.push({ row: rowNumber, sku, message: "Quantity must be a non-negative whole number." });
+    if (!sku) issues.push({ row: rowNumber, message: "SKU is required for bulk imports." });
 
     if (sku && skus.has(sku)) issues.push({ row: rowNumber, sku, message: "SKU is repeated in this file." });
     if (sku) skus.add(sku);

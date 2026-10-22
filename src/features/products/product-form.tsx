@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Field } from "@/components/ui/field";
-import { productSchema, type ProductFormValues } from "@/validations/product";
+import { productSchema, type ProductFormInput, type ProductFormValues } from "@/validations/product";
 import { createProductAction, updateProductAction } from "@/server/actions";
+import { PRODUCT_CATEGORY_SELECTION } from "@/lib/constants/categories";
 
 type Option = { id: string; name: string };
 
@@ -26,16 +27,17 @@ export function ProductForm({
   onCancel?: () => void;
 }) {
   const router = useRouter();
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<ProductFormValues>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<ProductFormInput, unknown, ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      sku: "", barcode: "", name: "", variantLabel: "", description: "", categoryId: "", brandId: "",
+      sku: "", barcode: "", name: "", variantLabel: "", description: "", categoryId: "", customCategory: "", brandId: "",
       purchasePrice: 0, sellingPrice: 0, discountPercent: 0, minStock: 5, maxStock: NaN,
       trackingType: "QUANTITY", status: "ACTIVE", initialQuantity: 0, initialSerials: "",
       ...defaults,
     },
   });
   const tracking = watch("trackingType");
+  const categoryId = watch("categoryId");
   const num = { valueAsNumber: true } as const;
 
   return (
@@ -59,7 +61,7 @@ export function ProductForm({
           <Field label="Variant" htmlFor="variantLabel" hint="Optional, e.g. Black · 256 GB. Give each variant its own SKU and stock.">
             <Input id="variantLabel" placeholder="Black · 256 GB" aria-invalid={!!errors.variantLabel} {...register("variantLabel")} />
           </Field>
-          <Field label="SKU" htmlFor="sku" required error={errors.sku?.message} hint="Unique. Letters, numbers, dot, dash.">
+          <Field label="SKU" htmlFor="sku" error={errors.sku?.message} hint={mode === "create" ? "Optional. Leave blank to generate one automatically." : "Optional. Leave blank to keep the current SKU."}>
             <Input id="sku" className="font-mono" aria-invalid={!!errors.sku} {...register("sku")} />
           </Field>
           <Field label="Barcode" htmlFor="barcode" error={errors.barcode?.message} hint="Optional, must be unique if set.">
@@ -69,8 +71,14 @@ export function ProductForm({
             <NativeSelect id="categoryId" aria-invalid={!!errors.categoryId} {...register("categoryId")}>
               <option value="">Choose a category</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value={PRODUCT_CATEGORY_SELECTION.CUSTOM}>Other…</option>
             </NativeSelect>
           </Field>
+          {categoryId === PRODUCT_CATEGORY_SELECTION.CUSTOM && (
+            <Field label="New category" htmlFor="customCategory" required error={errors.customCategory?.message} hint="This category will be available for other products too.">
+              <Input id="customCategory" aria-invalid={!!errors.customCategory} {...register("customCategory")} />
+            </Field>
+          )}
           <Field label="Brand" htmlFor="brandId">
             <NativeSelect id="brandId" {...register("brandId")}>
               <option value="">No brand</option>

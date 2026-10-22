@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LoginForm } from "./login-form";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
+import Image from "next/image";
 
 const COPYRIGHT_YEAR = new Date().getFullYear();
 
@@ -31,7 +32,7 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
         <div aria-hidden className="pointer-events-none absolute -right-40 -top-40 size-[30rem] rounded-full border border-white/[0.06]" />
         <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 size-[20rem] rounded-full border border-white/[0.06]" />
         <div className="relative flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-sidebar-active font-heading text-lg font-semibold">C</span>
+          <Image src="/citypalaza-mark.webp" alt="" width={40} height={40} priority className="size-10 rounded-xl object-cover ring-1 ring-sidebar-border" />
           <span className="font-heading text-[21px] font-semibold tracking-[-0.03em]">CityPalaza</span>
         </div>
 
@@ -66,7 +67,7 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
         <div className="absolute top-5 right-5 sm:top-8 sm:right-8"><ThemeToggle /></div>
         <div className="rise w-full max-w-[420px]">
           <div className="mb-9 flex items-center justify-center gap-2.5 lg:hidden">
-            <span className="grid size-9 place-items-center rounded-lg bg-primary font-heading text-base font-semibold text-primary-foreground">C</span>
+            <Image src="/citypalaza-mark.webp" alt="" width={36} height={36} priority className="size-9 rounded-lg object-cover" />
             <span className="font-heading text-lg font-semibold tracking-[-0.025em]">CityPalaza</span>
           </div>
           <Card className="gap-7 rounded-2xl border-border/80 px-0 py-8 shadow-card sm:py-9">

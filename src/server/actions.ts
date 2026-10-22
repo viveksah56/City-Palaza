@@ -96,6 +96,7 @@ export async function createProductAction(raw: unknown) {
     const actor = await assertPermission(PERMISSION.PRODUCT_CREATE);
     const res = await products.createProduct(actor, raw);
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
+    revalidateTag(TAXONOMY_CACHE_TAG[TAXONOMY_KIND.CATEGORY], "max");
     revalidatePath("/products");
     revalidatePath("/inventory");
     return res;
@@ -106,6 +107,7 @@ export async function updateProductAction(id: string, raw: unknown) {
     const actor = await assertPermission(PERMISSION.PRODUCT_UPDATE);
     await products.updateProduct(actor, id, raw);
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
+    revalidateTag(TAXONOMY_CACHE_TAG[TAXONOMY_KIND.CATEGORY], "max");
     revalidatePath("/products");
     revalidatePath(`/products/${id}`);
     return undefined;

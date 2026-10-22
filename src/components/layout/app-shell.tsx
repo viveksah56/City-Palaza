@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { SignOutConfirmation } from "./sign-out-confirmation";
+import Image from "next/image";
 
 const ICONS: Record<string, LucideIcon> = { LayoutDashboard, ShoppingCart, Smartphone, Boxes, Users, BarChart3, UserCog, ScrollText, Settings };
 
@@ -57,7 +58,7 @@ function Breadcrumbs() {
 function Brand({ name, onDark = false }: { name: string; onDark?: boolean }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5 rounded-lg outline-none">
-      <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-lg font-heading text-[17px] font-semibold", onDark ? "bg-sidebar-active text-sidebar-foreground" : "bg-primary text-primary-foreground")}>C</span>
+      <Image src="/citypalaza-mark.webp" alt="" width={36} height={36} className={cn("size-9 shrink-0 rounded-lg object-cover", onDark && "ring-1 ring-sidebar-border")} />
       <span className={cn("truncate font-heading text-[18px] font-semibold tracking-[-0.025em] group-data-[collapsed=true]/sidebar:hidden", onDark ? "text-sidebar-foreground" : "text-foreground")}>{name}</span>
     </Link>
   );

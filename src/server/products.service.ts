@@ -1,4 +1,5 @@
 import {PERMISSION, assertRolePermission} from "@/lib/rbac/permission";
+import { randomUUID } from "node:crypto";
 import { unstable_cache } from "next/cache";
 import { Prisma, type ProductStatus, type TrackingType } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
@@ -12,6 +13,8 @@ import { stockStatus, type StockStatus } from "@/lib/stock";
 import { productSchema, type ProductFormValues } from "@/validations/product";
 import { splitSerials } from "@/validations/inventory";
 import { addStockTx, type Actor } from "./inventory.service";
+import { PRODUCT_CATEGORY_SELECTION, TAXONOMY_CACHE_TAG, TAXONOMY_KIND } from "@/lib/constants/categories";
+import { slugify } from "@/lib/format";
 
 export type ProductRow = {
   id: string;
@@ -146,9 +149,9 @@ export async function getProduct(id: string, canSeeCost: boolean) {
   return { ...toProductRow(p, canSeeCost), description: p.description, maxStock: p.maxStock, createdAt: p.createdAt, updatedAt: p.updatedAt, brandId: p.brandId };
 }
 
-function toData(v: ProductFormValues) {
+function toData(v: ProductFormValues, fallbackSku?: string) {
   return {
-    sku: v.sku.trim().toUpperCase(),
+    sku: v.sku.trim().toUpperCase() || fallbackSku || `CP-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
     barcode: emptyToNull(v.barcode),
     name: v.name.trim(),
     variantLabel: v.variantLabel?.trim() || null,
@@ -165,6 +168,46 @@ function toData(v: ProductFormValues) {
   };
 }
 
+async function resolveProductCategory(tx: Prisma.TransactionClient, actor: Actor, values: ProductFormValues) {
+  if (values.categoryId !== PRODUCT_CATEGORY_SELECTION.CUSTOM) return values.categoryId;
+
+  assertRolePermission(actor.role, PERMISSION.CATEGORY_CREATE);
+  const name = values.customCategory.trim();
+  const slug = slugify(name);
+  if (!slug) throw new DomainError("VALIDATION", "Category name must contain letters or numbers.");
+
+  const existing = await tx.category.findFirst({
+    where: { name: { equals: name, mode: "insensitive" } },
+    select: { id: true, name: true, isActive: true },
+  });
+  if (existing) {
+    if (!existing.isActive) {
+      await tx.category.update({ where: { id: existing.id }, data: { isActive: true } });
+      await writeAudit(tx, {
+        actorId: actor.id,
+        action: PERMISSION.CATEGORY_UPDATE,
+        entityType: "Category",
+        entityId: existing.id,
+        description: `Reactivated category “${existing.name}” while adding a product`,
+      });
+    }
+    return existing.id;
+  }
+
+  const slugOwner = await tx.category.findUnique({ where: { slug }, select: { id: true } });
+  if (slugOwner) throw new DomainError("CONFLICT", "A category with a similar name already exists. Choose it from the category list.");
+
+  const category = await tx.category.create({ data: { name, slug, isActive: true } });
+  await writeAudit(tx, {
+    actorId: actor.id,
+    action: PERMISSION.CATEGORY_CREATE,
+    entityType: "Category",
+    entityId: category.id,
+    description: `Created category “${category.name}” while adding a product`,
+  });
+  return category.id;
+}
+
 export async function createProduct(actor: Actor, raw: unknown) {
   assertRolePermission(actor.role, PERMISSION.PRODUCT_CREATE);
   const v = productSchema.parse(raw);
@@ -172,7 +215,8 @@ export async function createProduct(actor: Actor, raw: unknown) {
   if (data.maxStock !== null && data.maxStock < data.minStock) throw new DomainError("VALIDATION", "Maximum stock can't be lower than minimum stock.");
 
   return prisma.$transaction(async (tx) => {
-    const product = await tx.product.create({ data });
+    const categoryId = await resolveProductCategory(tx, actor, v);
+    const product = await tx.product.create({ data: { ...data, categoryId } });
     const serials = splitSerials(v.initialSerials);
     const qty = typeof v.initialQuantity === "number" && Number.isFinite(v.initialQuantity) ? v.initialQuantity : 0;
     if (v.trackingType === "QUANTITY" ? qty > 0 : serials.length > 0) {
@@ -192,12 +236,13 @@ export async function createProduct(actor: Actor, raw: unknown) {
 export async function updateProduct(actor: Actor, id: string, raw: unknown) {
   assertRolePermission(actor.role, PERMISSION.PRODUCT_UPDATE);
   const v = productSchema.parse(raw);
-  const data = toData(v);
-  if (data.maxStock !== null && data.maxStock < data.minStock) throw new DomainError("VALIDATION", "Maximum stock can't be lower than minimum stock.");
-
   return prisma.$transaction(async (tx) => {
     const before = await tx.product.findUnique({ where: { id }, include: { _count: { select: { serials: true } } } });
     if (!before) throw new DomainError("NOT_FOUND", "Product not found.");
+    const data = toData(v, before.sku);
+    if (data.maxStock !== null && data.maxStock < data.minStock) throw new DomainError("VALIDATION", "Maximum stock can't be lower than minimum stock.");
+    const categoryId = await resolveProductCategory(tx, actor, v);
+    data.categoryId = categoryId;
     if (before.trackingType !== data.trackingType && (before.quantity > 0 || before._count.serials > 0)) {
       throw new DomainError("CONFLICT", "Tracking type can't be changed once the product has stock or registered devices.");
     }
