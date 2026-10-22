@@ -157,6 +157,20 @@ export async function deleteTaxonomyAction(kind: taxonomy.TaxonomyKind, id: stri
     return undefined;
   });
 }
+export async function deleteTaxonomiesAction(kind: taxonomy.TaxonomyKind, rawIds: unknown) {
+  return run(async () => {
+    kind = z.enum([TAXONOMY_KIND.CATEGORY, TAXONOMY_KIND.BRAND]).parse(kind);
+    const ids = z.array(z.string().min(1).max(64)).min(1).max(100).superRefine((values, context) => {
+      if (new Set(values).size !== values.length) context.addIssue({ code: "custom", message: "Selected items must be unique." });
+    }).parse(rawIds);
+    const permission = kind === TAXONOMY_KIND.CATEGORY ? PERMISSION.CATEGORY_DELETE : PERMISSION.BRAND_DELETE;
+    const actor = await assertPermission(permission);
+    const result = await taxonomy.deleteTaxonomies(actor, kind, ids);
+    updateTag(TAXONOMY_CACHE_TAG[kind]);
+    revalidatePath("/products", "layout");
+    return result;
+  });
+}
 
 // ---------- inventory ----------
 export async function addStockAction(raw: unknown) {

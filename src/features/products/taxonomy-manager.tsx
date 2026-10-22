@@ -4,62 +4,56 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
-import { StatusBadge } from "@/components/shared/badges";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { EmptyState } from "@/components/shared/states";
-import { IconButton } from "@/components/shared/icon-button";
 import { categoryBrandSchema, type CategoryBrandValues } from "@/validations/product";
-import { deleteTaxonomyAction, saveTaxonomyAction } from "@/server/actions";
+import { deleteTaxonomiesAction, saveTaxonomyAction } from "@/server/actions";
 import { TAXONOMY_KIND, type TaxonomyKind } from "@/lib/constants/categories";
+import { DataTable } from "@/components/data-table";
+import type { TaxonomyItem } from "./taxonomy-types";
+import { createCategoryColumns } from "./category-columns";
+import { createBrandColumns } from "./brand-columns";
 
-type Item = { id: string; name: string; description: string | null; isActive: boolean };
-
-export function TaxonomyManager({ kind, items, canCreate, canUpdate, canDelete }: { kind: TaxonomyKind; items: Item[]; canCreate: boolean; canUpdate: boolean; canDelete: boolean }) {
-  const [editing, setEditing] = React.useState<Item | "new" | null>(null);
+export function TaxonomyManager({ kind, items, canCreate, canUpdate, canDelete }: { kind: TaxonomyKind; items: TaxonomyItem[]; canCreate: boolean; canUpdate: boolean; canDelete: boolean }) {
+  const [editing, setEditing] = React.useState<TaxonomyItem | "new" | null>(null);
+  const router = useRouter();
   const title = kind === TAXONOMY_KIND.CATEGORY ? "Categories" : "Brands";
+  const columns = React.useMemo(() => {
+    const options = { onEdit: (item: TaxonomyItem) => setEditing(item), canUpdate, canDelete };
+    return kind === TAXONOMY_KIND.CATEGORY ? createCategoryColumns(options) : createBrandColumns(options);
+  }, [kind, canDelete, canUpdate]);
+
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>{title}</CardTitle>
-        {canCreate && <Button size="sm" onClick={() => setEditing("new")}><Plus /> Add {kind}</Button>}
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? <EmptyState title={`No ${title.toLowerCase()} yet`} description={`Add your first ${kind} to start organising products.`} /> : (
-          <ul className="divide-y divide-border/60">
-            {items.map((i) => (
-              <li key={i.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0"><p className="truncate text-sm font-medium">{i.name}</p>{i.description && <p className="truncate text-xs text-muted-foreground">{i.description}</p>}</div>
-                <div className="flex items-center gap-1">
-                  {!i.isActive && <StatusBadge status="INACTIVE" />}
-                  {canUpdate && <IconButton label={`Edit ${i.name}`} variant="ghost" onClick={() => setEditing(i)}><Pencil /></IconButton>}
-                  {canDelete && (
-                    <ConfirmDialog
-                      trigger={<Button size="icon" variant="ghost" aria-label={`Delete ${i.name}`} title={`Delete ${i.name}`}><Trash2 className="text-destructive" /></Button>}
-                      triggerLabel="Delete"
-                      title={`Delete “${i.name}”?`}
-                      description={`This only works if no product uses it. Otherwise deactivate the ${kind} instead.`}
-                      confirmLabel="Delete" destructive successMessage={kind === TAXONOMY_KIND.CATEGORY ? "Category deleted" : "Brand deleted"}
-                      onConfirm={() => deleteTaxonomyAction(kind, i.id)}
-                    />
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-heading text-base font-semibold">{title}</h2>
+        {canCreate && <Button size="sm" onClick={() => setEditing("new")}><Plus data-icon="inline-start" /> Add {kind}</Button>}
+      </div>
+        <DataTable
+          data={items}
+          columns={columns}
+          getRowId={(item) => item.id}
+          getRowLabel={(item) => item.name}
+          searchPlaceholder={`Search ${title.toLowerCase()}`}
+          enableRowSelection={canDelete}
+          onBulkDelete={canDelete ? async (ids) => {
+            const result = await deleteTaxonomiesAction(kind, ids);
+            if (result.ok) router.refresh();
+            return result;
+          } : undefined}
+          bulkDeleteLabel="Delete selected"
+          bulkDeleteSuccessMessage={`${title} deleted.`}
+          bulkDeleteDescription={`Delete the selected ${title.toLowerCase()}? Any item used by a product will prevent the entire operation.`}
+        />
       {editing && <TaxonomyDialog kind={kind} item={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
-    </Card>
+    </section>
   );
 }
 
-function TaxonomyDialog({ kind, item, onClose }: { kind: TaxonomyKind; item: Item | null; onClose: () => void }) {
+function TaxonomyDialog({ kind, item, onClose }: { kind: TaxonomyKind; item: TaxonomyItem | null; onClose: () => void }) {
   const router = useRouter();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CategoryBrandValues>({
     resolver: zodResolver(categoryBrandSchema),
