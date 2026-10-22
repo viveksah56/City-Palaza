@@ -24,11 +24,13 @@ export const metadata: Metadata = { title: "Inventory" };
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.INVENTORY_VIEW);
   const sp = await searchParams;
-  const categories = await getCategories();
   const q = parseInventoryQuery({ ...sp, category: undefined });
   const catSlug = toParams(sp).category;
-  q.categoryId = categories.find((c) => c.slug === catSlug)?.id;
-  const [result, summary, settings] = await Promise.all([listInventory(q), getInventorySummary(), getSettings()]);
+  const categoriesPromise = getCategories();
+  const resultPromise = catSlug
+    ? categoriesPromise.then((categories) => listInventory({ ...q, categoryId: categories.find((category) => category.slug === catSlug)?.id }))
+    : listInventory(q);
+  const [categories, result, summary, settings] = await Promise.all([categoriesPromise, resultPromise, getInventorySummary(), getSettings()]);
   const params = toParams(sp);
   return (
     <>

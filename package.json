@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "build:prod": "PRISMA_ENV_FILE=.env.prod prisma generate && node scripts/next-prod.mjs build",
+    "analyze": "next analyze --output",
+    "analyze:webpack": "prisma generate && ANALYZE=true next build --webpack",
     "start": "next start",
-    "start:prod": "node --env-file=.env.prod node_modules/next/dist/bin/next start",
+    "start:prod": "node scripts/next-prod.mjs start",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
     "db:push": "PRISMA_ENV_FILE=.env prisma db push",
@@ -47,10 +50,12 @@
     "date-fns": "^4.1.0",
     "decimal.js": "^10.5.0",
     "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
     "jose": "^6.0.0",
     "lucide-react": "^0.468.0",
     "next": "^16.4.2",
     "nodemailer": "^10.1.7",
+    "pdfkit": "^0.20.2",
     "pg": "^8.16.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -62,8 +67,10 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.4.2",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.10.0",
+    "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.16.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
@@ -74,6 +81,9 @@
     "tw-animate-css": "^1.3.0",
     "typescript": "^5.7.0",
     "vitest": "^3.2.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   },
   "allowScripts": {
     "@prisma/client@7.10.1": true,

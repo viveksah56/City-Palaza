@@ -10,6 +10,8 @@ import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/l
 import { first, type SearchParams } from "@/lib/url";
 import type { Actor } from "./inventory.service";
 import { ROLE } from "@/lib/constants/roles";
+import { randomUUID } from "node:crypto";
+import { timeServerOperation } from "./timing";
 
 export type EmployeeQuery = { search?: string; status?: UserStatus; sort: "firstName" | "role" | "status" | "lastLoginAt"; order: SortOrder } & PageQuery;
 export function parseEmployeeQuery(sp: SearchParams): EmployeeQuery {
@@ -19,8 +21,8 @@ export function parseEmployeeQuery(sp: SearchParams): EmployeeQuery {
 
 export async function getEmployeeOverview() {
   const [total, active] = await Promise.all([
-    prisma.user.count(),
-    prisma.user.count({ where: { status: "ACTIVE" } }),
+    prisma.user.count({ where: { deletedAt: null } }),
+    prisma.user.count({ where: { status: "ACTIVE", deletedAt: null } }),
   ]);
   return { total, active, disabled: total - active };
 }
@@ -29,6 +31,7 @@ const publicSelect = { id: true, firstName: true, lastName: true, email: true, p
 
 export async function listEmployees(q: EmployeeQuery) {
   const where: Prisma.UserWhereInput = {
+    deletedAt: null,
     ...(q.status && { status: q.status }),
     ...(q.search && {
       OR: [
@@ -38,15 +41,22 @@ export async function listEmployees(q: EmployeeQuery) {
       ],
     }),
   };
+  return timeServerOperation("employees.list.fetch", async () => {
   const [rows, total] = await Promise.all([
     prisma.user.findMany({ where, orderBy: q.sort === "lastLoginAt" ? { lastLoginAt: { sort: q.order, nulls: "last" } } : { [q.sort]: q.order }, skip: q.skip, take: q.take, select: { ...publicSelect, _count: { select: { sales: true } } } }),
     prisma.user.count({ where }),
   ]);
   return paged(rows, total, q);
+  });
 }
 
-export const getEmployee = (id: string) => prisma.user.findUnique({ where: { id }, select: { ...publicSelect, _count: { select: { sales: true } } } });
-export const listEmployeeOptions = () => prisma.user.findMany({ orderBy: { firstName: "asc" }, select: { id: true, firstName: true, lastName: true, status: true } });
+export const getEmployee = (id: string) => prisma.user.findFirst({ where: { id, deletedAt: null }, select: { ...publicSelect, _count: { select: { sales: true } } } });
+export const listEmployeeOptions = () => prisma.user.findMany({ where: { deletedAt: null }, orderBy: { firstName: "asc" }, select: { id: true, firstName: true, lastName: true, status: true } });
+
+async function requireAnotherActiveAdmin(tx: Prisma.TransactionClient, id: string) {
+  const count = await tx.user.count({ where: { id: { not: id }, role: ROLE.ADMIN, status: "ACTIVE", deletedAt: null } });
+  if (count === 0) throw new DomainError("CONFLICT", "Keep at least one other active admin account before making this change.");
+}
 
 export async function createEmployee(actor: Actor, raw: unknown) {
   assertRolePermission(actor.role, PERMISSION.EMPLOYEE_CREATE);
@@ -67,8 +77,9 @@ export async function updateEmployee(actor: Actor, raw: unknown) {
   const v = employeeUpdateSchema.parse(raw);
   if (v.id === actor.id && v.role !== ROLE.ADMIN) throw new DomainError("CONFLICT", "You can't remove your own admin role.");
   await prisma.$transaction(async (tx) => {
-    const before = await tx.user.findUnique({ where: { id: v.id }, select: { role: true } });
+    const before = await tx.user.findFirst({ where: { id: v.id, deletedAt: null }, select: { role: true, status: true } });
     if (!before) throw new DomainError("NOT_FOUND", "Account not found.");
+    if (before.role === ROLE.ADMIN && before.status === "ACTIVE" && v.role !== ROLE.ADMIN) await requireAnotherActiveAdmin(tx, v.id);
     const u = await tx.user.update({
       where: { id: v.id },
       data: { firstName: v.firstName.trim(), lastName: v.lastName.trim(), email: v.email, phone: emptyToNull(v.phone), role: v.role },
@@ -80,11 +91,13 @@ export async function updateEmployee(actor: Actor, raw: unknown) {
   });
 }
 
-/** Employees are never deleted (they own historical sales) – only disabled. */
 export async function setEmployeeStatus(actor: Actor, id: string, status: UserStatus) {
   assertRolePermission(actor.role, PERMISSION.EMPLOYEE_DISABLE);
   if (id === actor.id && status !== "ACTIVE") throw new DomainError("CONFLICT", "You can't disable your own account.");
   await prisma.$transaction(async (tx) => {
+    const existing = await tx.user.findFirst({ where: { id, deletedAt: null }, select: { id: true, role: true, status: true, email: true } });
+    if (!existing) throw new DomainError("NOT_FOUND", "Account not found.");
+    if (existing.role === ROLE.ADMIN && existing.status === "ACTIVE" && status !== "ACTIVE") await requireAnotherActiveAdmin(tx, id);
     const u = await tx.user.update({ where: { id }, data: { status }, select: { email: true } });
     if (status !== "ACTIVE") await tx.session.deleteMany({ where: { userId: id } }); // kick out immediately
     await writeAudit(tx, {
@@ -97,11 +110,50 @@ export async function setEmployeeStatus(actor: Actor, id: string, status: UserSt
   });
 }
 
+export async function deleteEmployee(actor: Actor, id: string) {
+  assertRolePermission(actor.role, PERMISSION.EMPLOYEE_DELETE);
+  if (id === actor.id) throw new DomainError("CONFLICT", "You can't delete your own account.");
+  const deletedPasswordHash = await hashPassword(randomUUID());
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.user.findFirst({ where: { id, deletedAt: null }, select: { id: true, email: true, role: true, status: true } });
+    if (!existing) throw new DomainError("NOT_FOUND", "Account not found.");
+    if (existing.role === ROLE.ADMIN && existing.status === "ACTIVE") await requireAnotherActiveAdmin(tx, id);
+    const now = new Date();
+    await Promise.all([
+      tx.user.update({
+        where: { id },
+        data: {
+          firstName: "Deleted",
+          lastName: "Account",
+          email: `deleted+${id}@deleted.citypalaza.invalid`,
+          phone: null,
+          passwordHash: deletedPasswordHash,
+          status: "SUSPENDED",
+          deletedAt: now,
+        },
+      }),
+      tx.session.deleteMany({ where: { userId: id } }),
+      tx.passwordResetToken.deleteMany({ where: { userId: id } }),
+      tx.auditLog.updateMany({ where: { actorId: id }, data: { description: "Activity recorded for an anonymized account." } }),
+      tx.auditLog.updateMany({ where: { entityType: "User", entityId: id }, data: { description: "Account management event for an anonymized account." } }),
+    ]);
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: PERMISSION.EMPLOYEE_DELETE,
+      entityType: "User",
+      entityId: id,
+      description: `Anonymized and deleted access for account ${id}`,
+    });
+  });
+}
+
 export async function resetEmployeePassword(actor: Actor, raw: unknown) {
   assertRolePermission(actor.role, PERMISSION.EMPLOYEE_UPDATE);
   const v = passwordResetSchema.parse(raw);
   const passwordHash = await hashPassword(v.password);
   await prisma.$transaction(async (tx) => {
+    const existing = await tx.user.findFirst({ where: { id: v.id, deletedAt: null }, select: { id: true } });
+    if (!existing) throw new DomainError("NOT_FOUND", "Account not found.");
     const u = await tx.user.update({ where: { id: v.id }, data: { passwordHash }, select: { email: true } });
     await tx.session.deleteMany({ where: { userId: v.id } });
     await writeAudit(tx, { actorId: actor.id, action: "EMPLOYEE_PASSWORD_RESET", entityType: "User", entityId: v.id, description: `Reset password for ${u.email}` });

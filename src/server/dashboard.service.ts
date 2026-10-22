@@ -6,8 +6,10 @@ import { D } from "@/lib/money";
 import { stockStatus } from "@/lib/stock";
 import { ROLE } from "@/lib/constants/roles";
 import * as reports from "./reports.service";
+import { timeServerOperation } from "./timing";
 
 export async function getAdminDashboard(range: DateRange) {
+  return timeServerOperation("dashboard.admin.fetch", async () => {
   const today = resolveRange("today");
   const [todaySales, todayProfit, inventory, employees, series, byCategory, topProducts, payments, rangeSummary, recentSales, lowStock] = await Promise.all([
     reports.getSalesSummary(today),
@@ -46,10 +48,12 @@ export async function getAdminDashboard(range: DateRange) {
     recentSales,
     lowStock,
   };
+  });
 }
 
 /** Employee view: only their own numbers; no profit, valuation, audit or other staff. */
 export async function getEmployeeDashboard(userId: string) {
+  return timeServerOperation("dashboard.employee.fetch", async () => {
   const today = resolveRange("today");
   const week = resolveRange("last7");
   const [summary, available, lowStock, recent, salesTrend] = await Promise.all([
@@ -72,6 +76,7 @@ export async function getEmployeeDashboard(userId: string) {
     recent,
     salesTrend,
   };
+  });
 }
 
 export const getNotifications = unstable_cache(async () => {

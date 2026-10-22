@@ -240,6 +240,7 @@ export async function createEmployeeAction(raw: unknown) {
     const actor = await assertPermission(PERMISSION.EMPLOYEE_CREATE);
     const res = await employees.createEmployee(actor, raw);
     revalidatePath("/employees");
+    revalidatePath("/dashboard");
     return res;
   });
 }
@@ -257,6 +258,18 @@ export async function setEmployeeStatusAction(id: string, status: UserStatus) {
     z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).parse(status);
     await employees.setEmployeeStatus(actor, id, status);
     revalidatePath("/employees", "layout");
+    revalidatePath("/dashboard");
+    return undefined;
+  });
+}
+export async function deleteEmployeeAction(id: string) {
+  return run(async () => {
+    const actor = await assertPermission(PERMISSION.EMPLOYEE_DELETE);
+    z.string().min(1).parse(id);
+    await employees.deleteEmployee(actor, id);
+    revalidatePath("/employees", "layout");
+    revalidatePath("/audit-logs");
+    revalidatePath("/dashboard");
     return undefined;
   });
 }

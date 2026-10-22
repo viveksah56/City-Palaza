@@ -19,16 +19,22 @@ import { getBrands, getCategories, listProducts, parseProductQuery } from "@/ser
 import { getSettings } from "@/server/settings.service";
 import { getInventorySummary } from "@/server/reports.service";
 import { ReportCard } from "@/components/shared/report-card";
+import { first } from "@/lib/url";
 
 export const metadata: Metadata = { title: "Products" };
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePermission(PERMISSION.PRODUCT_VIEW);
   const sp = await searchParams;
-  const [categories, brands, settings, overview] = await Promise.all([getCategories(), getBrands(), getSettings(), getInventorySummary()]);
   const canSeeCost = hasPermission(user.role, PERMISSION.INVENTORY_VIEW);
-  const q = parseProductQuery(sp, new Map(categories.map((c) => [c.slug, c.id])));
-  const result = await listProducts(q, canSeeCost);
+  const q = parseProductQuery(sp);
+  const categoriesPromise = getCategories();
+  const resultPromise = first(sp.category)
+    ? categoriesPromise.then((categories) => listProducts(parseProductQuery(sp, new Map(categories.map((c) => [c.slug, c.id]))), canSeeCost))
+    : listProducts(q, canSeeCost);
+  const [categories, brands, settings, overview, result] = await Promise.all([
+    categoriesPromise, getBrands(), getSettings(), getInventorySummary(), resultPromise,
+  ]);
   const params = toParams(sp);
 
   return (

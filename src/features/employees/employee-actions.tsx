@@ -1,27 +1,43 @@
 "use client";
 import * as React from "react";
 import { toast } from "sonner";
-import { KeyRound, UserCheck, UserX } from "lucide-react";
+import { KeyRound, Trash2, UserCheck, UserRoundX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { resetEmployeePasswordAction, setEmployeeStatusAction } from "@/server/actions";
+import { deleteEmployeeAction, resetEmployeePasswordAction, setEmployeeStatusAction } from "@/server/actions";
 
-export function EmployeeStatusButton({ id, active, isSelf }: { id: string; active: boolean; isSelf: boolean }) {
+export function EmployeeStatusButton({ id, status, isSelf }: { id: string; status: "ACTIVE" | "INACTIVE" | "SUSPENDED"; isSelf: boolean }) {
   if (isSelf) return null;
-  return active ? (
+  return status === "ACTIVE" ? (
     <ConfirmDialog
-      trigger={<Button variant="outline" className="text-destructive"><UserX /> Disable account</Button>}
-      title="Disable this account?" description="They’re signed out immediately and can’t sign in. Their past sales stay on record; accounts are never deleted."
-      confirmLabel="Disable" destructive successMessage="Account disabled" onConfirm={() => setEmployeeStatusAction(id, "INACTIVE")}
+      trigger={<Button variant="outline" className="text-destructive"><UserRoundX /> Suspend account</Button>}
+      title="Suspend this account?" description="They’ll be signed out immediately and won’t be able to sign in until access is restored. Their sales history stays on record."
+      confirmLabel="Suspend" destructive successMessage="Account suspended" onConfirm={() => setEmployeeStatusAction(id, "SUSPENDED")}
     />
   ) : (
     <ConfirmDialog
       trigger={<Button variant="outline"><UserCheck /> Reactivate</Button>}
       title="Reactivate this account?" description="They can sign in again with their current password."
       confirmLabel="Reactivate" successMessage="Account reactivated" onConfirm={() => setEmployeeStatusAction(id, "ACTIVE")}
+    />
+  );
+}
+
+export function DeleteEmployeeButton({ id, isSelf }: { id: string; isSelf: boolean }) {
+  if (isSelf) return null;
+  return (
+    <ConfirmDialog
+      trigger={<Button variant="destructive"><Trash2 /> Delete account</Button>}
+      title="Delete this account?"
+      description="This removes sign-in access and anonymizes the profile. Historical sales and audit records are retained for accurate store records. This action can’t be undone."
+      confirmLabel="Delete account"
+      destructive
+      successMessage="Account deleted and anonymized"
+      redirectTo="/employees"
+      onConfirm={() => deleteEmployeeAction(id)}
     />
   );
 }

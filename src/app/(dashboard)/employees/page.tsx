@@ -33,7 +33,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   ];
   return (
     <>
-      <PageHeader title="Employees" description="Manage workspace access and see team sales activity." actions={hasPermission(user.role, PERMISSION.EMPLOYEE_CREATE) ? <EmployeeCreateDialog /> : undefined} />
+      <PageHeader title="Team accounts" description="Manage employee and admin access and review team sales activity." actions={hasPermission(user.role, PERMISSION.EMPLOYEE_CREATE) ? <EmployeeCreateDialog /> : undefined} />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
         <ReportCard label="Team members" value={overview.total} hint="All employee accounts" />
         <ReportCard label="Active" value={overview.active} hint="Can sign in" accent="green" />

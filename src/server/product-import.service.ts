@@ -9,6 +9,7 @@ import { normalizeSerials } from "@/lib/imei";
 import { productSchema } from "@/validations/product";
 import { addStockTx, type Actor } from "./inventory.service";
 import { writeAudit } from "@/lib/audit";
+import { timeServerOperation } from "./timing";
 
 const MAX_ROWS = 250;
 const MAX_CSV_CHARS = 1_000_000;
@@ -150,27 +151,49 @@ function parseRows(source: string): { products: ParsedProduct[]; issues: ImportI
   return { products, issues };
 }
 
-async function getOrCreateCategory(tx: Prisma.TransactionClient, name: string) {
-  const found = await tx.category.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
-  if (found) return found;
-  const slug = slugify(name);
-  if (!slug) throw new DomainError("VALIDATION", `Category “${name}” needs a letter or number.`);
-  const collision = await tx.category.findUnique({ where: { slug } });
-  if (collision) throw new DomainError("CONFLICT", `Category name “${name}” conflicts with existing category “${collision.name}”.`);
-  return tx.category.create({ data: { name, slug, isActive: true } });
+async function resolveCategories(tx: Prisma.TransactionClient, names: string[]) {
+  const uniqueNames = [...new Map(names.map((name) => [name.toLocaleLowerCase("en"), name.trim()])).values()];
+  const existing = await tx.category.findMany({ where: { name: { in: uniqueNames, mode: "insensitive" } }, select: { id: true, name: true } });
+  const byName = new Map(existing.map((category) => [category.name.toLocaleLowerCase("en"), category]));
+  const missing = uniqueNames.filter((name) => !byName.has(name.toLocaleLowerCase("en"))).map((name) => {
+    const slug = slugify(name);
+    if (!slug) throw new DomainError("VALIDATION", `Category “${name}” needs a letter or number.`);
+    return { name, slug, isActive: true };
+  });
+  if (missing.length) {
+    const collisions = await tx.category.findMany({ where: { slug: { in: missing.map((category) => category.slug) } }, select: { name: true, slug: true } });
+    const collisionSlugs = new Set(collisions.map((category) => category.slug));
+    const collision = missing.find((category) => collisionSlugs.has(category.slug));
+    if (collision) throw new DomainError("CONFLICT", `Category name “${collision.name}” conflicts with an existing category.`);
+    const created = await tx.category.createManyAndReturn({ data: missing, select: { id: true, name: true } });
+    for (const category of created) byName.set(category.name.toLocaleLowerCase("en"), category);
+  }
+  return byName;
 }
 
-async function getOrCreateBrand(tx: Prisma.TransactionClient, name: string) {
-  const found = await tx.brand.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
-  if (found) return found;
-  const slug = slugify(name);
-  if (!slug) throw new DomainError("VALIDATION", `Brand “${name}” needs a letter or number.`);
-  const collision = await tx.brand.findUnique({ where: { slug } });
-  if (collision) throw new DomainError("CONFLICT", `Brand name “${name}” conflicts with existing brand “${collision.name}”.`);
-  return tx.brand.create({ data: { name, slug, isActive: true } });
+async function resolveBrands(tx: Prisma.TransactionClient, names: string[]) {
+  const uniqueNames = [...new Map(names.map((name) => [name.toLocaleLowerCase("en"), name.trim()])).values()];
+  if (!uniqueNames.length) return new Map<string, { id: string; name: string }>();
+  const existing = await tx.brand.findMany({ where: { name: { in: uniqueNames, mode: "insensitive" } }, select: { id: true, name: true } });
+  const byName = new Map(existing.map((brand) => [brand.name.toLocaleLowerCase("en"), brand]));
+  const missing = uniqueNames.filter((name) => !byName.has(name.toLocaleLowerCase("en"))).map((name) => {
+    const slug = slugify(name);
+    if (!slug) throw new DomainError("VALIDATION", `Brand “${name}” needs a letter or number.`);
+    return { name, slug, isActive: true };
+  });
+  if (missing.length) {
+    const collisions = await tx.brand.findMany({ where: { slug: { in: missing.map((brand) => brand.slug) } }, select: { name: true, slug: true } });
+    const collisionSlugs = new Set(collisions.map((brand) => brand.slug));
+    const collision = missing.find((brand) => collisionSlugs.has(brand.slug));
+    if (collision) throw new DomainError("CONFLICT", `Brand name “${collision.name}” conflicts with an existing brand.`);
+    const created = await tx.brand.createManyAndReturn({ data: missing, select: { id: true, name: true } });
+    for (const brand of created) byName.set(brand.name.toLocaleLowerCase("en"), brand);
+  }
+  return byName;
 }
 
 export async function importProductsCsv(actor: Actor, csv: string) {
+  return timeServerOperation("products.bulk-import", async () => {
   assertRolePermission(actor.role, PERMISSION.PRODUCT_CREATE);
   const parsed = parseRows(csv);
   if (parsed.issues.length) return { imported: 0, issues: parsed.issues };
@@ -189,9 +212,14 @@ export async function importProductsCsv(actor: Actor, csv: string) {
     for (const product of existingBarcodes) if (product.barcode) issues.push({ row: rowByBarcode.get(product.barcode) ?? 0, message: `Barcode ${product.barcode} already exists.` });
     if (issues.length) return { imported: 0, issues };
 
+    const [categories, brands] = await Promise.all([
+      resolveCategories(tx, parsed.products.map((product) => product.categoryName)),
+      resolveBrands(tx, parsed.products.flatMap((product) => product.brandName ? [product.brandName] : [])),
+    ]);
     for (const product of parsed.products) {
-      const category = await getOrCreateCategory(tx, product.categoryName);
-      const brand = product.brandName ? await getOrCreateBrand(tx, product.brandName) : null;
+      const category = categories.get(product.categoryName.toLocaleLowerCase("en"));
+      const brand = product.brandName ? brands.get(product.brandName.toLocaleLowerCase("en")) : null;
+      if (!category) throw new DomainError("CONFLICT", `Could not resolve category “${product.categoryName}”.`);
       const value = product.value;
       const created = await tx.product.create({
         data: {
@@ -227,4 +255,5 @@ export async function importProductsCsv(actor: Actor, csv: string) {
   }, { timeout: 30_000 });
 
   return result;
+  });
 }

@@ -19,18 +19,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { getAdminDashboard, getEmployeeDashboard } from "@/server/dashboard.service";
 import { getSettings } from "@/server/settings.service";
 import { IconButton } from "@/components/shared/icon-button";
+import { DashboardExports } from "@/features/reports/dashboard-exports";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requirePermission(PERMISSION.DASHBOARD_VIEW);
-  const sp = await searchParams;
-  if (!hasPermission(user.role, PERMISSION.REPORT_VIEW)) return <EmployeeDashboard userId={user.id} name={user.firstName} />;
+  const [user, sp] = await Promise.all([requirePermission(PERMISSION.DASHBOARD_VIEW), searchParams]);
+  if (!hasPermission(user.role, PERMISSION.REPORT_VIEW)) return <Suspense fallback={<LoadingSkeleton cards={4} rows={4} />}><EmployeeDashboard userId={user.id} name={user.firstName} /></Suspense>;
 
   const range = resolveRange(first(sp.range), first(sp.from), first(sp.to), { fallback: "last7" });
   return (
     <>
-      <PageHeader title="Dashboard" description="A live view of sales, stock, and store activity." actions={<><DateRangePicker /><Button asChild variant="outline"><Link href="/sales/new"><ShoppingBag /> New sale</Link></Button></>} />
+      <PageHeader title="Dashboard" description="A live view of sales, stock, and store activity." actions={<><DateRangePicker /><DashboardExports range={range} /><Button asChild variant="outline"><Link href="/sales/new"><ShoppingBag /> New sale</Link></Button></>} />
       <Suspense key={`${range.from.toISOString()}-${range.to.toISOString()}`} fallback={<LoadingSkeleton cards={8} rows={4} />}>
         <DashboardServerView range={range} />
       </Suspense>
@@ -115,7 +115,7 @@ async function EmployeeDashboard({ userId, name }: { userId: string; name: strin
   const [d, s] = await Promise.all([getEmployeeDashboard(userId), getSettings()]);
   return (
     <>
-      <PageHeader title={`Hello, ${name}`} description="Your day at the counter." actions={<Button asChild><Link href="/sales/new"><ShoppingBag /> New sale</Link></Button>} />
+      <PageHeader title={`Hello, ${name}`} description="Your day at the counter." actions={<><DashboardExports /><Button asChild><Link href="/sales/new"><ShoppingBag /> New sale</Link></Button></>} />
       <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_19rem] 2xl:gap-6">
       <div className="min-w-0 space-y-5">
         <section aria-label="My performance today" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">

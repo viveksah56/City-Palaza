@@ -30,7 +30,7 @@ npm run dev                       # http://localhost:3000
 
 **Bulk product import:** open **Products → Bulk upload**, download the CSV template, and upload up to 250 rows at a time. Categories and brands are added when missing; opening stock and IMEI/serial entries are created through the inventory ledger. Each batch validates before writing and rolls back completely if a row has an error. Existing SKUs are never overwritten.
 
-**Production:** configure the transaction-pool `DATABASE_URL`, session-pool `DIRECT_URL`, a production-only `AUTH_SECRET`, public `APP_URL`, and SMTP settings in the private `.env.prod` file or the hosting provider's environment settings. Do not configure `SEED_*` variables in production. `npm run start:prod` starts Next.js with `.env.prod`; `npm run db:migrate:prod` applies reviewed Prisma migrations and `npm run db:setup:prod` also applies the database constraints. Destructive Prisma resets are blocked for Supabase URLs. For Vercel, set the same values in project environment settings instead of uploading a local env file.
+**Production:** configure the transaction-pool `DATABASE_URL`, session-pool `DIRECT_URL`, a production-only `AUTH_SECRET`, public `APP_URL`, and SMTP settings in the private `.env.prod` file or the hosting provider's environment settings. Do not configure `SEED_*` variables in production. `npm run build:prod` builds with `.env.prod`, `npm run start:prod` starts Next.js with `.env.prod`, and `npm run db:migrate:prod` applies reviewed Prisma migrations. `npm run db:setup:prod` also applies the database constraints. Destructive Prisma resets are blocked for Supabase URLs. For Vercel, set the same values in project environment settings instead of uploading a local env file.
 
 **Migration source:** `.env` contains `SOURCE_DIRECT_URL` for read-only exports from the old project. Do not use it for application runtime, migrations, or writes.
 
@@ -43,6 +43,9 @@ Seed users from `db:seed`: `admin@citypalaza.local` (ADMIN), `sita@`, `ram@`, `a
 | Script | Purpose |
 |---|---|
 | `npm run dev` / `build` / `start` / `start:prod` | Next.js |
+| `npm run build:prod` | Build using `.env.prod` for a local production-mode check |
+| `npm run analyze` | Capture a Turbopack production bundle analysis |
+| `npm run analyze:webpack` | Produce `client.html`, `edge.html`, and `nodejs.html` bundle reports with `@next/bundle-analyzer` |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Unit tests (no database needed) |
 | `npm run test:integration` | DB-backed tests; requires `TEST_DATABASE_URL` (a **disposable** DB: tables are truncated) |
@@ -62,8 +65,8 @@ npm run test:integration
 
 ## What's in the box
 
-**Admin:** Dashboard (KPIs + 4 charts + date-range filters) · Sales (all, void) · Products, Categories & Brands · Inventory (add stock, adjust, damage/lost, history) · Customers · Reports (Sales, Profit, Inventory, Employee performance) · Employees · Audit logs · Settings.
-**Employee:** Dashboard (own numbers only) · Sales terminal and own sales · Products (search, price, availability, no costs) · Customers.
+**Admin:** Dashboard (KPIs + charts + date-range filters and PDF/Excel exports) · Sales (all, void) · Products, Categories & Brands · Inventory (add stock, adjust, damage/lost, history) · Customers · Reports (Sales, Profit, Inventory, Employee performance) · Team accounts (create employees/admins, suspend, anonymize/delete) · Audit logs · Settings.
+**Employee:** Dashboard (own numbers only, with personal PDF/Excel exports) · Sales terminal and own sales · Products (search, price, availability, no costs) · Customers.
 
 Highlights
 - **Sales terminal** – fast product search (name/SKU/barcode/IMEI), cart (Zustand), optional customer or walk-in, % or fixed discount, payment method, live preview, then a **server-authoritative** checkout. Receipt can be printed or downloaded.
@@ -109,7 +112,8 @@ Rules the code follows: Server Components by default (client components only for
 
 ### Security
 - **Auth:** HTTP-only, `SameSite=Lax`, `Secure` (prod) cookies containing signed access and rotating refresh tokens that reference a server-side `Session` row. Nothing sensitive in `localStorage`. Sessions expire, are deleted on logout, and are revoked immediately when an account is disabled or its password is reset. Password recovery stores only a SHA-256 digest of a random single-use token. Passwords use bcrypt (cost 12) and strength rules.
-- **RBAC:** `lib/rbac/permissions.ts` defines all 35 permissions and the role map. UI uses it for navigation and `PermissionGate`; **every** Server Action calls `assertPermission()` and every route handler calls `can()`. Pages call `requirePermission()` (redirects to `/forbidden`). Employees never receive purchase prices (omitted in the DTO, not merely hidden) and can only open their own sales.
+- **RBAC:** `lib/rbac/permission.ts` defines the permissions and role map. UI uses it for navigation and `PermissionGate`; **every** Server Action calls `assertPermission()` and every route handler checks access. Pages call `requirePermission()` (redirects to `/forbidden`). Employees never receive purchase prices (omitted in the DTO, not merely hidden) and can only open their own sales.
+- **Account deletion:** deleting an account revokes sessions and reset tokens, anonymizes its profile and audit descriptions, and retains historical sales/stock records. The last active admin cannot be suspended, demoted, or deleted.
 - Security headers in `next.config.ts`; secrets stay in private, git-ignored `.env` and `.env.prod` files or the production host's environment settings.
 
 ### Money, stock and concurrency

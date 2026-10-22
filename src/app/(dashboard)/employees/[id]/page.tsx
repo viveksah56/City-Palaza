@@ -5,7 +5,7 @@ import { fullName } from "@/lib/format";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/badges";
 import { EmployeeForm } from "@/features/employees/employee-form";
-import { EmployeeStatusButton, ResetPasswordDialog } from "@/features/employees/employee-actions";
+import { DeleteEmployeeButton, EmployeeStatusButton, ResetPasswordDialog } from "@/features/employees/employee-actions";
 import { getEmployee } from "@/server/employees.service";
 
 export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,7 +19,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       <PageHeader
         title={fullName(e)}
         description={`${e._count.sales} sales on record`}
-        actions={<><StatusBadge status={e.status} />{canUpdate && <ResetPasswordDialog id={e.id} />}{hasPermission(user.role, PERMISSION.EMPLOYEE_DISABLE) && <EmployeeStatusButton id={e.id} active={e.status === "ACTIVE"} isSelf={e.id === user.id} />}</>}
+        actions={<><StatusBadge status={e.status} />{canUpdate && <ResetPasswordDialog id={e.id} />}{hasPermission(user.role, PERMISSION.EMPLOYEE_DISABLE) && <EmployeeStatusButton id={e.id} status={e.status} isSelf={e.id === user.id} />}{hasPermission(user.role, PERMISSION.EMPLOYEE_DELETE) && <DeleteEmployeeButton id={e.id} isSelf={e.id === user.id} />}</>}
       />
       {canUpdate ? <EmployeeForm employee={{ id: e.id, firstName: e.firstName, lastName: e.lastName, email: e.email, phone: e.phone, role: e.role }} /> : <p className="text-sm text-muted-foreground">{e.email}</p>}
     </>

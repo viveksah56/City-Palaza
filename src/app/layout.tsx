@@ -15,7 +15,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-          <title> CityPalaza</title>
         <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('citypalaza-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}}catch{}` }} />
       </head>
       <body className="min-h-dvh antialiased">

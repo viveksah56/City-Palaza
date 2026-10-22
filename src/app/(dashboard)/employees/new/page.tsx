@@ -4,9 +4,9 @@ import { requirePermission } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmployeeForm } from "@/features/employees/employee-form";
 
-export const metadata: Metadata = { title: "Add employee" };
+export const metadata: Metadata = { title: "Add account" };
 
 export default async function NewEmployeePage() {
   await requirePermission(PERMISSION.EMPLOYEE_CREATE);
-  return (<><PageHeader title="Add employee" description="Give them a temporary password and ask them to keep it private." /><EmployeeForm /></>);
+  return (<><PageHeader title="Add account" description="Create an employee or admin account with a temporary password." /><EmployeeForm /></>);
 }
