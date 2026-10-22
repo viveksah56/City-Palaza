@@ -31,9 +31,8 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
       <section className="relative hidden flex-col justify-between overflow-hidden bg-sidebar px-12 py-10 text-sidebar-foreground lg:flex xl:px-16 xl:py-12">
         <div aria-hidden className="pointer-events-none absolute -right-40 -top-40 size-[30rem] rounded-full border border-white/[0.06]" />
         <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 size-[20rem] rounded-full border border-white/[0.06]" />
-        <div className="relative flex items-center gap-3">
-          <Image src="/citypalaza-mark.webp" alt="" width={40} height={40} priority className="size-10 rounded-xl object-cover ring-1 ring-sidebar-border" />
-          <span className="font-heading text-[21px] font-semibold tracking-[-0.03em]">CityPalaza</span>
+        <div className="relative">
+          <Image src="/citypalaza-logo.webp" alt="CityPalaza" width={640} height={640} sizes="120px" priority className="size-28 rounded-2xl object-cover ring-1 ring-sidebar-border sm:size-32" />
         </div>
 
         <div className="relative max-w-xl py-12">
@@ -66,9 +65,8 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
       <section className="relative flex min-h-dvh items-center justify-center px-5 py-10 sm:px-8">
         <div className="absolute top-5 right-5 sm:top-8 sm:right-8"><ThemeToggle /></div>
         <div className="rise w-full max-w-[420px]">
-          <div className="mb-9 flex items-center justify-center gap-2.5 lg:hidden">
-            <Image src="/citypalaza-mark.webp" alt="" width={36} height={36} priority className="size-9 rounded-lg object-cover" />
-            <span className="font-heading text-lg font-semibold tracking-[-0.025em]">CityPalaza</span>
+          <div className="mb-7 flex justify-center lg:hidden">
+            <Image src="/citypalaza-logo.webp" alt="CityPalaza" width={640} height={640} sizes="96px" priority className="size-24 rounded-2xl object-cover ring-1 ring-border" />
           </div>
           <Card className="gap-7 rounded-2xl border-border/80 px-0 py-8 shadow-card sm:py-9">
             <CardHeader className="gap-2 px-7 sm:px-8">

@@ -26,11 +26,12 @@ export function EmployeeStatusButton({ id, status, isSelf }: { id: string; statu
   );
 }
 
-export function DeleteEmployeeButton({ id, isSelf }: { id: string; isSelf: boolean }) {
+export function DeleteEmployeeButton({ id, isSelf, compact = false }: { id: string; isSelf: boolean; compact?: boolean }) {
   if (isSelf) return null;
   return (
     <ConfirmDialog
-      trigger={<Button variant="destructive"><Trash2 /> Delete account</Button>}
+      trigger={compact ? <Button size="icon" variant="ghost" aria-label="Delete account"><Trash2 className="text-destructive" /></Button> : <Button variant="destructive"><Trash2 /> Delete account</Button>}
+      triggerLabel={compact ? "Delete account" : undefined}
       title="Delete this account?"
       description="This removes sign-in access and anonymizes the profile. Historical sales and audit records are retained for accurate store records. This action can’t be undone."
       confirmLabel="Delete account"

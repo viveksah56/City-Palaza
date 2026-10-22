@@ -13,6 +13,7 @@ import { DataTable, Pagination, type Column } from "@/components/shared/data-tab
 import { EmptyState } from "@/components/shared/states";
 import { getEmployeeOverview, listEmployees, parseEmployeeQuery } from "@/server/employees.service";
 import { EmployeeCreateDialog } from "@/features/employees/employee-create-dialog";
+import { DeleteEmployeeButton } from "@/features/employees/employee-actions";
 import { ReportCard } from "@/components/shared/report-card";
 
 export const metadata: Metadata = { title: "Employees" };
@@ -30,6 +31,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
     { key: "s", header: "Status", sortKey: "status", cell: (e) => <StatusBadge status={e.status} /> },
     { key: "c", header: "Sales", align: "right", cell: (e) => <span className="num">{e._count.sales}</span> },
     { key: "l", header: "Last sign-in", sortKey: "lastLoginAt", cell: (e) => (e.lastLoginAt ? formatDateTime(e.lastLoginAt) : "Never") },
+    ...(hasPermission(user.role, PERMISSION.EMPLOYEE_DELETE) ? [{ key: "a", header: <span className="sr-only">Actions</span>, align: "right" as const, cell: (e: Row) => <DeleteEmployeeButton id={e.id} isSelf={e.id === user.id} compact /> }] : []),
   ];
   return (
     <>

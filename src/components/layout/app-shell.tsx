@@ -58,7 +58,7 @@ function Breadcrumbs() {
 function Brand({ name, onDark = false }: { name: string; onDark?: boolean }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5 rounded-lg outline-none">
-      <Image src="/citypalaza-mark.webp" alt="" width={36} height={36} className={cn("size-9 shrink-0 rounded-lg object-cover", onDark && "ring-1 ring-sidebar-border")} />
+      <Image src="/citypalaza-icon.png" alt="" width={36} height={36} className={cn("size-9 shrink-0 rounded-lg object-cover", onDark && "ring-1 ring-sidebar-border")} />
       <span className={cn("truncate font-heading text-[18px] font-semibold tracking-[-0.025em] group-data-[collapsed=true]/sidebar:hidden", onDark ? "text-sidebar-foreground" : "text-foreground")}>{name}</span>
     </Link>
   );
