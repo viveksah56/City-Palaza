@@ -15,9 +15,11 @@ import { splitSerials } from "@/validations/inventory";
 import { addStockTx, type Actor } from "./inventory.service";
 import { PRODUCT_CATEGORY_SELECTION, TAXONOMY_CACHE_TAG, TAXONOMY_KIND } from "@/lib/constants/categories";
 import { slugify } from "@/lib/format";
+import { uniqueSlug } from "@/lib/slug";
 
 export type ProductRow = {
   id: string;
+  slug: string;
   sku: string;
   barcode: string | null;
   name: string;
@@ -68,6 +70,7 @@ type ProductWithRels = Prisma.ProductGetPayload<{ include: { category: { select:
 export function toProductRow(p: ProductWithRels, canSeeCost: boolean): ProductRow {
   return {
     id: p.id,
+    slug: p.slug,
     sku: p.sku,
     barcode: p.barcode,
     name: p.name,
@@ -140,9 +143,9 @@ export async function searchSellableProducts(term: string, limit = 20): Promise<
   return rows.map((p) => toProductRow(p, false));
 }
 
-export async function getProduct(id: string, canSeeCost: boolean) {
+export async function getProductBySlug(slug: string, canSeeCost: boolean) {
   const p = await prisma.product.findUnique({
-    where: { id },
+    where: { slug },
     include: { category: { select: { name: true } }, brand: { select: { name: true } } },
   });
   if (!p) return null;
@@ -216,7 +219,8 @@ export async function createProduct(actor: Actor, raw: unknown) {
 
   return prisma.$transaction(async (tx) => {
     const categoryId = await resolveProductCategory(tx, actor, v);
-    const product = await tx.product.create({ data: { ...data, categoryId } });
+    const slug = await uniqueSlug(v.name, async (value) => !!(await tx.product.findUnique({ where: { slug: value }, select: { id: true } })));
+    const product = await tx.product.create({ data: { ...data, slug, categoryId } });
     const serials = splitSerials(v.initialSerials);
     const qty = typeof v.initialQuantity === "number" && Number.isFinite(v.initialQuantity) ? v.initialQuantity : 0;
     if (v.trackingType === "QUANTITY" ? qty > 0 : serials.length > 0) {
@@ -229,7 +233,7 @@ export async function createProduct(actor: Actor, raw: unknown) {
       entityId: product.id,
       description: `Created product ${product.name} (${product.sku})`,
     });
-    return { id: product.id };
+    return { id: product.id, slug: product.slug };
   });
 }
 

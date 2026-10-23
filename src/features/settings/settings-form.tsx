@@ -14,6 +14,7 @@ export function SettingsForm({ defaults, canEdit }: { defaults: SettingsValues; 
   const router = useRouter();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SettingsValues>({ resolver: zodResolver(settingsSchema), defaultValues: defaults });
   const num = { valueAsNumber: true } as const;
+  const nullableNum = { setValueAs: (value: string) => value === "" ? null : Number(value) } as const;
   return (
     <form noValidate className="grid max-w-3xl gap-6" onSubmit={handleSubmit(async (v) => {
       const res = await updateSettingsAction(v);
@@ -39,6 +40,7 @@ export function SettingsForm({ defaults, canEdit }: { defaults: SettingsValues; 
             <Field label="Invoice prefix" htmlFor="invoicePrefix" error={errors.invoicePrefix?.message} hint="Sale numbers look like CP-000123"><Input id="invoicePrefix" {...register("invoicePrefix")} /></Field>
             <Field label="Tax rate (%)" htmlFor="taxRate" error={errors.taxRate?.message} hint="Added on top of prices at checkout. Use 0 for none."><Input id="taxRate" type="number" step="0.01" min="0" max="100" {...register("taxRate", num)} /></Field>
             <Field label="Employee discount limit (%)" htmlFor="employeeDiscountLimit" error={errors.employeeDiscountLimit?.message} hint="The most an employee can discount a sale. Admins have no limit."><Input id="employeeDiscountLimit" type="number" step="0.01" min="0" max="100" {...register("employeeDiscountLimit", num)} /></Field>
+            <Field label="Employee total discount ceiling (%)" htmlFor="employeeMaxTotalDiscountPercent" error={errors.employeeMaxTotalDiscountPercent?.message} hint="Optional cap for promotions plus manual discounts. Leave blank to disable."><Input id="employeeMaxTotalDiscountPercent" type="number" step="0.01" min="0" max="100" {...register("employeeMaxTotalDiscountPercent", nullableNum)} /></Field>
           </CardContent>
         </Card>
       </fieldset>

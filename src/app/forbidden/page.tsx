@@ -11,7 +11,7 @@ export default function ForbiddenPage() {
       <div className="max-w-sm text-center">
         <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-red/12 text-red"><ShieldAlert className="size-8" strokeWidth={1.5} aria-hidden /></span>
         <h1 className="mt-3 font-heading text-2xl font-semibold tracking-tight">You don’t have access to this page</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Ask a CityPalaza admin if you need this permission.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Ask a CityPlaza admin if you need this permission.</p>
         <Button asChild className="mt-5"><Link href="/dashboard">Back to dashboard</Link></Button>
       </div>
     </main>

@@ -1,4 +1,4 @@
-export const APP_NAME = "CityPalaza";
+export const APP_NAME = "CityPlaza";
 export const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Kathmandu";
 export const SESSION_COOKIE = "cp_session";
 export const REFRESH_COOKIE = "cp_refresh";

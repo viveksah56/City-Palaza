@@ -25,7 +25,7 @@ export async function getAdminDashboard(range: DateRange) {
       where: { status: "COMPLETED" },
       orderBy: { createdAt: "desc" },
       take: 6,
-      select: { id: true, saleNumber: true, total: true, paymentStatus: true, createdAt: true, customer: { select: { name: true } }, employee: { select: { firstName: true, lastName: true } } },
+      select: { id: true, slug: true, saleNumber: true, total: true, paymentStatus: true, createdAt: true, customer: { select: { name: true } }, employee: { select: { firstName: true, lastName: true } } },
     }),
     reports.getLowStockProducts(6),
   ]);
@@ -64,7 +64,7 @@ export async function getEmployeeDashboard(userId: string) {
       where: { employeeId: userId },
       orderBy: { createdAt: "desc" },
       take: 6,
-      select: { id: true, saleNumber: true, total: true, status: true, createdAt: true, customer: { select: { name: true } } },
+      select: { id: true, slug: true, saleNumber: true, total: true, status: true, createdAt: true, customer: { select: { name: true } } },
     }),
     reports.getSalesOverTime(week, userId),
   ]);

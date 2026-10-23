@@ -130,13 +130,20 @@ export async function getProfitByProduct(p: Period, limit = 15) {
 
 export async function getEmployeePerformance(p: Period) {
   return prisma.$queryRaw<
-    { id: string; name: string; sales: number; units: number; revenue: string; discounts: string; profit: string; average: string }[]
+    { id: string; name: string; sales: number; units: number; revenue: string; discounts: string | null; profit: string; average: string }[]
   >`
+    WITH employee_discounts AS (
+      SELECT "employeeId",
+             CASE WHEN COUNT("manualDiscount") = COUNT(*) THEN SUM("manualDiscount")::text ELSE NULL END AS discounts
+        FROM "citypalaza_database"."Sale"
+       WHERE "status" = 'COMPLETED' AND "createdAt" >= ${p.from} AND "createdAt" < ${p.to}
+       GROUP BY "employeeId"
+    )
     SELECT u."id", u."firstName" || ' ' || u."lastName" AS name,
            COUNT(DISTINCT s."id")::int AS sales,
            COALESCE(SUM(si."quantity"),0)::int AS units,
            COALESCE(SUM(si."subtotal" - si."discount"),0)::text AS revenue,
-           COALESCE(SUM(si."discount"),0)::text AS discounts,
+           ed.discounts,
            COALESCE(SUM(si."subtotal" - si."discount" - si."unitCost" * si."quantity"),0)::text AS profit,
            CASE WHEN COUNT(DISTINCT s."id") = 0 THEN '0.00'
                 ELSE (SUM(si."total") / COUNT(DISTINCT s."id"))::numeric(14,2)::text END AS average
@@ -144,7 +151,8 @@ export async function getEmployeePerformance(p: Period) {
       JOIN "citypalaza_database"."Sale" s ON s."employeeId" = u."id" AND s."status" = 'COMPLETED'
                    AND s."createdAt" >= ${p.from} AND s."createdAt" < ${p.to}
       JOIN "citypalaza_database"."SaleItem" si ON si."saleId" = s."id"
-     GROUP BY u."id", u."firstName", u."lastName"
+      LEFT JOIN employee_discounts ed ON ed."employeeId" = u."id"
+     GROUP BY u."id", u."firstName", u."lastName", ed.discounts
      ORDER BY SUM(si."subtotal" - si."discount") DESC`;
 }
 
@@ -179,8 +187,8 @@ export async function getInventorySummary() {
 }
 
 export function getLowStockProducts(limit = 50) {
-  return prisma.$queryRaw<{ id: string; name: string; sku: string; quantity: number; minStock: number }[]>`
-    SELECT "id", "name", "sku", "quantity", "minStock" FROM "citypalaza_database"."Product"
+  return prisma.$queryRaw<{ id: string; slug: string; name: string; sku: string; quantity: number; minStock: number }[]>`
+    SELECT "id", "slug", "name", "sku", "quantity", "minStock" FROM "citypalaza_database"."Product"
      WHERE "status" = 'ACTIVE' AND "quantity" > 0 AND "quantity" <= "minStock"
      ORDER BY "quantity" ASC, "name" ASC LIMIT ${limit}`;
 }
@@ -190,6 +198,6 @@ export function getOutOfStockProducts(limit = 50) {
     where: { status: "ACTIVE", quantity: { lte: 0 } },
     orderBy: { name: "asc" },
     take: limit,
-    select: { id: true, name: true, sku: true, minStock: true, category: { select: { name: true } } },
+    select: { id: true, slug: true, name: true, sku: true, minStock: true, category: { select: { name: true } } },
   });
 }

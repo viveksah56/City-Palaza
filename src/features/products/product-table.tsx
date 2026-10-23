@@ -5,13 +5,20 @@ import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { TRACKING_LABELS } from "@/lib/constants";
 import type { ProductRow } from "@/server/products.service";
 import { SkuCode } from "@/components/shared/sku-code";
+import { StockActions } from "@/features/inventory/inventory-adjustment-form";
+import { ProductAdminActions } from "./product-admin-actions";
+import { Button } from "@/components/ui/button";
+import { Edit3 } from "lucide-react";
+import { PERMISSION, hasPermission } from "@/lib/rbac/permission";
+import type { Role } from "@/lib/constants/roles";
 
 export function ProductTable({
-  rows, canSeeCost, currency, url, sort, empty,
+  rows, canSeeCost, currency, role, url, sort, empty,
 }: {
   rows: ProductRow[];
   canSeeCost: boolean;
   currency: string;
+  role: Role;
   url: { basePath: string; params: Record<string, string | undefined> };
   sort: { key?: string; order?: "asc" | "desc" };
   empty?: React.ReactNode;
@@ -21,7 +28,7 @@ export function ProductTable({
       key: "name", header: "Product", sortKey: "name",
       cell: (p) => (
         <div className="min-w-48">
-          <Link href={`/products/${p.id}`} className="font-medium hover:text-primary hover:underline">{p.name}</Link>
+          <Link href={`/products/${p.slug}`} className="font-medium hover:text-primary hover:underline">{p.name}</Link>
           <p className="text-xs text-muted-foreground">{p.variantLabel ? `${p.variantLabel} · ` : ""}{p.category}{p.brand ? ` · ${p.brand}` : ""} · {TRACKING_LABELS[p.trackingType]}</p>
         </div>
       ),
@@ -31,6 +38,14 @@ export function ProductTable({
     { key: "price", header: "Price", sortKey: "sellingPrice", align: "right", cell: (p) => <CurrencyDisplay value={p.sellingPrice} currency={currency} className="font-medium" /> },
     { key: "qty", header: "Stock", sortKey: "quantity", align: "right", cell: (p) => <span className="num">{p.quantity}</span> },
     { key: "status", header: "Availability", cell: (p) => (p.status === "ACTIVE" ? <StockBadge status={p.stockStatus} /> : <StatusBadge status={p.status} />) },
+    ...(hasPermission(role, PERMISSION.INVENTORY_ADD) || hasPermission(role, PERMISSION.INVENTORY_ADJUST) || hasPermission(role, PERMISSION.PRODUCT_UPDATE) || hasPermission(role, PERMISSION.PRODUCT_DELETE) ? [{
+      key: "actions", header: <span className="sr-only">Actions</span>, align: "right" as const,
+      cell: (p: ProductRow) => <div className="flex items-center justify-end gap-1.5">
+        {hasPermission(role, PERMISSION.PRODUCT_UPDATE) && <Button asChild size="sm" variant="outline"><Link href={`/products/${p.slug}`} aria-label={`Edit ${p.name}`}><Edit3 /> Edit</Link></Button>}
+        {(hasPermission(role, PERMISSION.INVENTORY_ADD) || hasPermission(role, PERMISSION.INVENTORY_ADJUST)) && <StockActions product={{ id: p.id, name: p.name, sku: p.sku, trackingType: p.trackingType, quantity: p.quantity }} canAdd={hasPermission(role, PERMISSION.INVENTORY_ADD)} canAdjust={hasPermission(role, PERMISSION.INVENTORY_ADJUST)} />}
+        {(hasPermission(role, PERMISSION.PRODUCT_UPDATE) || hasPermission(role, PERMISSION.PRODUCT_DELETE)) && <ProductAdminActions id={p.id} status={p.status} canUpdate={hasPermission(role, PERMISSION.PRODUCT_UPDATE)} canDelete={hasPermission(role, PERMISSION.PRODUCT_DELETE)} compact />}
+      </div>,
+    }] : []),
   ];
   return <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} url={url} sort={sort} empty={empty} />;
 }

@@ -220,6 +220,7 @@ export async function listInventory(q: InventoryQuery) {
   return paged(
     rows.map((p) => ({
       id: p.id,
+      slug: p.slug,
       sku: p.sku,
       name: p.name,
       variantLabel: p.variantLabel,
@@ -267,16 +268,28 @@ export async function listInventoryHistory(q: HistoryQuery) {
       orderBy: { [q.sort]: q.order },
       skip: q.skip,
       take: q.take,
-      include: { product: { select: { name: true, sku: true } }, user: { select: { firstName: true, lastName: true } } },
+      include: { product: { select: { name: true, slug: true, sku: true } }, user: { select: { firstName: true, lastName: true } } },
     }),
     prisma.inventoryTransaction.count({ where }),
   ]);
-  return paged(rows, total, q);
+  const saleIds = rows.flatMap((row) => row.referenceId && row.referenceType?.startsWith("SALE") ? [row.referenceId] : []);
+  const sales = saleIds.length ? await prisma.sale.findMany({ where: { id: { in: saleIds } }, select: { id: true, slug: true } }) : [];
+  const saleSlugs = new Map(sales.map((sale) => [sale.id, sale.slug]));
+  return paged(rows.map((row) => ({ ...row, saleSlug: row.referenceId ? saleSlugs.get(row.referenceId) ?? null : null })), total, q);
 }
 
 export async function listSerials(productId: string, status?: "IN_STOCK") {
   return prisma.productSerial.findMany({
     where: { productId, ...(status && { status }) },
+    orderBy: [{ status: "asc" }, { serial: "asc" }],
+    take: 500,
+    select: { id: true, serial: true, status: true, notes: true },
+  });
+}
+
+export async function listSerialsByProductSlug(productSlug: string, status?: "IN_STOCK") {
+  return prisma.productSerial.findMany({
+    where: { product: { slug: productSlug }, ...(status && { status }) },
     orderBy: [{ status: "asc" }, { serial: "asc" }],
     take: 500,
     select: { id: true, serial: true, status: true, notes: true },

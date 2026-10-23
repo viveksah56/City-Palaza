@@ -8,13 +8,13 @@ import { StatusBadge } from "@/components/shared/badges";
 import { Button } from "@/components/ui/button";
 import { Receipt } from "@/features/sales/receipt";
 import { DownloadReceipt, PrintButton, VoidSaleDialog } from "@/features/sales/sale-actions";
-import { getSaleForUser } from "@/server/sales.service";
+import { getSaleForUserBySlug } from "@/server/sales.service";
 import { getSettings } from "@/server/settings.service";
 
-export default async function SaleDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ new?: string }> }) {
+export default async function SaleDetailPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ new?: string }> }) {
   const user = await requirePermission(PERMISSION.SALE_VIEW);
-  const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const sale = await getSaleForUser(user, id);
+  const [{ slug }, sp] = await Promise.all([params, searchParams]);
+  const sale = await getSaleForUserBySlug(user, slug);
   if (!sale) notFound();
   const settings = await getSettings();
   return (
@@ -27,7 +27,7 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
             <>
               <StatusBadge status={sale.status} />
               <PrintButton />
-              <DownloadReceipt id={sale.id} />
+              <DownloadReceipt slug={sale.slug} />
               {hasPermission(user.role, PERMISSION.SALE_VOID) && sale.status === "COMPLETED" && <VoidSaleDialog saleId={sale.id} saleNumber={sale.saleNumber} />}
               {hasPermission(user.role, PERMISSION.SALE_CREATE) && <Button asChild><Link href="/sales/new">New sale</Link></Button>}
             </>

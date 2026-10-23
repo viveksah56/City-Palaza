@@ -41,7 +41,7 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
   ]);
   const scope = employeeId ? "My sales" : "Store sales";
   return {
-    title: `CityPalaza ${scope.toLowerCase()} report`,
+    title: `CityPlaza ${scope.toLowerCase()} report`,
     period: `${range.label} · ${range.from.toLocaleDateString("en-GB")} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB")}`,
     currency,
     summary: [
@@ -81,7 +81,7 @@ export async function getReportExportData(user: SessionUser, range: DateRange, c
   if (tab === "profit") {
     const [summary, trend, products] = await Promise.all([reports.getProfitSummary(range), reports.getProfitOverTime(range), reports.getProfitByProduct(range)]);
     return {
-      title: "CityPalaza profit report",
+      title: "CityPlaza profit report",
       period: `${range.label} · ${range.from.toLocaleDateString("en-GB")} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB")}`,
       currency,
       summary: [["Revenue", money(summary.revenue, currency)], ["Cost of goods sold", money(summary.cost, currency)], ["Gross profit", money(summary.profit, currency)], ["Margin", `${summary.marginPercent}%`]],
@@ -94,7 +94,7 @@ export async function getReportExportData(user: SessionUser, range: DateRange, c
   if (tab === "inventory") {
     const [summary, low, out] = await Promise.all([reports.getInventorySummary(), reports.getLowStockProducts(), reports.getOutOfStockProducts()]);
     return {
-      title: "CityPalaza inventory report",
+      title: "CityPlaza inventory report",
       period: `Current inventory · generated ${new Date().toLocaleDateString("en-GB")}`,
       currency,
       summary: [["Active products", summary.products], ["Units in stock", summary.units], ["Inventory cost value", money(summary.costValue, currency)], ["Inventory selling value", money(summary.sellingValue, currency)], ["Potential gross profit", money(summary.potentialProfit, currency)], ["Low stock", summary.lowStock], ["Out of stock", summary.outOfStock]],
@@ -106,10 +106,10 @@ export async function getReportExportData(user: SessionUser, range: DateRange, c
   }
   const employees = await reports.getEmployeePerformance(range);
   return {
-    title: "CityPalaza employee performance report",
+    title: "CityPlaza employee performance report",
     period: `${range.label} · ${range.from.toLocaleDateString("en-GB")} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB")}`,
     currency,
     summary: [["Employees with sales", employees.length], ["Sales", employees.reduce((total, row) => total + row.sales, 0)], ["Revenue", money(employees.reduce((total, row) => total.plus(row.revenue), D(0)).toFixed(2), currency)]],
-    sections: [{ title: "Employee performance", columns: ["Employee", "Sales", "Units", `Revenue (${currency})`, `Discounts (${currency})`, `Gross profit (${currency})`, `Average sale (${currency})`], rows: employees.map((row) => [row.name, row.sales, row.units, Number(row.revenue), Number(row.discounts), Number(row.profit), Number(row.average)]) }],
+    sections: [{ title: "Employee performance", columns: ["Employee", "Sales", "Units", `Revenue (${currency})`, `Manual discounts (${currency})`, `Gross profit (${currency})`, `Average sale (${currency})`], rows: employees.map((row) => [row.name, row.sales, row.units, Number(row.revenue), row.discounts === null ? "Unknown for legacy sales" : Number(row.discounts), Number(row.profit), Number(row.average)]) }],
   };
 }

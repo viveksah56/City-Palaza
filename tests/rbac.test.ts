@@ -37,4 +37,17 @@ describe("RBAC", () => {
   it("employee permissions are a strict subset of admin's", () => {
     for (const p of ROLE_PERMISSIONS.EMPLOYEE) expect(ROLE_PERMISSIONS.ADMIN.has(p)).toBe(true);
   });
+
+  it("defines the complete permission matrix for both application roles", () => {
+    const expectedEmployeePermissions = new Set([
+      "DASHBOARD_VIEW", "PRODUCT_VIEW", "CATEGORY_VIEW", "BRAND_VIEW", "SALE_CREATE", "SALE_VIEW",
+      "CUSTOMER_VIEW", "CUSTOMER_CREATE", "CUSTOMER_UPDATE",
+    ]);
+    expect([...ROLE_PERMISSIONS.ADMIN]).toHaveLength(PERMISSIONS.length);
+    expect([...ROLE_PERMISSIONS.EMPLOYEE].sort()).toEqual([...expectedEmployeePermissions].sort());
+    for (const permission of PERMISSIONS) {
+      expect(hasPermission("ADMIN", permission)).toBe(true);
+      expect(hasPermission("EMPLOYEE", permission)).toBe(expectedEmployeePermissions.has(permission));
+    }
+  });
 });

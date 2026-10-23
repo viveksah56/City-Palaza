@@ -17,7 +17,7 @@ function safeCell(value: string | number): string | number {
 
 async function createWorkbook(data: ReportExportData): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "CityPalaza";
+  workbook.creator = "CityPlaza";
   workbook.created = new Date();
   const summary = workbook.addWorksheet("Overview");
   summary.addRow([data.title]);
@@ -47,7 +47,7 @@ async function createWorkbook(data: ReportExportData): Promise<Buffer> {
 
 async function createPdf(data: ReportExportData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 48, bufferPages: true, info: { Title: data.title, Author: "CityPalaza" } });
+    const doc = new PDFDocument({ size: "A4", margin: 48, bufferPages: true, info: { Title: data.title, Author: "CityPlaza" } });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("error", reject);
@@ -103,7 +103,7 @@ export async function GET(request: Request) {
     const extension = format === "pdf" ? "pdf" : "xlsx";
     const contentType = format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     const reportName = scope === "report" ? `${tabValue}-report` : "sales-report";
-    const filename = `citypalaza-${reportName}-${new Date().toISOString().slice(0, 10)}.${extension}`;
+    const filename = `cityplaza-${reportName}-${new Date().toISOString().slice(0, 10)}.${extension}`;
     return new Response(new Uint8Array(file), {
       headers: {
         "Content-Type": contentType,

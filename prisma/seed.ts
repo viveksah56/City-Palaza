@@ -87,24 +87,30 @@ async function bootstrap() {
     }
 
     // --- settings ---
-    const settings = { ...DEFAULT_SETTINGS, address: "New Road", city: "Kathmandu", phone: "+977-1-0000000", email: "hello@citypalaza.local", taxRate: 13 };
-    for (const [key, value] of Object.entries(settings)) await prisma.setting.upsert({ where: { key }, create: { key, value }, update: { value } });
+    const settings = { ...DEFAULT_SETTINGS, address: "New Road", city: "Kathmandu", phone: "+977-1-0000000", email: "hello@cityplaza.local", taxRate: 13 };
+    for (const [key, value] of Object.entries(settings)) {
+      if (value === null) {
+        await prisma.setting.deleteMany({ where: { key } });
+        continue;
+      }
+      await prisma.setting.upsert({ where: { key }, create: { key, value }, update: { value } });
+    }
 
     // --- users ---
-    const adminEmail = process.env.SEED_ADMIN_EMAIL || "admin@citypalaza.local";
+    const adminEmail = process.env.SEED_ADMIN_EMAIL || "admin@cityplaza.local";
     const adminPw = process.env.SEED_ADMIN_PASSWORD;
     const empPw = process.env.SEED_EMPLOYEE_PASSWORD;
     if (!adminPw || !empPw) throw new Error("Set SEED_ADMIN_PASSWORD and SEED_EMPLOYEE_PASSWORD in the local environment before seeding.");
     const admin = await prisma.user.upsert({
       where: { email: adminEmail },
-      create: { firstName: "Shop", lastName: "Admin", email: adminEmail, passwordHash: await hashPassword(adminPw), role: ROLE.ADMIN },
+      create: { slug: "shop-admin", firstName: "Shop", lastName: "Admin", email: adminEmail, passwordHash: await hashPassword(adminPw), role: ROLE.ADMIN },
       update: { passwordHash: await hashPassword(adminPw) },
     });
     const staff = [];
     for (const [first, last] of [["Sita", "Sharma"], ["Ram", "Thapa"], ["Anita", "Gurung"]] as const) {
       staff.push(await prisma.user.upsert({
-        where: { email: `${first.toLowerCase()}@citypalaza.local` },
-        create: { firstName: first, lastName: last, email: `${first.toLowerCase()}@citypalaza.local`, passwordHash: await hashPassword(empPw), role: ROLE.EMPLOYEE },
+        where: { email: `${first.toLowerCase()}@cityplaza.local` },
+        create: { slug: `${first.toLowerCase()}-${last.toLowerCase()}`, firstName: first, lastName: last, email: `${first.toLowerCase()}@cityplaza.local`, passwordHash: await hashPassword(empPw), role: ROLE.EMPLOYEE },
         update: { passwordHash: await hashPassword(empPw) },
       }));
     }
@@ -121,7 +127,7 @@ async function bootstrap() {
       let imeiSeq = 1;
       for (const [sku, name, cat, brand, cost, price, tracking, min, qty] of PRODUCTS) {
         const p = await prisma.product.create({
-          data: { sku, name, categoryId: catId[cat]!, brandId: brand ? brandId[brand] : null, purchasePrice: cost, sellingPrice: price, minStock: min, trackingType: tracking, description: `${name} – CityPalaza demo item` },
+          data: { slug: `${slugify(name)}-${slugify(sku)}`, sku, name, categoryId: catId[cat]!, brandId: brand ? brandId[brand] : null, purchasePrice: cost, sellingPrice: price, minStock: min, trackingType: tracking, description: `${name} – CityPlaza demo item` },
         });
         if (qty > 0) {
           const serials = tracking === "IMEI" ? Array.from({ length: qty }, () => imeiFromBody(`35${String(imeiSeq++).padStart(12, "0")}`)) : undefined;
@@ -133,7 +139,7 @@ async function bootstrap() {
       // --- customers ---
       const customers = [];
       for (const [name, phone] of [["Bikash Rai", "9841000001"], ["Mina Tamang", "9841000002"], ["Suresh KC", "9841000003"], ["Pooja Shrestha", "9841000004"], ["Dipesh Adhikari", "9841000005"], ["Nisha Karki", "9841000006"]] as const) {
-        customers.push(await prisma.customer.create({ data: { name, phone } }));
+        customers.push(await prisma.customer.create({ data: { slug: `${slugify(name)}-${phone}`, name, phone } }));
       }
 
       // --- historical sales (created through the real service, then backdated) ---

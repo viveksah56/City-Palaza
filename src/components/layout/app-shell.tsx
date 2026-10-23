@@ -22,7 +22,7 @@ export type ShellProps = {
   nav: ShellNavItem[];
   user: { name: string; email: string; roleLabel: string };
   shopName: string;
-  notifications: { count: number; items: { id: string; name: string; quantity: number }[] };
+  notifications: { count: number; items: { id: string; slug: string; name: string; quantity: number }[] };
   logoutAction: () => Promise<void | { ok: false }>;
   children: React.ReactNode;
 };
@@ -136,7 +136,7 @@ function AppShellContent({ nav, user, shopName, notifications, logoutAction, chi
                   <p className="px-2.5 py-4 text-sm text-muted-foreground">Everything is stocked above its minimum.</p>
                 ) : notifications.items.map((item) => (
                   <DropdownMenuItem key={item.id} asChild>
-                    <Link href={`/products/${item.id}`}><AlertTriangle className="text-orange" /><span className="flex-1 truncate">{item.name}</span><span className="num text-xs opacity-70">{item.quantity} left</span></Link>
+                    <Link href={`/products/${item.slug}`}><AlertTriangle className="text-orange" /><span className="flex-1 truncate">{item.name}</span><span className="num text-xs opacity-70">{item.quantity} left</span></Link>
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />

@@ -11,6 +11,7 @@ export function SaleSummary({ calc, currency, taxRate }: { calc: SaleCalculation
     <dl className="grid gap-1.5" aria-live="polite">
       {row("Subtotal", f(calc?.subtotal))}
       {row("Discount", `-${f(calc?.discount)}`)}
+      {row("Effective discount", `${calc?.effectiveDiscountPercent.toDecimalPlaces(2).toFixed(2) ?? "0.00"}%`)}
       {row(`Tax (${taxRate}%)`, f(calc?.tax))}
       {row("Total", f(calc?.total), true)}
     </dl>

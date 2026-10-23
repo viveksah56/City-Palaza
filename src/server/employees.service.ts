@@ -12,6 +12,7 @@ import type { Actor } from "./inventory.service";
 import { ROLE } from "@/lib/constants/roles";
 import { randomUUID } from "node:crypto";
 import { timeServerOperation } from "./timing";
+import { uniqueSlug } from "@/lib/slug";
 
 export type EmployeeQuery = { search?: string; status?: UserStatus; sort: "firstName" | "role" | "status" | "lastLoginAt"; order: SortOrder } & PageQuery;
 export function parseEmployeeQuery(sp: SearchParams): EmployeeQuery {
@@ -27,7 +28,7 @@ export async function getEmployeeOverview() {
   return { total, active, disabled: total - active };
 }
 
-const publicSelect = { id: true, firstName: true, lastName: true, email: true, phone: true, role: true, status: true, lastLoginAt: true, createdAt: true } as const;
+const publicSelect = { id: true, slug: true, firstName: true, lastName: true, email: true, phone: true, role: true, status: true, lastLoginAt: true, createdAt: true } as const;
 
 export async function listEmployees(q: EmployeeQuery) {
   const where: Prisma.UserWhereInput = {
@@ -50,7 +51,7 @@ export async function listEmployees(q: EmployeeQuery) {
   });
 }
 
-export const getEmployee = (id: string) => prisma.user.findFirst({ where: { id, deletedAt: null }, select: { ...publicSelect, _count: { select: { sales: true } } } });
+export const getEmployeeBySlug = (slug: string) => prisma.user.findFirst({ where: { slug, deletedAt: null }, select: { ...publicSelect, _count: { select: { sales: true } } } });
 export const listEmployeeOptions = () => prisma.user.findMany({ where: { deletedAt: null }, orderBy: { firstName: "asc" }, select: { id: true, firstName: true, lastName: true, status: true } });
 
 async function requireAnotherActiveAdmin(tx: Prisma.TransactionClient, id: string) {
@@ -58,13 +59,18 @@ async function requireAnotherActiveAdmin(tx: Prisma.TransactionClient, id: strin
   if (count === 0) throw new DomainError("CONFLICT", "Keep at least one other active admin account before making this change.");
 }
 
+async function lockAdminAccessChanges(tx: Prisma.TransactionClient) {
+  await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_advisory_xact_lock(641807214) IS NULL AS locked`;
+}
+
 export async function createEmployee(actor: Actor, raw: unknown) {
   assertRolePermission(actor.role, PERMISSION.EMPLOYEE_CREATE);
   const v = employeeCreateSchema.parse(raw);
   const passwordHash = await hashPassword(v.password);
   return prisma.$transaction(async (tx) => {
+    const slug = await uniqueSlug(`${v.firstName} ${v.lastName}`, async (value) => !!(await tx.user.findUnique({ where: { slug: value }, select: { id: true } })));
     const u = await tx.user.create({
-      data: { firstName: v.firstName.trim(), lastName: v.lastName.trim(), email: v.email, phone: emptyToNull(v.phone), role: v.role, passwordHash },
+      data: { slug, firstName: v.firstName.trim(), lastName: v.lastName.trim(), email: v.email, phone: emptyToNull(v.phone), role: v.role, passwordHash },
       select: { id: true, email: true },
     });
     await writeAudit(tx, { actorId: actor.id, action: PERMISSION.EMPLOYEE_CREATE, entityType: "User", entityId: u.id, description: `Created ${v.role.toLowerCase()} account for ${u.email}` });
@@ -77,6 +83,7 @@ export async function updateEmployee(actor: Actor, raw: unknown) {
   const v = employeeUpdateSchema.parse(raw);
   if (v.id === actor.id && v.role !== ROLE.ADMIN) throw new DomainError("CONFLICT", "You can't remove your own admin role.");
   await prisma.$transaction(async (tx) => {
+    await lockAdminAccessChanges(tx);
     const before = await tx.user.findFirst({ where: { id: v.id, deletedAt: null }, select: { role: true, status: true } });
     if (!before) throw new DomainError("NOT_FOUND", "Account not found.");
     if (before.role === ROLE.ADMIN && before.status === "ACTIVE" && v.role !== ROLE.ADMIN) await requireAnotherActiveAdmin(tx, v.id);
@@ -95,6 +102,7 @@ export async function setEmployeeStatus(actor: Actor, id: string, status: UserSt
   assertRolePermission(actor.role, PERMISSION.EMPLOYEE_DISABLE);
   if (id === actor.id && status !== "ACTIVE") throw new DomainError("CONFLICT", "You can't disable your own account.");
   await prisma.$transaction(async (tx) => {
+    await lockAdminAccessChanges(tx);
     const existing = await tx.user.findFirst({ where: { id, deletedAt: null }, select: { id: true, role: true, status: true, email: true } });
     if (!existing) throw new DomainError("NOT_FOUND", "Account not found.");
     if (existing.role === ROLE.ADMIN && existing.status === "ACTIVE" && status !== "ACTIVE") await requireAnotherActiveAdmin(tx, id);
@@ -115,6 +123,7 @@ export async function deleteEmployee(actor: Actor, id: string) {
   if (id === actor.id) throw new DomainError("CONFLICT", "You can't delete your own account.");
   const deletedPasswordHash = await hashPassword(randomUUID());
   await prisma.$transaction(async (tx) => {
+    await lockAdminAccessChanges(tx);
     const existing = await tx.user.findFirst({ where: { id, deletedAt: null }, select: { id: true, email: true, role: true, status: true } });
     if (!existing) throw new DomainError("NOT_FOUND", "Account not found.");
     if (existing.role === ROLE.ADMIN && existing.status === "ACTIVE") await requireAnotherActiveAdmin(tx, id);

@@ -6,7 +6,7 @@ import { calculateSale, assertDiscountAllowed } from "@/lib/sales-calc";
 import { D, toDb, money } from "@/lib/money";
 import { formatCurrency } from "@/lib/format";
 import { PERMISSION, assertRolePermission, hasPermission } from "@/lib/rbac/permission";
-import type { Role } from "@/lib/constants/roles";
+import { ROLE, type Role } from "@/lib/constants/roles";
 import { resolveRange } from "@/lib/dates";
 import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
@@ -14,6 +14,7 @@ import { PAYMENT_METHODS } from "@/lib/constants";
 import { createSaleSchema, voidSaleSchema, type CreateSaleInput } from "@/validations/sale";
 import { changeStock, normalizeSerials, type Actor } from "./inventory.service";
 import { readSettings } from "./settings.service";
+import { uniqueSlug } from "@/lib/slug";
 
 async function nextCounter(tx: Tx, key: string): Promise<number> {
   const rows = await tx.$queryRaw<{ value: number }[]>`
@@ -30,14 +31,15 @@ type Prepared = { product: Prisma.ProductGetPayload<object>; quantity: number; s
  * Sale + SaleItems + serial claims + guarded stock deduction + inventory transactions + audit.
  * Prices, discounts, tax and totals are recomputed here – nothing numeric from the browser is trusted.
  */
-export async function createSale(actor: Actor, raw: unknown): Promise<{ id: string; saleNumber: string }> {
+export async function createSale(actor: Actor, raw: unknown): Promise<{ id: string; slug: string; saleNumber: string }> {
   assertRolePermission(actor.role, PERMISSION.SALE_CREATE);
   const input: CreateSaleInput = createSaleSchema.parse(raw);
 
   // merge duplicate product lines
-  const merged = new Map<string, { quantity: number; serials: string[] }>();
+  const merged = new Map<string, { quantity: number; serials: string[]; discount: CreateSaleInput["items"][number]["discount"] }>();
   for (const it of input.items) {
-    const cur = merged.get(it.productId) ?? { quantity: 0, serials: [] };
+    const cur = merged.get(it.productId) ?? { quantity: 0, serials: [], discount: it.discount };
+    if (JSON.stringify(cur.discount ?? null) !== JSON.stringify(it.discount ?? null)) throw new DomainError("VALIDATION", "A product can only have one item discount per sale.");
     cur.quantity += it.quantity;
     cur.serials.push(...(it.serials ?? []));
     merged.set(it.productId, cur);
@@ -69,11 +71,18 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
           unitCost: x.product.purchasePrice,
           quantity: x.quantity,
           promoPercent: x.product.discountPercent,
+          discount: merged.get(x.product.id)?.discount,
         })),
         discount: input.discount && D(input.discount.value).gt(0) ? input.discount : null,
         taxRatePercent: settings.taxRate,
       });
-      assertDiscountAllowed(calc.manualDiscountPercent, actor.role, settings.employeeDiscountLimit);
+      assertDiscountAllowed(calc.manualDiscount, calc.netAfterPromo, actor.role, settings.employeeDiscountLimit, settings.currency);
+      if (actor.role !== ROLE.ADMIN && settings.employeeMaxTotalDiscountPercent !== null) {
+        const maximum = money(calc.subtotal.times(settings.employeeMaxTotalDiscountPercent).div(100));
+        if (calc.discount.gt(maximum)) throw new DomainError("DISCOUNT_NOT_ALLOWED", `Total discount exceeds the ${settings.employeeMaxTotalDiscountPercent}% limit.`);
+      }
+      const soldBelowCost = calc.lines.some((line) => line.subtotal.minus(line.discount).lt(line.unitCost.times(line.quantity)));
+      if (actor.role !== ROLE.ADMIN && soldBelowCost) throw new DomainError("DISCOUNT_NOT_ALLOWED", "This discount needs admin approval.");
 
       // customer (optional → walk-in)
       let customerId: string | null = input.customerId ?? null;
@@ -83,7 +92,7 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
         const existing = phone ? await tx.customer.findUnique({ where: { phone } }) : null;
         customerId =
           existing?.id ??
-          (await tx.customer.create({ data: { name: nc.name.trim(), phone, email: nc.email?.trim() || null, address: nc.address?.trim() || null } })).id;
+          (await tx.customer.create({ data: { slug: await uniqueSlug(nc.name, async (value) => !!(await tx.customer.findUnique({ where: { slug: value }, select: { id: true } }))), name: nc.name.trim(), phone, email: nc.email?.trim() || null, address: nc.address?.trim() || null } })).id;
       }
       if (customerId && !(await tx.customer.findUnique({ where: { id: customerId }, select: { id: true } }))) {
         throw new DomainError("NOT_FOUND", "Selected customer no longer exists.");
@@ -101,14 +110,18 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
 
       const seq = await nextCounter(tx, "sale");
       const saleNumber = `${settings.invoicePrefix}-${String(seq).padStart(6, "0")}`;
+      const saleSlug = saleNumber.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
       const sale = await tx.sale.create({
         data: {
+          slug: saleSlug,
           saleNumber,
           employeeId: actor.id,
           customerId,
           subtotal: toDb(calc.subtotal),
           discount: toDb(calc.discount),
+          promoDiscount: toDb(calc.promoDiscount),
+          manualDiscount: toDb(calc.manualDiscount),
           tax: toDb(calc.tax),
           total: toDb(calc.total),
           discountType: input.discount && D(input.discount.value).gt(0) ? input.discount.type : null,
@@ -126,9 +139,12 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
                 : prepared[i]!.product.name,
               sku: prepared[i]!.product.sku,
               quantity: l.quantity,
+              serialSnapshot: prepared[i]!.serials,
               unitPrice: toDb(l.unitPrice),
               unitCost: toDb(l.unitCost),
               discount: toDb(l.discount),
+              promoDiscount: toDb(l.promoDiscount),
+              saleDiscount: toDb(l.saleDiscount.plus(l.itemManualDiscount)),
               tax: toDb(l.tax),
               subtotal: toDb(l.subtotal),
               total: toDb(l.total),
@@ -166,9 +182,9 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
         action: PERMISSION.SALE_CREATE,
         entityType: "Sale",
         entityId: sale.id,
-        description: `Sale ${saleNumber}: ${prepared.length} product(s), total ${formatCurrency(calc.total, settings.currency)} (${input.paymentMethod})`,
+        description: `Sale ${saleNumber}: ${prepared.length} product(s), total ${formatCurrency(calc.total, settings.currency)} (${input.paymentMethod})${soldBelowCost ? " · sold below cost" : ""}`,
       });
-      return { id: sale.id, saleNumber };
+      return { id: sale.id, slug: sale.slug, saleNumber };
     },
     { timeout: 20_000, maxWait: 10_000 },
   );
@@ -272,6 +288,22 @@ export async function getSaleForUser(user: { id: string; role: Role }, id: strin
   assertRolePermission(user.role, PERMISSION.SALE_VIEW);
   const sale = await prisma.sale.findUnique({
     where: { id },
+    include: {
+      employee: { select: { firstName: true, lastName: true } },
+      voidedBy: { select: { firstName: true, lastName: true } },
+      customer: true,
+      items: { include: { serials: { select: { serial: true } } }, orderBy: { productName: "asc" } },
+    },
+  });
+  if (!sale) return null;
+  if (!hasPermission(user.role, PERMISSION.SALE_VIEW_ALL) && sale.employeeId !== user.id) return null;
+  return sale;
+}
+
+export async function getSaleForUserBySlug(user: { id: string; role: Role }, slug: string) {
+  assertRolePermission(user.role, PERMISSION.SALE_VIEW);
+  const sale = await prisma.sale.findUnique({
+    where: { slug },
     include: {
       employee: { select: { firstName: true, lastName: true } },
       voidedBy: { select: { firstName: true, lastName: true } },

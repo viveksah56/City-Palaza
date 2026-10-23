@@ -27,6 +27,16 @@ describe("sale totals", () => {
     expect(c.total.toFixed(2)).toBe("1900.00");
   });
 
+  it("accepts a manual percentage discount when a 100% promotion makes the cart zero", () => {
+    const c = calculateSale({
+      lines: [line({ unitPrice: "307.00", quantity: 2, promoPercent: 100 })],
+      discount: { type: "PERCENT", value: 2 },
+    });
+    expect(c.total.toFixed(2)).toBe("0.00");
+    expect(c.manualDiscount.toFixed(2)).toBe("0.00");
+    expect(c.lines[0]!.total.toFixed(2)).toBe("0.00");
+  });
+
   it("supports fixed-amount discounts and rejects ones larger than the sale", () => {
     expect(calculateSale({ lines: [line()], discount: { type: "FIXED", value: 150 } }).total.toFixed(2)).toBe("1850.00");
     expect(() => calculateSale({ lines: [line()], discount: { type: "FIXED", value: 2500 } })).toThrow(DomainError);
@@ -44,6 +54,32 @@ describe("sale totals", () => {
     expect(c.total.toFixed(2)).toBe("900.00");
   });
 
+  it("allocates cents by largest remainder and never gives a line more than its net", () => {
+    const c = calculateSale({
+      lines: [line({ productId: "zero", unitPrice: "0.01", unitCost: 0, promoPercent: 100 }), line({ productId: "a", unitPrice: "0.03", unitCost: 0 }), line({ productId: "b", unitPrice: "0.02", unitCost: 0 })],
+      discount: { type: "FIXED", value: "0.02" },
+    });
+    expect(c.lines[0]!.saleDiscount.toFixed(2)).toBe("0.00");
+    expect(c.lines.reduce((total, item) => total.plus(item.saleDiscount), c.lines[0]!.saleDiscount.minus(c.lines[0]!.saleDiscount)).toFixed(2)).toBe("0.02");
+    for (const item of c.lines) {
+      expect(item.saleDiscount.gte(0)).toBe(true);
+      expect(item.discount.lte(item.subtotal)).toBe(true);
+      expect(item.tax.gte(0)).toBe(true);
+      expect(item.total.gte(0)).toBe(true);
+    }
+  });
+
+  it("preserves line and cart manual discounts after promotions", () => {
+    const c = calculateSale({
+      lines: [line({ unitPrice: 100, unitCost: 50, quantity: 1, promoPercent: 10, discount: { type: "FIXED", value: 5 } })],
+      discount: { type: "PERCENT", value: 10 },
+    });
+    expect(c.promoDiscount.toFixed(2)).toBe("10.00");
+    expect(c.manualDiscount.toFixed(2)).toBe("13.50");
+    expect(c.lines[0]!.discount.toFixed(2)).toBe("23.50");
+    expect(c.effectiveDiscountPercent.toFixed(2)).toBe("23.50");
+  });
+
   it("rejects invalid quantities", () => {
     expect(() => calculateSale({ lines: [line({ quantity: 0 })] })).toThrow(DomainError);
     expect(() => calculateSale({ lines: [line({ quantity: 1.5 })] })).toThrow(DomainError);
@@ -52,15 +88,51 @@ describe("sale totals", () => {
 
 describe("employee discount limit", () => {
   it("lets employees discount up to the limit only", () => {
-    expect(() => assertDiscountAllowed(5, "EMPLOYEE", 5)).not.toThrow();
-    expect(() => assertDiscountAllowed("5.01", "EMPLOYEE", 5)).toThrow(/admin/);
+    expect(() => assertDiscountAllowed("0.01", "0.20", "EMPLOYEE", 5)).not.toThrow();
+    const largeCart = calculateSale({ lines: [line({ unitPrice: "100000.00", unitCost: 0, quantity: 1 })], discount: { type: "PERCENT", value: "5.01" } });
+    expect(() => assertDiscountAllowed(largeCart.manualDiscount, largeCart.netAfterPromo, "EMPLOYEE", 5)).toThrow(/5\.00%.*NPR 5000\.00/);
+    for (let cents = 1; cents <= 20_000; cents += 1) {
+      const price = (cents / 100).toFixed(2);
+      const sale = calculateSale({ lines: [line({ unitPrice: price, unitCost: 0, quantity: 1 })], discount: { type: "PERCENT", value: 5 } });
+      expect(() => assertDiscountAllowed(sale.manualDiscount, sale.netAfterPromo, "EMPLOYEE", 5)).not.toThrow();
+    }
   });
   it("is unrestricted for admins", () => {
-    expect(() => assertDiscountAllowed(60, "ADMIN", 5)).not.toThrow();
+    expect(() => assertDiscountAllowed(60, 100, "ADMIN", 5)).not.toThrow();
   });
   it("measures the manual discount percentage from the calculation", () => {
     const c = calculateSale({ lines: [line()], discount: { type: "FIXED", value: 100 } }); // 100 / 2000
     expect(c.manualDiscountPercent.toFixed(2)).toBe("5.00");
+  });
+
+  it("preserves discount invariants across 5,000 deterministic randomized carts", () => {
+    let seed = 942_381;
+    const random = (max: number) => {
+      seed = (seed * 16_807) % 2_147_483_647;
+      return seed % max;
+    };
+    for (let run = 0; run < 5_000; run += 1) {
+      const lines = Array.from({ length: 1 + random(8) }, (_, index) => {
+        const cents = 1 + random(200_000);
+        const promo = [0, 100, random(10_001) / 100][random(3)]!;
+        return line({ productId: `${run}-${index}`, unitPrice: (cents / 100).toFixed(2), unitCost: (random(cents + 1) / 100).toFixed(2), quantity: 1 + random(10), promoPercent: promo, discount: random(2) ? { type: "PERCENT", value: random(10_001) / 100 } : undefined });
+      });
+      const base = calculateSale({ lines });
+      const cartCents = base.netAfterPromo.minus(base.manualDiscount).times(100).toNumber();
+      const discount = random(2) ? { type: "PERCENT" as const, value: random(10_001) / 100 } : { type: "FIXED" as const, value: (Math.floor(cartCents * random(101) / 100) / 100).toFixed(2) };
+      const result = calculateSale({ lines, discount, taxRatePercent: random(2) ? 0 : 13 });
+      const allocated = result.lines.reduce((sum, item) => sum.plus(item.saleDiscount), result.lines[0]!.saleDiscount.minus(result.lines[0]!.saleDiscount));
+      expect(allocated.toFixed(2)).toBe(result.saleDiscount.toFixed(2));
+      const lineTotal = result.lines.reduce((sum, item) => sum.plus(item.total), result.lines[0]!.total.minus(result.lines[0]!.total));
+      expect(result.total.toFixed(2)).toBe(lineTotal.toFixed(2));
+      for (const item of result.lines) {
+        expect(item.discount.gte(0)).toBe(true);
+        expect(item.discount.lte(item.subtotal)).toBe(true);
+        expect(item.tax.gte(0)).toBe(true);
+        expect(item.total.gte(0)).toBe(true);
+        if (item.subtotal.minus(item.promoDiscount).minus(item.itemManualDiscount).isZero()) expect(item.saleDiscount.isZero()).toBe(true);
+      }
+    }
   });
 });
 

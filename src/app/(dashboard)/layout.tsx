@@ -27,7 +27,7 @@ async function DashboardLayoutContent({ children }: { children: React.ReactNode 
       nav={nav}
       user={{ name: fullName(user), email: user.email, roleLabel: ROLE_LABELS[user.role] }}
       shopName={settings.shopName}
-      notifications={{ count: notes.lowStockCount, items: notes.items.map((i) => ({ id: i.id, name: i.name, quantity: i.quantity })) }}
+      notifications={{ count: notes.lowStockCount, items: notes.items.map((i) => ({ id: i.id, slug: i.slug, name: i.name, quantity: i.quantity })) }}
       logoutAction={logoutAction}
     >
       {children}

@@ -48,7 +48,7 @@ export function ProductForm({
         const res = mode === "create" ? await createProductAction(values) : await updateProductAction(productId!, values);
         if (!res.ok) return void toast.error(res.error);
         toast.success(mode === "create" ? "Product added" : "Changes saved");
-        router.push(mode === "create" ? `/products/${(res.data as { id: string }).id}` : "/products");
+        router.push(mode === "create" ? `/products/${(res.data as { slug: string }).slug}` : "/products");
         router.refresh();
       })}
     >

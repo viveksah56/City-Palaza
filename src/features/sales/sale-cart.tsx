@@ -2,16 +2,17 @@
 import * as React from "react";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { useCart, type CartItem } from "@/stores/cart-store";
 import { formatCurrency } from "@/lib/format";
 import { money } from "@/lib/money";
 import { IconButton } from "@/components/shared/icon-button";
 
 export function SaleCart({ currency }: { currency: string }) {
-  const { items, setQuantity, remove } = useCart();
+  const { items, setQuantity, remove, setDiscount } = useCart();
   if (items.length === 0) return <p className="rounded-2xl bg-secondary/60 p-8 text-center text-sm text-muted-foreground">The cart is empty. Search for a product and tap it to add it.</p>;
   return (
-    <ul className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-secondary/40">
+    <ul aria-label="Products added to this sale" className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-secondary/40">
       {items.map((i) => (
         <li key={i.productId} className="grid gap-3 p-4">
           <div className="flex items-start justify-between gap-2">
@@ -20,6 +21,10 @@ export function SaleCart({ currency }: { currency: string }) {
               <p className="text-xs text-muted-foreground num">{formatCurrency(i.unitPrice, currency)} each{Number(i.discountPercent) > 0 ? ` · ${i.discountPercent}% off` : ""}</p>
             </div>
             <IconButton label={`Remove ${i.name}`} variant="ghost" onClick={() => remove(i.productId)}><Trash2 className="text-destructive" /></IconButton>
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+            <Input aria-label={`Manual discount for ${i.name}`} type="number" min="0" step="0.01" inputMode="decimal" value={i.discount?.value ?? ""} onChange={(event) => setDiscount(i.productId, event.target.value === "" ? undefined : { type: i.discount?.type ?? "PERCENT", value: event.target.value })} placeholder="Item discount" />
+            <NativeSelect aria-label={`Discount type for ${i.name}`} value={i.discount?.type ?? "PERCENT"} onChange={(event) => setDiscount(i.productId, i.discount ? { ...i.discount, type: event.target.value as "PERCENT" | "FIXED" } : undefined)}><option value="PERCENT">%</option><option value="FIXED">{currency}</option></NativeSelect>
           </div>
           {i.trackingType === "QUANTITY" ? (
             <div className="flex items-center justify-between">
@@ -44,9 +49,9 @@ function SerialPicker({ item, currency }: { item: CartItem; currency: string }) 
   const [list, setList] = React.useState<{ id: string; serial: string }[] | null>(null);
   React.useEffect(() => {
     let live = true;
-    fetch(`/api/products/${item.productId}/serials`).then((r) => r.json()).then((d) => live && setList(d.serials ?? []));
+    fetch(`/api/products/${item.slug}/serials`).then((r) => r.json()).then((d) => live && setList(d.serials ?? []));
     return () => { live = false; };
-  }, [item.productId]);
+  }, [item.slug]);
   const toggle = (s: string) => setSerials(item.productId, item.serials.includes(s) ? item.serials.filter((x) => x !== s) : [...item.serials, s]);
   return (
     <fieldset className="grid gap-1.5">

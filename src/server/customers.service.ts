@@ -7,6 +7,7 @@ import { emptyToNull } from "@/validations/common";
 import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
 import type { Actor } from "./inventory.service";
+import { uniqueSlug } from "@/lib/slug";
 
 export type CustomerQuery = { search?: string; sort: "name" | "phone" | "email" | "lastPurchaseAt"; order: SortOrder } & PageQuery;
 export const parseCustomerQuery = (sp: SearchParams): CustomerQuery => ({ ...parsePage(sp), ...parseSort(sp, ["name", "phone", "email", "lastPurchaseAt"] as const, "lastPurchaseAt"), search: first(sp.search) });
@@ -31,7 +32,7 @@ export async function listCustomers(q: CustomerQuery) {
         : { [q.sort]: q.order },
       skip: q.skip,
       take: q.take,
-      select: { id: true, name: true, phone: true, email: true, address: true, lastPurchaseAt: true, _count: { select: { sales: true } } },
+      select: { id: true, slug: true, name: true, phone: true, email: true, address: true, lastPurchaseAt: true, _count: { select: { sales: true } } },
     }),
     prisma.customer.count({ where }),
   ]);
@@ -54,7 +55,8 @@ export async function saveCustomer(actor: Actor, raw: unknown) {
   assertRolePermission(actor.role, v.id ? PERMISSION.CUSTOMER_UPDATE : PERMISSION.CUSTOMER_CREATE);
   const data = { name: v.name.trim(), phone: emptyToNull(v.phone), email: emptyToNull(v.email), address: emptyToNull(v.address) };
   return prisma.$transaction(async (tx) => {
-    const c = v.id ? await tx.customer.update({ where: { id: v.id }, data }) : await tx.customer.create({ data });
+    const slug = v.id ? undefined : await uniqueSlug(data.name, async (value) => !!(await tx.customer.findUnique({ where: { slug: value }, select: { id: true } })));
+    const c = v.id ? await tx.customer.update({ where: { id: v.id }, data }) : await tx.customer.create({ data: { ...data, slug: slug! } });
     await writeAudit(tx, {
       actorId: actor.id,
       action: v.id ? PERMISSION.CUSTOMER_UPDATE : PERMISSION.CUSTOMER_CREATE,
@@ -66,6 +68,6 @@ export async function saveCustomer(actor: Actor, raw: unknown) {
   });
 }
 
-export async function getCustomer(id: string) {
-  return prisma.customer.findUnique({ where: { id } });
+export async function getCustomerBySlug(slug: string) {
+  return prisma.customer.findUnique({ where: { slug } });
 }

@@ -38,6 +38,14 @@ describe("IMEI / serial handling", () => {
 describe("product validation", () => {
   const ok = { sku: "IP15-128", name: "iPhone 15", categoryId: "c1", purchasePrice: 90000, sellingPrice: 100000, discountPercent: 0, minStock: 2, trackingType: "IMEI" as const, status: "ACTIVE" as const };
   it("accepts a valid product", () => expect(productSchema.safeParse(ok).success).toBe(true));
+  it("accepts products without a manually supplied SKU or device identifiers", () => {
+    const result = productSchema.safeParse({ ...ok, sku: undefined });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sku).toBe("");
+      expect(result.data.initialSerials).toBeUndefined();
+    }
+  });
   it("rejects bad SKU, negative or 3-decimal prices, and missing category", () => {
     expect(productSchema.safeParse({ ...ok, sku: "bad sku!" }).success).toBe(false);
     expect(productSchema.safeParse({ ...ok, sellingPrice: -1 }).success).toBe(false);

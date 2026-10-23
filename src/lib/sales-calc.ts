@@ -18,6 +18,7 @@ export type CalcLineInput = {
   unitCost: MoneyInput;
   quantity: number;
   promoPercent?: MoneyInput;
+  discount?: DiscountInput;
 };
 
 export type DiscountInput = { type: "PERCENT" | "FIXED"; value: MoneyInput } | null | undefined;
@@ -29,6 +30,7 @@ export type CalcLine = {
   unitCost: Decimal;
   subtotal: Decimal;
   promoDiscount: Decimal;
+  itemManualDiscount: Decimal;
   saleDiscount: Decimal;
   discount: Decimal;
   tax: Decimal;
@@ -41,12 +43,15 @@ export type SaleCalculation = {
   subtotal: Decimal;
   promoDiscount: Decimal;
   saleDiscount: Decimal;
+  manualDiscount: Decimal;
   discount: Decimal;
   tax: Decimal;
   total: Decimal;
   profit: Decimal;
   /** Manual (cashier-applied) discount as % of the pre-discount net – what the employee limit checks. */
   manualDiscountPercent: Decimal;
+  effectiveDiscountPercent: Decimal;
+  netAfterPromo: Decimal;
 };
 
 export function calculateSale(
@@ -60,35 +65,20 @@ export function calculateSale(
     const unitPrice = money(l.unitPrice);
     const subtotal = money(unitPrice.times(l.quantity));
     const promoPct = D(l.promoPercent ?? 0);
+    if (promoPct.isNegative() || promoPct.gt(100)) throw new DomainError("VALIDATION", "Promotion cannot exceed 100%.");
     const promoDiscount = money(subtotal.times(promoPct).div(100));
-    return { l, unitPrice, unitCost: money(l.unitCost), subtotal, promoDiscount, net: subtotal.minus(promoDiscount) };
+    const promoNet = subtotal.minus(promoDiscount);
+    const itemManualDiscount = discountAmount(l.discount, promoNet);
+    return { l, unitPrice, unitCost: money(l.unitCost), subtotal, promoDiscount, itemManualDiscount, net: promoNet.minus(itemManualDiscount) };
   });
 
   const netTotal = sum(base.map((b) => b.net));
-
-  let saleDiscountTotal = ZERO;
-  if (input.discount) {
-    const v = D(input.discount.value);
-    if (v.isNegative()) throw new DomainError("VALIDATION", "Discount cannot be negative.");
-    if (input.discount.type === "PERCENT") {
-      if (v.gt(100)) throw new DomainError("VALIDATION", "Discount cannot exceed 100%.");
-      saleDiscountTotal = money(netTotal.times(v).div(100));
-    } else {
-      saleDiscountTotal = money(v);
-    }
-    if (saleDiscountTotal.gt(netTotal)) throw new DomainError("VALIDATION", "Discount cannot be greater than the sale amount.");
-  }
-
-  let allocated = ZERO;
+  const saleDiscountTotal = discountAmount(input.discount, netTotal);
+  const shares = allocateDiscount(base.map((b) => b.net), saleDiscountTotal);
   const lines: CalcLine[] = base.map((b, i) => {
-    const isLast = i === base.length - 1;
-    const share = netTotal.isZero()
-      ? ZERO
-      : isLast
-        ? saleDiscountTotal.minus(allocated)
-        : money(saleDiscountTotal.times(b.net).div(netTotal));
-    allocated = allocated.plus(share);
-    const discount = b.promoDiscount.plus(share);
+    const share = shares[i] ?? ZERO;
+    const manualDiscount = b.itemManualDiscount.plus(share);
+    const discount = b.promoDiscount.plus(manualDiscount);
     const taxable = b.subtotal.minus(discount);
     const tax = money(taxable.times(taxRate).div(100));
     const total = taxable.plus(tax);
@@ -99,6 +89,7 @@ export function calculateSale(
       unitCost: b.unitCost,
       subtotal: b.subtotal,
       promoDiscount: b.promoDiscount,
+      itemManualDiscount: b.itemManualDiscount,
       saleDiscount: share,
       discount,
       tax,
@@ -112,28 +103,74 @@ export function calculateSale(
     lines,
     subtotal: sum(lines.map((l) => l.subtotal)),
     promoDiscount: sum(lines.map((l) => l.promoDiscount)),
-    saleDiscount: saleDiscountTotal,
+    saleDiscount: sum(lines.map((l) => l.saleDiscount)),
+    manualDiscount: sum(lines.map((l) => l.saleDiscount.plus(l.itemManualDiscount))),
     discount: sum(lines.map((l) => l.discount)),
     tax: sum(lines.map((l) => l.tax)),
     total: sum(lines.map((l) => l.total)),
     profit: sum(lines.map((l) => l.profit)),
-    manualDiscountPercent: netTotal.isZero() ? ZERO : saleDiscountTotal.div(netTotal).times(100),
+    manualDiscountPercent: netTotal.isZero() ? ZERO : sum(lines.map((l) => l.saleDiscount.plus(l.itemManualDiscount))).div(netTotal).times(100),
+    effectiveDiscountPercent: sum(lines.map((l) => l.subtotal)).isZero() ? ZERO : sum(lines.map((l) => l.discount)).div(sum(lines.map((l) => l.subtotal))).times(100),
+    netAfterPromo: sum(base.map((b) => b.subtotal.minus(b.promoDiscount))),
   };
+}
+
+function discountAmount(discount: DiscountInput, base: Decimal): Decimal {
+  if (!discount) return ZERO;
+  const value = D(discount.value);
+  if (value.isNegative()) throw new DomainError("VALIDATION", "Discount cannot be negative.");
+  if (discount.type === "PERCENT") {
+    if (value.gt(100)) throw new DomainError("VALIDATION", "Discount cannot exceed 100%.");
+    return money(base.times(value).div(100));
+  }
+  const amount = money(value);
+  if (amount.gt(base)) throw new DomainError("VALIDATION", "Discount cannot be greater than the sale amount.");
+  return amount;
+}
+
+function allocateDiscount(weights: Decimal[], amount: Decimal): Decimal[] {
+  if (amount.isZero()) return weights.map(() => ZERO);
+  const total = sum(weights);
+  if (amount.gt(total)) throw new DomainError("VALIDATION", "Discount cannot be greater than the sale amount.");
+  if (total.isZero()) return weights.map(() => ZERO);
+  const cents = amount.times(100).toNumber();
+  const allocations = weights.map((weight) => {
+    if (weight.isZero()) return { amount: ZERO, remainder: ZERO, weight };
+    const exactCents = amount.times(weight).div(total).times(100);
+    const wholeCents = exactCents.floor();
+    return { amount: new Decimal(wholeCents).div(100), remainder: exactCents.minus(wholeCents), weight };
+  });
+  let remaining = cents - allocations.reduce((sumCents, item) => sumCents + item.amount.times(100).toNumber(), 0);
+  const order = allocations.map((item, index) => ({ ...item, index })).sort((a, b) =>
+    b.remainder.comparedTo(a.remainder) || b.weight.comparedTo(a.weight) || a.index - b.index,
+  );
+  for (const item of order) {
+    if (remaining <= 0) break;
+    if (item.weight.gt(item.amount)) {
+      allocations[item.index]!.amount = allocations[item.index]!.amount.plus("0.01");
+      remaining -= 1;
+    }
+  }
+  if (remaining !== 0) throw new DomainError("VALIDATION", "Discount allocation could not be completed.");
+  return allocations.map((item) => item.amount);
 }
 
 /** Employees are capped by the configured limit; admins are unrestricted. */
 export function assertDiscountAllowed(
-  manualDiscountPercent: MoneyInput,
+  saleDiscount: MoneyInput,
+  netTotal: MoneyInput,
   role: Role,
   employeeLimitPercent: MoneyInput,
+  currency = "NPR",
 ) {
   if (role === ROLE.ADMIN) return;
-  const pct = D(manualDiscountPercent);
   const limit = D(employeeLimitPercent);
-  if (pct.gt(limit)) {
+  const applied = money(saleDiscount);
+  const maximum = money(D(netTotal).times(limit).div(100));
+  if (applied.gt(maximum)) {
     throw new DomainError(
       "DISCOUNT_NOT_ALLOWED",
-      `Discounts above ${limit.toDecimalPlaces(2).toString()}% need an admin. You applied ${pct.toDecimalPlaces(2).toString()}%.`,
+      `Discount limit is ${limit.toFixed(2)}%. Maximum allowed: ${currency} ${maximum.toFixed(2)}.`,
     );
   }
 }

@@ -9,6 +9,7 @@ import { createPrismaClient } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth/password";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "@/lib/rbac/permission";
 import { ROLE, ROLE_LABELS, ROLE_VALUES, type Role } from "@/lib/constants/roles";
+import { slugify } from "@/lib/format";
 
 config({ path: process.env.SEED_ENV_FILE ?? (process.env.NODE_ENV === "production" ? ".env.prod" : ".env") });
 
@@ -63,6 +64,7 @@ async function main() {
       await tx.user.upsert({
         where: { email: account.email },
         create: {
+          slug: slugify(`${account.firstName}-${account.lastName}`),
           firstName: account.firstName,
           lastName: account.lastName,
           email: account.email,

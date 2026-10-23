@@ -17,10 +17,11 @@ export type Settings = {
   invoicePrefix: string;
   /** max manual discount (%) an employee may give */
   employeeDiscountLimit: number;
+  employeeMaxTotalDiscountPercent: number | null;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  shopName: "CityPalaza",
+  shopName: "CityPlaza",
   address: "",
   city: "Kathmandu",
   phone: "",
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   taxRate: 0,
   invoicePrefix: "CP",
   employeeDiscountLimit: 5,
+  employeeMaxTotalDiscountPercent: null,
 };
 
 /** Always hits the DB – used inside sale transactions (authoritative). */
@@ -47,6 +49,10 @@ export async function updateSettings(actor: Actor, next: Settings) {
   await prisma.$transaction(async (tx) => {
     const before = await readSettings(tx);
     for (const [key, value] of Object.entries(next)) {
+      if (value === null) {
+        await tx.setting.deleteMany({ where: { key } });
+        continue;
+      }
       await tx.setting.upsert({
         where: { key },
         create: { key, value: value as Prisma.InputJsonValue },

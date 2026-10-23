@@ -24,7 +24,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   type Row = (typeof result.rows)[number];
   const canEdit = hasPermission(user.role, PERMISSION.CUSTOMER_UPDATE);
   const columns: Column<Row>[] = [
-    { key: "name", header: "Customer", sortKey: "name", cell: (c) => <Link href={`/customers/${c.id}`} className="font-medium hover:text-primary hover:underline">{c.name}</Link> },
+    { key: "name", header: "Customer", sortKey: "name", cell: (c) => <Link href={`/customers/${c.slug}`} className="font-medium hover:text-primary hover:underline">{c.name}</Link> },
     { key: "phone", header: "Phone", sortKey: "phone", cell: (c) => c.phone ?? "—" },
     { key: "email", header: "Email", sortKey: "email", cell: (c) => c.email ?? "—" },
     { key: "orders", header: "Purchases", align: "right", cell: (c) => <span className="num">{c._count.sales}</span> },

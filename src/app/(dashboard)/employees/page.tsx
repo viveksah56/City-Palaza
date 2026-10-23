@@ -26,7 +26,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   const params = toParams(sp);
   type Row = (typeof result.rows)[number];
   const columns: Column<Row>[] = [
-    { key: "n", header: "Name", sortKey: "firstName", cell: (e) => <div><Link href={`/employees/${e.id}`} className="font-medium hover:text-primary hover:underline">{fullName(e)}</Link><p className="text-xs text-muted-foreground">{e.email}</p></div> },
+    { key: "n", header: "Name", sortKey: "firstName", cell: (e) => <div><Link href={`/employees/${e.slug}`} className="font-medium hover:text-primary hover:underline">{fullName(e)}</Link><p className="text-xs text-muted-foreground">{e.email}</p></div> },
     { key: "r", header: "Role", sortKey: "role", cell: (e) => <StatusBadge status={e.role} /> },
     { key: "s", header: "Status", sortKey: "status", cell: (e) => <StatusBadge status={e.status} /> },
     { key: "c", header: "Sales", align: "right", cell: (e) => <span className="num">{e._count.sales}</span> },

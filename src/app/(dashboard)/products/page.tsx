@@ -68,6 +68,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           rows={result.rows}
           canSeeCost={canSeeCost}
           currency={settings.currency}
+          role={user.role}
           url={{ basePath: "/products", params }}
           sort={{ key: q.sort, order: q.order }}
           empty={<EmptyState title="No products match" description="Try a different search or clear the filters." action={<Button asChild variant="outline"><Link href="/products">Clear filters</Link></Button>} />}

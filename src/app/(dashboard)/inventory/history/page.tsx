@@ -29,11 +29,11 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   type Row = (typeof result.rows)[number];
   const columns: Column<Row>[] = [
     { key: "when", header: "When", sortKey: "createdAt", cell: (t) => <span className="whitespace-nowrap text-muted-foreground">{formatDateTime(t.createdAt)}</span> },
-    { key: "product", header: "Product", cell: (t) => <div><Link href={`/products/${t.productId}`} className="font-medium hover:underline">{t.product.name}</Link><p className="font-mono text-xs text-muted-foreground">{t.product.sku}</p></div> },
+    { key: "product", header: "Product", cell: (t) => <div><Link href={`/products/${t.product.slug}`} className="font-medium hover:underline">{t.product.name}</Link><p className="font-mono text-xs text-muted-foreground">{t.product.sku}</p></div> },
     { key: "type", header: "Type", sortKey: "type", cell: (t) => <Badge variant={TYPE_VARIANT[t.type]}>{t.type.replace("_", " ").toLowerCase()}</Badge> },
     { key: "qty", header: "Change", sortKey: "quantity", align: "right", cell: (t) => <span className={`num font-medium ${t.quantity < 0 ? "text-destructive" : "text-success"}`}>{t.quantity > 0 ? "+" : ""}{t.quantity}</span> },
     { key: "bal", header: "Before → after", align: "right", cell: (t) => <span className="num text-muted-foreground">{t.previousQuantity} → {t.newQuantity}</span> },
-    { key: "reason", header: "Reason / reference", cell: (t) => <span className="text-sm">{t.reason ?? "—"}{t.referenceId && t.referenceType?.startsWith("SALE") ? <> · <Link className="text-primary hover:underline" href={`/sales/${t.referenceId}`}>view sale</Link></> : null}</span> },
+    { key: "reason", header: "Reason / reference", cell: (t) => <span className="text-sm">{t.reason ?? "—"}{t.saleSlug ? <> · <Link className="text-primary hover:underline" href={`/sales/${t.saleSlug}`}>view sale</Link></> : null}</span> },
     { key: "by", header: "By", cell: (t) => <span className="whitespace-nowrap">{fullName(t.user)}</span> },
   ];
   return (

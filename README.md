@@ -1,8 +1,8 @@
-# CityPalaza — Inventory & Sales Management
+# CityPlaza — Inventory & Sales Management
 
-Inventory, sales, and role-based staff management for CityPalaza’s mobile and electronics store, built with Next.js App Router, TypeScript, Prisma, and PostgreSQL.
+Inventory, sales, and role-based staff management for CityPlaza’s mobile and electronics store, built with Next.js App Router, TypeScript, Prisma, and PostgreSQL.
 
-CityPalaza is a single-store operations app for administrators and employees. It models the real shop workflow:
+CityPlaza is a single-store operations app for administrators and employees. It models the real shop workflow:
 
 > Admin adds products and stock → employees sell at the counter → every sale changes inventory inside a database transaction → historical purchase/selling prices are preserved → reports derive sales, stock and profit from those records.
 
@@ -34,7 +34,7 @@ npm run dev                       # http://localhost:3000
 
 **Migration source:** `.env` contains `SOURCE_DIRECT_URL` for read-only exports from the old project. Do not use it for application runtime, migrations, or writes.
 
-Seed users from `db:seed`: `admin@citypalaza.local` (ADMIN), `sita@`, `ram@`, `anita@citypalaza.local` (EMPLOYEE).
+Seed users from `db:seed`: `admin@cityplaza.local` (ADMIN), `sita@`, `ram@`, `anita@cityplaza.local` (EMPLOYEE).
 
 > `npm run db:constraints` adds what Prisma can't express: `CHECK (quantity >= 0)` on products, non-negative prices, positive sale quantities, and a trigram index for fast name search. `db:setup` already runs it.
 
@@ -118,7 +118,7 @@ Rules the code follows: Server Components by default (client components only for
 
 ### Money, stock and concurrency
 - All money is `NUMERIC(12,2)` in PostgreSQL and `decimal.js` in code (half-up rounding). Nothing is computed with floats; the browser's totals are display-only previews.
-- **Sale calculation** (`lib/sales-calc.ts`): line subtotal = price × qty; product standing discount applied; the sale-level discount (percent or fixed) is allocated proportionally across lines (last line absorbs rounding) so per-line profit is exact; tax is exclusive and computed on the discounted amount. Employees are capped by the configurable discount limit (default 5 %); admins are unrestricted. All enforced on the server.
+- **Sale calculation** (`lib/sales-calc.ts`): line subtotal = price × qty; product promotion applies first, then optional per-item and cart manual discounts. Cart discount cents are allocated by largest remainder and larger net lines break ties. Tax is exclusive and computed on the discounted amount. Employee manual discounts are capped by a rounded currency amount (default 5% of the post-promotion net); an optional total-discount ceiling is disabled by default. Employees cannot sell below cost; admins can, with the audit entry marked. All rules are enforced on the server.
 - **Profit** = Σ (historical unit selling price × qty − discounts − historical unit purchase price × qty). With no discount this is exactly *(selling − purchase) × quantity*. `SaleItem` snapshots name, SKU, prices, discount and tax, so later price edits never rewrite history.
 - **No overselling:** `changeStock()` is the only code that changes `Product.quantity`, via one guarded statement
   `UPDATE "Product" SET quantity = quantity + $delta WHERE id = $id AND quantity + $delta >= 0 RETURNING quantity`.
@@ -158,7 +158,7 @@ Notes on the schema choices
 
 ## Tests
 
-`npm test` (36 tests, no DB): RBAC and navigation, password hashing, session tokens, login/password validation, sale totals, discount allocation and limits, profit, NPR formatting, stock status, IMEI/serial validation, product validation, sale-input validation, date ranges.
+`npm test` (42 tests, no DB): RBAC and navigation, password hashing, session tokens, login/password validation, sale totals, discount allocation and limits, 5,000 randomized discount carts, profit, NPR formatting, stock status, IMEI/serial validation, product validation, sale-input validation, date ranges.
 `npm run test:integration` (PostgreSQL): sale creation & inventory deduction, historical price preservation, **simultaneous last-unit race → one winner**, full rollback on partial failure, negative-stock protection (service + CHECK), adjustment reasons, SKU/barcode uniqueness, IMEI uniqueness & no re-sale, void & restoration (once only), employee discount limit, server ignores client prices, employees see only own sales, disabled accounts lose sessions.
 
 ## Extending later

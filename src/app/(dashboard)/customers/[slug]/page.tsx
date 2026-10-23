@@ -6,16 +6,16 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/states";
 import { SaleTable } from "@/features/sales/sale-table";
-import { getCustomer } from "@/server/customers.service";
+import { getCustomerBySlug } from "@/server/customers.service";
 import { listSales, parseSalesQuery } from "@/server/sales.service";
 import { getSettings } from "@/server/settings.service";
 
-export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CustomerPage({ params }: { params: Promise<{ slug: string }> }) {
   const user = await requirePermission(PERMISSION.CUSTOMER_VIEW);
-  const { id } = await params;
-  const customer = await getCustomer(id);
+  const { slug } = await params;
+  const customer = await getCustomerBySlug(slug);
   if (!customer) notFound();
-  const q = { ...parseSalesQuery({ range: "thisYear" }), customerId: id, pageSize: 50, take: 50 };
+  const q = { ...parseSalesQuery({ range: "thisYear" }), customerId: customer.id, pageSize: 50, take: 50 };
   const [sales, settings] = await Promise.all([listSales(user, q), getSettings()]);
   return (
     <>

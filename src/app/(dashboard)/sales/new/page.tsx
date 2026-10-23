@@ -15,7 +15,7 @@ export default async function NewSalePage() {
   return (
     <>
       <PageHeader title="New sale" description="Add products, pick payment, complete." />
-      <QueryProvider><SalesTerminal currency={s.currency} taxRate={s.taxRate} discountLimit={s.employeeDiscountLimit} isAdmin={hasRole(user.role, ROLE.ADMIN)} /></QueryProvider>
+      <QueryProvider><SalesTerminal currency={s.currency} taxRate={s.taxRate} discountLimit={s.employeeDiscountLimit} totalDiscountLimit={s.employeeMaxTotalDiscountPercent} isAdmin={hasRole(user.role, ROLE.ADMIN)} /></QueryProvider>
     </>
   );
 }

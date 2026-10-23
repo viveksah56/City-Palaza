@@ -26,7 +26,7 @@ export function Receipt({ sale, settings }: { sale: Sale; settings: Settings }) 
           <li key={i.id} className="py-2">
             <div className="flex justify-between gap-2"><span className="font-medium">{i.productName}</span><span className="num">{m(i.total)}</span></div>
             <p className="num text-xs text-muted-foreground">{i.quantity} × {m(i.unitPrice)}{Number(i.discount) > 0 ? ` · discount ${m(i.discount)}` : ""} · <span className="font-mono">{i.sku}</span></p>
-            {i.serials.length > 0 && <p className="font-mono text-xs text-muted-foreground">{i.serials.map((s) => s.serial).join(", ")}</p>}
+            {i.serialSnapshot.length > 0 && <p className="font-mono text-xs text-muted-foreground">{i.serialSnapshot.join(", ")}</p>}
           </li>
         ))}
       </ul>

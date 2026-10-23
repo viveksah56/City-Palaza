@@ -10,17 +10,17 @@ import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { ProductForm } from "@/features/products/product-form";
 import { ProductAdminActions } from "@/features/products/product-admin-actions";
 import { SkuCode } from "@/components/shared/sku-code";
-import { getBrands, getCategories, getProduct } from "@/server/products.service";
-import { listSerials } from "@/server/inventory.service";
+import { getBrands, getCategories, getProductBySlug } from "@/server/products.service";
+import { listSerialsByProductSlug } from "@/server/inventory.service";
 import { getSettings } from "@/server/settings.service";
 import { TRACKING_LABELS } from "@/lib/constants";
 
-export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const user = await requirePermission(PERMISSION.PRODUCT_VIEW);
-  const { id } = await params;
+  const { slug } = await params;
   const canEdit = hasPermission(user.role, PERMISSION.PRODUCT_UPDATE);
   const canSeeCost = hasPermission(user.role, PERMISSION.INVENTORY_VIEW);
-  const product = await getProduct(id, canSeeCost);
+  const product = await getProductBySlug(slug, canSeeCost);
   if (!product) notFound();
   const settings = await getSettings();
 
@@ -40,7 +40,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const [categories, brands, serials] = await Promise.all([getCategories(), getBrands(), product.trackingType === "QUANTITY" ? [] : listSerials(id)]);
+  const [categories, brands, serials] = await Promise.all([getCategories(), getBrands(), product.trackingType === "QUANTITY" ? [] : listSerialsByProductSlug(slug)]);
   return (
     <>
       <PageHeader
@@ -51,7 +51,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
         <ProductForm
           mode="edit"
-          productId={id}
+          productId={product.id}
           categories={categories.filter((c) => c.isActive || c.id === product.categoryId)}
           brands={brands.filter((b) => b.isActive || b.id === product.brandId)}
           defaults={{

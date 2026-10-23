@@ -22,9 +22,9 @@ async function sendResetEmail(email: string, url: string) {
     await transport.sendMail({
       from,
       to: email,
-      subject: "Reset your CityPalaza password",
+      subject: "Reset your CityPlaza password",
       text: `Use this link within ${RESET_TTL_MINUTES} minutes to reset your password: ${url}`,
-      html: `<p>A password reset was requested for your CityPalaza account.</p><p><a href="${url}">Reset password</a></p><p>This link expires in ${RESET_TTL_MINUTES} minutes. If you did not request this, you can ignore this email.</p>`,
+      html: `<p>A password reset was requested for your CityPlaza account.</p><p><a href="${url}">Reset password</a></p><p>This link expires in ${RESET_TTL_MINUTES} minutes. If you did not request this, you can ignore this email.</p>`,
     });
   } finally {
     await transport.close();

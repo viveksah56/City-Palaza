@@ -84,7 +84,7 @@ async function DashboardServerView({ range }: { range: ReturnType<typeof resolve
           <CardContent>
             {d.recentSales.length === 0 ? <p className="py-3 text-sm text-muted-foreground">Sales will appear here as they are recorded.</p> : <ul className="divide-y divide-border">
               {d.recentSales.map((sale) => <li key={sale.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="min-w-0"><Link href={`/sales/${sale.id}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{sale.saleNumber}</Link><p className="truncate text-xs text-muted-foreground">{sale.customer?.name ?? "Walk-in"} · {fullName(sale.employee)}</p><p className="text-xs text-muted-foreground">{formatDateTime(sale.createdAt)}</p></div>
+                <div className="min-w-0"><Link href={`/sales/${sale.slug}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{sale.saleNumber}</Link><p className="truncate text-xs text-muted-foreground">{sale.customer?.name ?? "Walk-in"} · {fullName(sale.employee)}</p><p className="text-xs text-muted-foreground">{formatDateTime(sale.createdAt)}</p></div>
                 <CurrencyDisplay value={sale.total} currency={c} className="shrink-0 text-sm font-medium" />
               </li>)}
             </ul>}
@@ -99,7 +99,7 @@ async function DashboardServerView({ range }: { range: ReturnType<typeof resolve
           <CardContent>
             {d.lowStock.length === 0 ? <p className="py-3 text-sm text-muted-foreground">All products are above minimum stock.</p> : <ul className="divide-y divide-border">
               {d.lowStock.map((product) => <li key={product.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                <Link href={`/products/${product.id}`} className="min-w-0 truncate text-sm font-medium hover:text-primary hover:underline">{product.name}</Link>
+                <Link href={`/products/${product.slug}`} className="min-w-0 truncate text-sm font-medium hover:text-primary hover:underline">{product.name}</Link>
                 <span className="shrink-0 rounded-md bg-warning/10 px-2 py-1 text-xs font-medium text-warning-foreground num">{product.quantity} left</span>
               </li>)}
             </ul>}
@@ -135,7 +135,7 @@ async function EmployeeDashboard({ userId, name }: { userId: string; name: strin
                 {d.recent.map((r) => (
                   <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                     <div className="min-w-0">
-                      <Link href={`/sales/${r.id}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{r.saleNumber}</Link>
+                      <Link href={`/sales/${r.slug}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{r.saleNumber}</Link>
                       <p className="truncate text-xs text-muted-foreground">{r.customer?.name ?? "Walk-in"} · {formatDateTime(r.createdAt)}</p>
                     </div>
                     <div className="flex items-center gap-2">{r.status === "VOIDED" && <StatusBadge status="VOIDED" />}<CurrencyDisplay value={r.total} currency={s.currency} /></div>
@@ -153,7 +153,7 @@ async function EmployeeDashboard({ userId, name }: { userId: string; name: strin
               <ul className="divide-y">
                 {d.lowStock.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                    <Link href={`/products/${p.id}`} className="truncate hover:underline">{p.name}</Link>
+                    <Link href={`/products/${p.slug}`} className="truncate hover:underline">{p.name}</Link>
                     <span className="num text-muted-foreground">{p.quantity} left</span>
                   </li>
                 ))}

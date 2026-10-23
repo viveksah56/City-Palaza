@@ -6,12 +6,12 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/badges";
 import { EmployeeForm } from "@/features/employees/employee-form";
 import { DeleteEmployeeButton, EmployeeStatusButton, ResetPasswordDialog } from "@/features/employees/employee-actions";
-import { getEmployee } from "@/server/employees.service";
+import { getEmployeeBySlug } from "@/server/employees.service";
 
-export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EmployeePage({ params }: { params: Promise<{ slug: string }> }) {
   const user = await requirePermission(PERMISSION.EMPLOYEE_VIEW);
-  const { id } = await params;
-  const e = await getEmployee(id);
+  const { slug } = await params;
+  const e = await getEmployeeBySlug(slug);
   if (!e) notFound();
   const canUpdate = hasPermission(user.role, PERMISSION.EMPLOYEE_UPDATE);
   return (

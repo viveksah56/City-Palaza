@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StockBadge } from "@/components/shared/badges";
 import { useCart } from "@/stores/cart-store";
 import { calculateSale, type SaleCalculation } from "@/lib/sales-calc";
+import { money } from "@/lib/money";
 import { formatCurrency } from "@/lib/format";
 import { createSaleAction } from "@/server/actions";
 import { useCustomerSearch, useProductSearch } from "./sales-queries";
@@ -21,7 +22,7 @@ import { PaymentMethodSelector, type PaymentMethodValue } from "./payment-method
 
 type Cust = { id: string; name: string; phone: string | null };
 
-export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { currency: string; taxRate: number; discountLimit: number; isAdmin: boolean }) {
+export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountLimit, isAdmin }: { currency: string; taxRate: number; discountLimit: number; totalDiscountLimit: number | null; isAdmin: boolean }) {
   const router = useRouter();
   const cart = useCart();
   const [term, setTerm] = React.useState("");
@@ -58,18 +59,20 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
 
   const discNum = discValue === "" ? 0 : Number(discValue);
   const { calc, calcError } = React.useMemo<{ calc: SaleCalculation | null; calcError: string | null }>(() => {
-    const lines = cart.items.filter((i) => i.quantity > 0).map((i) => ({ productId: i.productId, unitPrice: i.unitPrice, unitCost: 0, quantity: i.quantity, promoPercent: i.discountPercent }));
+    const lines = cart.items.filter((i) => i.quantity > 0).map((i) => ({ productId: i.productId, unitPrice: i.unitPrice, unitCost: 0, quantity: i.quantity, promoPercent: i.discountPercent, discount: i.discount ? { ...i.discount, value: Number(i.discount.value) } : null }));
     if (!lines.length) return { calc: null, calcError: null };
     try { return { calc: calculateSale({ lines, discount: discNum > 0 ? { type: discType, value: discNum } : null, taxRatePercent: taxRate }), calcError: null }; }
     catch (e) { return { calc: null, calcError: (e as Error).message }; }
   }, [cart.items, discNum, discType, taxRate]);
 
-  const overLimit = !isAdmin && !!calc && calc.manualDiscountPercent.gt(discountLimit);
+  const overManualLimit = !isAdmin && !!calc && calc.manualDiscount.gt(money(calc.netAfterPromo.times(discountLimit).div(100)));
+  const overTotalLimit = !isAdmin && totalDiscountLimit !== null && !!calc && calc.discount.gt(money(calc.subtotal.times(totalDiscountLimit).div(100)));
+  const overLimit = overManualLimit || overTotalLimit;
 
   async function submit() {
     setSubmitting(true);
     const res = await createSaleAction({
-      items: cart.items.filter((i) => i.quantity > 0).map((i) => ({ productId: i.productId, quantity: i.quantity, serials: i.trackingType === "QUANTITY" ? undefined : i.serials })),
+      items: cart.items.filter((i) => i.quantity > 0).map((i) => ({ productId: i.productId, quantity: i.quantity, serials: i.trackingType === "QUANTITY" ? undefined : i.serials, discount: i.discount ? { type: i.discount.type, value: Number(i.discount.value) } : undefined })),
       customerId: customer?.id ?? null,
       newCustomer: !customer && newCust?.name ? { name: newCust.name, phone: newCust.phone || null } : null,
       discount: discNum > 0 ? { type: discType, value: discNum } : null,
@@ -82,7 +85,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
     if (!res.ok) return void toast.error(res.error);
     toast.success(`Sale ${res.data.saleNumber} completed`);
     cart.clear();
-    router.push(`/sales/${res.data.id}?new=1`);
+    router.push(`/sales/${res.data.slug}?new=1`);
   }
 
   const canSubmit = !!calc && !submitting && !overLimit && cart.items.every((i) => i.quantity > 0);
@@ -101,7 +104,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
               <li key={p.id}>
                 <button
                   type="button" disabled={out}
-                  onClick={() => cart.add({ productId: p.id, name: p.variantLabel ? `${p.name} · ${p.variantLabel}` : p.name, sku: p.sku, unitPrice: p.sellingPrice, discountPercent: p.discountPercent, trackingType: p.trackingType, available: p.quantity })}
+                  onClick={() => cart.add({ productId: p.id, slug: p.slug, name: p.variantLabel ? `${p.name} · ${p.variantLabel}` : p.name, sku: p.sku, unitPrice: p.sellingPrice, discountPercent: p.discountPercent, trackingType: p.trackingType, available: p.quantity })}
                   className="flex w-full items-start justify-between gap-3 rounded-xl border border-border bg-card p-3.5 text-left transition-[border-color,background-color] duration-150 hover:border-primary/45 hover:bg-accent/35 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}{p.variantLabel ? ` · ${p.variantLabel}` : ""}</span><span className="block font-mono text-xs text-muted-foreground">{p.sku}</span><span className="mt-1 block num mt-0.5 text-[15px] font-semibold">{formatCurrency(p.sellingPrice, currency)}</span></span>
@@ -116,7 +119,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
 
       <aside id="cart" aria-label="Current sale" className="grid scroll-mt-20 content-start gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
         <Card className="gap-4">
-          <CardHeader><CardTitle>Current sale</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Current sale <span className="text-sm font-normal text-muted-foreground">({cart.items.length} product{cart.items.length === 1 ? "" : "s"})</span></CardTitle></CardHeader>
           <CardContent className="grid gap-4">
             <SaleCart currency={currency} />
 
@@ -145,7 +148,8 @@ export function SalesTerminal({ currency, taxRate, discountLimit, isAdmin }: { c
                 <Input id="disc" type="number" min="0" step="0.01" inputMode="decimal" value={discValue} onChange={(e) => setDiscValue(e.target.value)} placeholder="0" aria-invalid={overLimit} />
                 <div className="w-28"><NativeSelect aria-label="Discount type" value={discType} onChange={(e) => setDiscType(e.target.value as "PERCENT" | "FIXED")}><option value="PERCENT">%</option><option value="FIXED">{currency}</option></NativeSelect></div>
               </div>
-              {overLimit && <p role="alert" className="text-xs font-medium text-destructive">That’s above your {discountLimit}% limit. Ask an admin to apply it.</p>}
+              {overManualLimit && <p role="alert" className="text-xs font-medium text-destructive">Manual discounts are above your {discountLimit}% limit. Ask an admin to apply it.</p>}
+              {overTotalLimit && <p role="alert" className="text-xs font-medium text-destructive">Promotions and manual discounts exceed your {totalDiscountLimit}% total limit.</p>}
               {calcError && <p role="alert" className="text-xs font-medium text-destructive">{calcError}</p>}
             </div>
 

@@ -13,8 +13,8 @@ export function PrintButton() {
   return <Button variant="outline" onClick={() => window.print()}><Printer /> Print</Button>;
 }
 
-export function DownloadReceipt({ id }: { id: string }) {
-  return <Button asChild variant="outline"><a href={`/api/sales/${id}/receipt`} download><Download /> Download</a></Button>;
+export function DownloadReceipt({ slug }: { slug: string }) {
+  return <Button asChild variant="outline"><a href={`/api/sales/${slug}/receipt`} download><Download /> Download PDF</a></Button>;
 }
 
 export function VoidSaleDialog({ saleId, saleNumber }: { saleId: string; saleNumber: string }) {

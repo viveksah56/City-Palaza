@@ -93,13 +93,13 @@ export async function InventoryReport() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="gap-0 py-0"><CardHeader className="p-4"><CardTitle>Low stock</CardTitle></CardHeader>
           <DataTable empty={<EmptyState title="Nothing is running low" />} rows={low} rowKey={(x) => x.id} columns={[
-            { key: "n", header: "Product", cell: (x) => <Link className="hover:underline" href={`/products/${x.id}`}>{x.name}</Link> },
+            { key: "n", header: "Product", cell: (x) => <Link className="hover:underline" href={`/products/${x.slug}`}>{x.name}</Link> },
             { key: "q", header: "On hand", align: "right", cell: (x) => <span className="num">{x.quantity}</span> },
             { key: "m", header: "Min", align: "right", cell: (x) => <span className="num text-muted-foreground">{x.minStock}</span> },
           ] satisfies Column<(typeof low)[number]>[]} /></Card>
         <Card className="gap-0 py-0"><CardHeader className="p-4"><CardTitle>Out of stock</CardTitle></CardHeader>
           <DataTable empty={<EmptyState title="Everything has stock" />} rows={out} rowKey={(x) => x.id} columns={[
-            { key: "n", header: "Product", cell: (x) => <Link className="hover:underline" href={`/products/${x.id}`}>{x.name}</Link> },
+            { key: "n", header: "Product", cell: (x) => <Link className="hover:underline" href={`/products/${x.slug}`}>{x.name}</Link> },
             { key: "c", header: "Category", cell: (x) => x.category.name },
           ] satisfies Column<(typeof out)[number]>[]} /></Card>
       </div>
@@ -117,7 +117,7 @@ export async function EmployeeReport({ range }: { range: DateRange }) {
         { key: "s", header: "Sales", align: "right", cell: (x) => <span className="num">{x.sales}</span> },
         { key: "u", header: "Units", align: "right", cell: (x) => <span className="num">{x.units}</span> },
         { key: "r", header: "Revenue", align: "right", cell: (x) => money(x.revenue) },
-        { key: "d", header: "Discounts given", align: "right", cell: (x) => money(x.discounts) },
+        { key: "d", header: "Manual discounts", align: "right", cell: (x) => x.discounts === null ? <span className="text-muted-foreground">Unknown for legacy sales</span> : money(x.discounts) },
         { key: "p", header: "Gross profit", align: "right", cell: (x) => money(x.profit) },
         { key: "a", header: "Avg. sale", align: "right", cell: (x) => money(x.average) },
       ] satisfies Column<(typeof rows)[number]>[]} />

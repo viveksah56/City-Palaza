@@ -53,7 +53,7 @@ export function SignOutConfirmation({ action }: { action: () => Promise<void | {
       </Button>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Sign out of CityPalaza?</AlertDialogTitle>
+          <AlertDialogTitle>Sign out of CityPlaza?</AlertDialogTitle>
           <AlertDialogDescription>
             This will end your current session on this device. You’ll need to sign in again to continue.
           </AlertDialogDescription>

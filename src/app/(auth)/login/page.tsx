@@ -32,7 +32,7 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
         <div aria-hidden className="pointer-events-none absolute -right-40 -top-40 size-[30rem] rounded-full border border-white/[0.06]" />
         <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 size-[20rem] rounded-full border border-white/[0.06]" />
         <div className="relative">
-          <Image src="/citypalaza-logo.webp" alt="CityPalaza" width={640} height={640} sizes="120px" priority className="size-28 rounded-2xl object-cover ring-1 ring-sidebar-border sm:size-32" />
+          <Image src="/citypalaza-logo.webp" alt="CityPlaza" width={640} height={640} sizes="120px" priority className="size-28 rounded-2xl object-cover ring-1 ring-sidebar-border sm:size-32" />
         </div>
 
         <div className="relative max-w-xl py-12">
@@ -59,14 +59,14 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
           </div>
         </div>
 
-        <p className="relative text-xs text-sidebar-muted">© {COPYRIGHT_YEAR} CityPalaza · Store management</p>
+        <p className="relative text-xs text-sidebar-muted">© {COPYRIGHT_YEAR} CityPlaza · Store management</p>
       </section>
 
       <section className="relative flex min-h-dvh items-center justify-center px-5 py-10 sm:px-8">
         <div className="absolute top-5 right-5 sm:top-8 sm:right-8"><ThemeToggle /></div>
         <div className="rise w-full max-w-[420px]">
           <div className="mb-7 flex justify-center lg:hidden">
-            <Image src="/citypalaza-logo.webp" alt="CityPalaza" width={640} height={640} sizes="96px" priority className="size-24 rounded-2xl object-cover ring-1 ring-border" />
+            <Image src="/citypalaza-logo.webp" alt="CityPlaza" width={640} height={640} sizes="96px" priority className="size-24 rounded-2xl object-cover ring-1 ring-border" />
           </div>
           <Card className="gap-7 rounded-2xl border-border/80 px-0 py-8 shadow-card sm:py-9">
             <CardHeader className="gap-2 px-7 sm:px-8">
@@ -78,7 +78,7 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
               <LoginForm redirectTo={redirectTo} />
             </CardContent>
           </Card>
-          <p className="mt-6 text-center text-xs text-muted-foreground">Need access? Contact your CityPalaza administrator.</p>
+          <p className="mt-6 text-center text-xs text-muted-foreground">Need access? Contact your CityPlaza administrator.</p>
         </div>
       </section>
     </main>

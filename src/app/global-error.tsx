@@ -25,7 +25,7 @@ export default function GlobalError({
     return (
         <html lang="en">
             <head>
-                <title>Something went wrong | CityPalaza</title>
+                <title>Something went wrong | CityPlaza</title>
                 <meta name="robots" content="noindex" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <style>{`
@@ -101,7 +101,7 @@ export default function GlobalError({
                             className="m-0 bg-gradient-to-br from-neutral-900 via-neutral-800 to-indigo-700 bg-clip-text text-2xl font-bold leading-tight tracking-tight text-transparent animate-[ge-fade-up_0.8s_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none sm:text-3xl md:text-4xl dark:from-white dark:via-neutral-100 dark:to-indigo-300"
                             style={{ animationDelay: "260ms" }}
                         >
-                            CityPalaza could not load
+                            CityPlaza could not load
                         </h1>
 
                         <p

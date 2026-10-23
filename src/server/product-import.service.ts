@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { toDb, money } from "@/lib/money";
+import { uniqueSlug } from "@/lib/slug";
 import { slugify } from "@/lib/format";
 import { normalizeSerials } from "@/lib/imei";
 import { productSchema } from "@/validations/product";
@@ -107,6 +108,8 @@ function parseRows(source: string): { products: ParsedProduct[]; issues: ImportI
     if (barcode && barcodes.has(barcode)) issues.push({ row: rowNumber, sku, message: "Barcode is repeated in this file." });
     if (barcode) barcodes.add(barcode);
     if (!categoryName) issues.push({ row: rowNumber, sku, message: "Category is required." });
+    if (!String(record.purchasePrice ?? "").trim()) issues.push({ row: rowNumber, sku, message: "Purchase price is required." });
+    if (!String(record.sellingPrice ?? "").trim()) issues.push({ row: rowNumber, sku, message: "Selling price is required." });
 
     const value = productSchema.safeParse({
       sku,
@@ -152,10 +155,17 @@ function parseRows(source: string): { products: ParsedProduct[]; issues: ImportI
   return { products, issues };
 }
 
-async function resolveCategories(tx: Prisma.TransactionClient, names: string[]) {
+async function resolveCategories(tx: Prisma.TransactionClient, actor: Actor, names: string[]) {
   const uniqueNames = [...new Map(names.map((name) => [name.toLocaleLowerCase("en"), name.trim()])).values()];
-  const existing = await tx.category.findMany({ where: { name: { in: uniqueNames, mode: "insensitive" } }, select: { id: true, name: true } });
-  const byName = new Map(existing.map((category) => [category.name.toLocaleLowerCase("en"), category]));
+  const existing = await tx.category.findMany({ where: { name: { in: uniqueNames, mode: "insensitive" } }, select: { id: true, name: true, isActive: true } });
+  const byName = new Map<string, { id: string; name: string }>(existing.map((category) => [category.name.toLocaleLowerCase("en"), category]));
+  for (const category of existing) {
+    if (!category.isActive) {
+      await tx.category.update({ where: { id: category.id }, data: { isActive: true } });
+      await writeAudit(tx, { actorId: actor.id, action: PERMISSION.CATEGORY_UPDATE, entityType: "Category", entityId: category.id, description: `Reactivated category “${category.name}” while importing products` });
+      byName.set(category.name.toLocaleLowerCase("en"), { id: category.id, name: category.name });
+    }
+  }
   const missing = uniqueNames.filter((name) => !byName.has(name.toLocaleLowerCase("en"))).map((name) => {
     const slug = slugify(name);
     if (!slug) throw new DomainError("VALIDATION", `Category “${name}” needs a letter or number.`);
@@ -172,11 +182,18 @@ async function resolveCategories(tx: Prisma.TransactionClient, names: string[]) 
   return byName;
 }
 
-async function resolveBrands(tx: Prisma.TransactionClient, names: string[]) {
+async function resolveBrands(tx: Prisma.TransactionClient, actor: Actor, names: string[]) {
   const uniqueNames = [...new Map(names.map((name) => [name.toLocaleLowerCase("en"), name.trim()])).values()];
   if (!uniqueNames.length) return new Map<string, { id: string; name: string }>();
-  const existing = await tx.brand.findMany({ where: { name: { in: uniqueNames, mode: "insensitive" } }, select: { id: true, name: true } });
-  const byName = new Map(existing.map((brand) => [brand.name.toLocaleLowerCase("en"), brand]));
+  const existing = await tx.brand.findMany({ where: { name: { in: uniqueNames, mode: "insensitive" } }, select: { id: true, name: true, isActive: true } });
+  const byName = new Map<string, { id: string; name: string }>(existing.map((brand) => [brand.name.toLocaleLowerCase("en"), brand]));
+  for (const brand of existing) {
+    if (!brand.isActive) {
+      await tx.brand.update({ where: { id: brand.id }, data: { isActive: true } });
+      await writeAudit(tx, { actorId: actor.id, action: PERMISSION.BRAND_UPDATE, entityType: "Brand", entityId: brand.id, description: `Reactivated brand “${brand.name}” while importing products` });
+      byName.set(brand.name.toLocaleLowerCase("en"), { id: brand.id, name: brand.name });
+    }
+  }
   const missing = uniqueNames.filter((name) => !byName.has(name.toLocaleLowerCase("en"))).map((name) => {
     const slug = slugify(name);
     if (!slug) throw new DomainError("VALIDATION", `Brand “${name}” needs a letter or number.`);
@@ -214,16 +231,19 @@ export async function importProductsCsv(actor: Actor, csv: string) {
     if (issues.length) return { imported: 0, issues };
 
     const [categories, brands] = await Promise.all([
-      resolveCategories(tx, parsed.products.map((product) => product.categoryName)),
-      resolveBrands(tx, parsed.products.flatMap((product) => product.brandName ? [product.brandName] : [])),
+      resolveCategories(tx, actor, parsed.products.map((product) => product.categoryName)),
+      resolveBrands(tx, actor, parsed.products.flatMap((product) => product.brandName ? [product.brandName] : [])),
     ]);
     for (const product of parsed.products) {
       const category = categories.get(product.categoryName.toLocaleLowerCase("en"));
       const brand = product.brandName ? brands.get(product.brandName.toLocaleLowerCase("en")) : null;
       if (!category) throw new DomainError("CONFLICT", `Could not resolve category “${product.categoryName}”.`);
       const value = product.value;
+      const slugBase = value.variantLabel ? `${value.name} ${value.variantLabel}` : value.name;
+      const slug = await uniqueSlug(slugBase, async (candidate) => !!(await tx.product.findUnique({ where: { slug: candidate }, select: { id: true } })));
       const created = await tx.product.create({
         data: {
+          slug,
           sku: product.sku,
           barcode: value.barcode?.trim() || null,
           name: value.name.trim(),

@@ -109,7 +109,7 @@ export async function updateProductAction(id: string, raw: unknown) {
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidateTag(TAXONOMY_CACHE_TAG[TAXONOMY_KIND.CATEGORY], "max");
     revalidatePath("/products");
-    revalidatePath(`/products/${id}`);
+    revalidatePath("/products");
     return undefined;
   });
 }
@@ -120,7 +120,7 @@ export async function setProductStatusAction(id: string, status: ProductStatus) 
     await products.setProductStatus(actor, id, status);
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/products");
-    revalidatePath(`/products/${id}`);
+    revalidatePath("/products");
     return undefined;
   });
 }

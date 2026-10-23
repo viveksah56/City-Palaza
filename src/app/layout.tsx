@@ -6,8 +6,8 @@ export const viewport: Viewport = { themeColor: [{ media: "(prefers-color-scheme
 
 
 export const metadata: Metadata = {
-  title: { default: "CityPalaza", template: "%s · CityPalaza" },
-  description: "Stock and sales management for CityPalaza mobile & electronics shop",
+  title: { default: "CityPlaza", template: "%s · CityPlaza" },
+  description: "Stock and sales management for CityPlaza mobile & electronics shop",
   robots: { index: false, follow: false },
 };
 
