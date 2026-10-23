@@ -14,7 +14,7 @@ import { Pagination } from "@/components/shared/data-table";
 import { ProductTable } from "@/features/products/product-table";
 import { ProductImportDialog } from "@/features/products/product-import-dialog";
 import { QueryProvider } from "@/components/providers/query-provider";
-import { ProductCreateDialog } from "@/features/products/product-create-dialog";
+import { ProductModal } from "@/features/products/product-modal";
 import { getBrands, getCategories, listProducts, parseProductQuery } from "@/server/products.service";
 import { getSettings } from "@/server/settings.service";
 import { getInventorySummary } from "@/server/reports.service";
@@ -46,7 +46,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <>
             {hasPermission(user.role, PERMISSION.CATEGORY_VIEW) && <Button asChild variant="outline"><Link href="/products/categories"><Tags /> Categories &amp; brands</Link></Button>}
             {hasPermission(user.role, PERMISSION.PRODUCT_CREATE) && <QueryProvider><ProductImportDialog /></QueryProvider>}
-            {hasPermission(user.role, PERMISSION.PRODUCT_CREATE) && <ProductCreateDialog categories={categories.filter((c) => c.isActive)} brands={brands.filter((b) => b.isActive)} />}
+            {hasPermission(user.role, PERMISSION.PRODUCT_CREATE) && <ProductModal categories={categories.filter((c) => c.isActive)} brands={brands.filter((b) => b.isActive)} />}
           </>
         }
       />
@@ -71,6 +71,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           role={user.role}
           url={{ basePath: "/products", params }}
           sort={{ key: q.sort, order: q.order }}
+          categories={categories}
+          brands={brands}
           empty={<EmptyState title="No products match" description="Try a different search or clear the filters." action={<Button asChild variant="outline"><Link href="/products">Clear filters</Link></Button>} />}
         />
         <Pagination page={result.page} totalPages={result.totalPages} total={result.total} pageSize={result.pageSize} url={{ basePath: "/products", params }} />

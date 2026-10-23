@@ -17,7 +17,7 @@ import { PRODUCT_CATEGORY_SELECTION } from "@/lib/constants/categories";
 type Option = { id: string; name: string };
 
 export function ProductForm({
-  mode, productId, categories, brands, defaults, onCancel,
+  mode, productId, categories, brands, defaults, onCancel, onSaved,
 }: {
   mode: "create" | "edit";
   productId?: string;
@@ -25,6 +25,7 @@ export function ProductForm({
   brands: Option[];
   defaults?: Partial<ProductFormValues>;
   onCancel?: () => void;
+  onSaved?: () => void;
 }) {
   const router = useRouter();
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<ProductFormInput, unknown, ProductFormValues>({
@@ -48,7 +49,8 @@ export function ProductForm({
         const res = mode === "create" ? await createProductAction(values) : await updateProductAction(productId!, values);
         if (!res.ok) return void toast.error(res.error);
         toast.success(mode === "create" ? "Product added" : "Changes saved");
-        router.push(mode === "create" ? `/products/${(res.data as { slug: string }).slug}` : "/products");
+        if (onSaved) onSaved();
+        else router.push(mode === "create" ? `/products/${(res.data as { slug: string }).slug}` : "/products");
         router.refresh();
       })}
     >

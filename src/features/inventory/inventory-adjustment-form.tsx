@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { PackagePlus, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/shared/icon-button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,12 +17,12 @@ import { addStockAction, adjustStockAction } from "@/server/actions";
 
 export type StockProduct = { id: string; name: string; sku: string; trackingType: "QUANTITY" | "SERIALIZED" | "IMEI"; quantity: number };
 
-export function StockActions({ product, canAdd, canAdjust }: { product: StockProduct; canAdd: boolean; canAdjust: boolean }) {
+export function StockActions({ product, canAdd, canAdjust, compact = false }: { product: StockProduct; canAdd: boolean; canAdjust: boolean; compact?: boolean }) {
   const [mode, setMode] = React.useState<"add" | "adjust" | null>(null);
   return (
     <div className="flex justify-end gap-1.5">
-      {canAdd && <Button size="sm" variant="outline" onClick={() => setMode("add")}><PackagePlus /> Add stock</Button>}
-      {canAdjust && <Button size="sm" variant="ghost" onClick={() => setMode("adjust")} aria-label={`Adjust stock for ${product.name}`}><SlidersHorizontal /> Adjust</Button>}
+      {canAdd && (compact ? <IconButton label={`Add stock to ${product.name}`} variant="outline" onClick={() => setMode("add")}><PackagePlus /></IconButton> : <Button size="sm" variant="outline" onClick={() => setMode("add")}><PackagePlus /> Add stock</Button>)}
+      {canAdjust && (compact ? <IconButton label={`Adjust stock for ${product.name}`} variant="ghost" onClick={() => setMode("adjust")}><SlidersHorizontal /></IconButton> : <Button size="sm" variant="ghost" onClick={() => setMode("adjust")} aria-label={`Adjust stock for ${product.name}`}><SlidersHorizontal /> Adjust</Button>)}
       {mode && <StockDialog mode={mode} product={product} onClose={() => setMode(null)} />}
     </div>
   );

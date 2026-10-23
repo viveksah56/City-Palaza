@@ -27,10 +27,13 @@ export type ProductRow = {
   category: string;
   categoryId: string;
   brand: string | null;
+  brandId: string | null;
+  description: string | null;
   sellingPrice: string;
   /** only present when the viewer may see costs (never sent to employees) */
   purchasePrice?: string;
   discountPercent: string;
+  maxStock: number | null;
   quantity: number;
   minStock: number;
   trackingType: TrackingType;
@@ -78,9 +81,12 @@ export function toProductRow(p: ProductWithRels, canSeeCost: boolean): ProductRo
     category: p.category.name,
     categoryId: p.categoryId,
     brand: p.brand?.name ?? null,
+    brandId: p.brandId,
+    description: p.description,
     sellingPrice: p.sellingPrice.toString(),
     ...(canSeeCost && { purchasePrice: p.purchasePrice.toString() }),
     discountPercent: p.discountPercent.toString(),
+    maxStock: p.maxStock,
     quantity: p.quantity,
     minStock: p.minStock,
     trackingType: p.trackingType,

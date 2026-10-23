@@ -14,6 +14,8 @@ export function ProductAdminActions({ id, status, canUpdate = true, canDelete, c
           title="Deactivate this product?"
           description="It disappears from the sales terminal but keeps its history, stock and reports. You can reactivate it any time."
           confirmLabel="Deactivate"
+          triggerLabel="Deactivate product"
+          triggerAsChild
           successMessage="Product deactivated"
           onConfirm={() => setProductStatusAction(id, "INACTIVE")}
         />
@@ -23,6 +25,8 @@ export function ProductAdminActions({ id, status, canUpdate = true, canDelete, c
           title="Reactivate this product?"
           description="It becomes available at the sales terminal again."
           confirmLabel="Reactivate"
+          triggerLabel="Reactivate product"
+          triggerAsChild
           successMessage="Product reactivated"
           onConfirm={() => setProductStatusAction(id, "ACTIVE")}
         />
@@ -33,6 +37,8 @@ export function ProductAdminActions({ id, status, canUpdate = true, canDelete, c
           title="Delete this product?"
           description="Only products with no stock or sales history can be deleted. Otherwise deactivate it."
           confirmLabel="Delete product"
+          triggerLabel="Delete product"
+          triggerAsChild
           destructive
           successMessage="Product deleted"
           redirectTo="/products"

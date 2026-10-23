@@ -7,13 +7,17 @@ import type { ProductRow } from "@/server/products.service";
 import { SkuCode } from "@/components/shared/sku-code";
 import { StockActions } from "@/features/inventory/inventory-adjustment-form";
 import { ProductAdminActions } from "./product-admin-actions";
-import { Button } from "@/components/ui/button";
-import { Edit3 } from "lucide-react";
+import { IconButton } from "@/components/shared/icon-button";
+import { Pencil } from "lucide-react";
 import { PERMISSION, hasPermission } from "@/lib/rbac/permission";
 import type { Role } from "@/lib/constants/roles";
+import { ProductModal } from "./product-modal";
+import type { ProductFormValues } from "@/validations/product";
+
+type Option = { id: string; name: string };
 
 export function ProductTable({
-  rows, canSeeCost, currency, role, url, sort, empty,
+  rows, canSeeCost, currency, role, url, sort, empty, categories, brands,
 }: {
   rows: ProductRow[];
   canSeeCost: boolean;
@@ -22,6 +26,8 @@ export function ProductTable({
   url: { basePath: string; params: Record<string, string | undefined> };
   sort: { key?: string; order?: "asc" | "desc" };
   empty?: React.ReactNode;
+  categories: Option[];
+  brands: Option[];
 }) {
   const columns: Column<ProductRow>[] = [
     {
@@ -41,8 +47,33 @@ export function ProductTable({
     ...(hasPermission(role, PERMISSION.INVENTORY_ADD) || hasPermission(role, PERMISSION.INVENTORY_ADJUST) || hasPermission(role, PERMISSION.PRODUCT_UPDATE) || hasPermission(role, PERMISSION.PRODUCT_DELETE) ? [{
       key: "actions", header: <span className="sr-only">Actions</span>, align: "right" as const,
       cell: (p: ProductRow) => <div className="flex items-center justify-end gap-1.5">
-        {hasPermission(role, PERMISSION.PRODUCT_UPDATE) && <Button asChild size="sm" variant="outline"><Link href={`/products/${p.slug}`} aria-label={`Edit ${p.name}`}><Edit3 /> Edit</Link></Button>}
-        {(hasPermission(role, PERMISSION.INVENTORY_ADD) || hasPermission(role, PERMISSION.INVENTORY_ADJUST)) && <StockActions product={{ id: p.id, name: p.name, sku: p.sku, trackingType: p.trackingType, quantity: p.quantity }} canAdd={hasPermission(role, PERMISSION.INVENTORY_ADD)} canAdjust={hasPermission(role, PERMISSION.INVENTORY_ADJUST)} />}
+        {hasPermission(role, PERMISSION.PRODUCT_UPDATE) && (
+          <ProductModal
+            categories={categories}
+            brands={brands}
+            product={{
+              id: p.id,
+              defaults: {
+                sku: p.sku,
+                barcode: p.barcode ?? "",
+                name: p.name,
+                variantLabel: p.variantLabel ?? "",
+                description: p.description ?? "",
+                categoryId: p.categoryId,
+                brandId: p.brandId ?? "",
+                purchasePrice: Number(p.purchasePrice ?? 0),
+                sellingPrice: Number(p.sellingPrice),
+                discountPercent: Number(p.discountPercent),
+                minStock: p.minStock,
+                maxStock: p.maxStock ?? NaN,
+                trackingType: p.trackingType,
+                status: p.status,
+              } satisfies Partial<ProductFormValues>,
+            }}
+            trigger={<IconButton label={`Edit ${p.name}`} variant="outline"><Pencil /></IconButton>}
+          />
+        )}
+        {(hasPermission(role, PERMISSION.INVENTORY_ADD) || hasPermission(role, PERMISSION.INVENTORY_ADJUST)) && <StockActions product={{ id: p.id, name: p.name, sku: p.sku, trackingType: p.trackingType, quantity: p.quantity }} canAdd={hasPermission(role, PERMISSION.INVENTORY_ADD)} canAdjust={hasPermission(role, PERMISSION.INVENTORY_ADJUST)} compact />}
         {(hasPermission(role, PERMISSION.PRODUCT_UPDATE) || hasPermission(role, PERMISSION.PRODUCT_DELETE)) && <ProductAdminActions id={p.id} status={p.status} canUpdate={hasPermission(role, PERMISSION.PRODUCT_UPDATE)} canDelete={hasPermission(role, PERMISSION.PRODUCT_DELETE)} compact />}
       </div>,
     }] : []),

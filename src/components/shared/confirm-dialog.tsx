@@ -18,6 +18,7 @@ export function ConfirmDialog({
   successMessage,
   redirectTo,
   triggerLabel,
+  triggerAsChild = false,
 }: {
   trigger: React.ReactNode;
   title: string;
@@ -28,6 +29,7 @@ export function ConfirmDialog({
   successMessage: string;
   redirectTo?: string;
   triggerLabel?: string;
+  triggerAsChild?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [pending, start] = React.useTransition();
@@ -36,10 +38,10 @@ export function ConfirmDialog({
     <AlertDialog open={open} onOpenChange={setOpen}>
       {triggerLabel ? (
         <Tooltip>
-          <TooltipTrigger asChild><AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger></TooltipTrigger>
+          <TooltipTrigger asChild><AlertDialogTrigger asChild={triggerAsChild}>{trigger}</AlertDialogTrigger></TooltipTrigger>
           <TooltipContent>{triggerLabel}</TooltipContent>
         </Tooltip>
-      ) : <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>}
+      ) : <AlertDialogTrigger asChild={triggerAsChild}>{trigger}</AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
