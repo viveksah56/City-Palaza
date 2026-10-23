@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { PAYMENT_METHODS, PAYMENT_STATUSES } from "@/lib/constants";
+import { PAYMENT_METHODS } from "@/lib/constants";
 import { moneyField } from "./common";
 
 const discountSchema = z.object({ type: z.enum(["PERCENT", "FIXED"]), value: moneyField("Discount") });
+const itemDiscountSchema = z.object({ type: z.literal("PERCENT"), value: moneyField("Discount") });
 
 export const createSaleSchema = z.object({
   items: z
@@ -11,7 +12,7 @@ export const createSaleSchema = z.object({
         productId: z.string().min(1),
         quantity: z.number().int().min(1).max(10_000),
         serials: z.array(z.string().max(60)).max(500).optional(),
-        discount: discountSchema.nullish(),
+        discount: itemDiscountSchema.nullish(),
       }),
     )
     .min(1, "Add at least one product")
@@ -27,8 +28,6 @@ export const createSaleSchema = z.object({
     .nullish(),
   discount: discountSchema.nullish(),
   paymentMethod: z.enum(PAYMENT_METHODS),
-  paymentStatus: z.enum(PAYMENT_STATUSES).default("PAID"),
-  amountPaid: z.number().min(0).nullish(),
   notes: z.string().trim().max(500).nullish(),
   idempotencyKey: z.string().uuid().optional(),
 });

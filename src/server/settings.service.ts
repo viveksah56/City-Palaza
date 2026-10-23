@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma, type Db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import type { Actor } from "./inventory.service";
+import { DEFAULT_BUSINESS_DETAILS } from "@/lib/constants";
 
 export type Settings = {
   shopName: string;
@@ -11,6 +12,7 @@ export type Settings = {
   city: string;
   phone: string;
   email: string;
+  panNumber: string;
   currency: string;
   /** percent, tax-exclusive, e.g. 13 */
   taxRate: number;
@@ -21,13 +23,14 @@ export type Settings = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  shopName: "CityPlaza",
-  address: "",
-  city: "Kathmandu",
-  phone: "",
-  email: "",
+  shopName: DEFAULT_BUSINESS_DETAILS.name,
+  address: DEFAULT_BUSINESS_DETAILS.address,
+  city: DEFAULT_BUSINESS_DETAILS.city,
+  phone: DEFAULT_BUSINESS_DETAILS.phone,
+  email: DEFAULT_BUSINESS_DETAILS.email,
+  panNumber: DEFAULT_BUSINESS_DETAILS.panNumber,
   currency: "NPR",
-  taxRate: 0,
+  taxRate: 13,
   invoicePrefix: "CP",
   employeeDiscountLimit: 5,
   employeeMaxTotalDiscountPercent: null,

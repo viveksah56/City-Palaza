@@ -39,7 +39,10 @@ export async function signIn(raw: unknown, requestedRedirect?: unknown): Promise
     if (blocked.length) throw new RateLimitExceededError(Math.max(...blocked.map((result) => result.retryAfterSeconds)));
 
     stage = "user lookup";
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, firstName: true, lastName: true, email: true, passwordHash: true, role: true, status: true },
+    });
     stage = "password verification";
     const validPassword = await verifyPassword(credentials.password, user?.passwordHash ?? (await getDummyHash()));
     if (!user || !validPassword) throw new DomainError("UNAUTHENTICATED", "Email or password is incorrect.");
@@ -58,7 +61,7 @@ export async function signIn(raw: unknown, requestedRedirect?: unknown): Promise
       resetRateLimit(accountBucket),
       refundRateLimit(ipBucket),
       pruneExpiredAuthData(),
-      prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
+      prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() }, select: { id: true } }),
       writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` }),
     ]);
     for (const result of bookkeeping) {

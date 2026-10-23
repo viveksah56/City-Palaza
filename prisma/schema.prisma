@@ -234,12 +234,9 @@ model Product {
   brand           Brand?        @relation(fields: [brandId], references: [id])
   purchasePrice   Decimal       @db.Decimal(12, 2)
   sellingPrice    Decimal       @db.Decimal(12, 2)
-  /// Standing promotional discount in percent, applied automatically at sale time.
-  discountPercent Decimal       @default(0) @db.Decimal(5, 2)
+  maxDiscountPercent Decimal    @default(5) @db.Decimal(5, 2)
   /// Current stock. Never negative (CHECK constraint + atomic guarded updates).
   quantity        Int           @default(0)
-  minStock        Int           @default(5)
-  maxStock        Int?
   trackingType    TrackingType  @default(QUANTITY)
   status          ProductStatus @default(ACTIVE)
   createdAt       DateTime      @default(now())

@@ -11,6 +11,8 @@ import { getSettings } from "@/server/settings.service";
 import { logoutAction } from "@/server/actions";
 import { LoadingSkeleton } from "@/components/shared/states";
 
+export const instant = false;
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={<LoadingSkeleton rows={6} cards={4} />}>

@@ -103,8 +103,8 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     const f = await fixtures();
     const p = await f.mk("LEDGER");
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 5, reason: "received" });
-    await inv.adjustStock(f.admin, { productId: p.id, type: "ADJUSTMENT", direction: "INCREASE", quantity: 2, reason: "count correction" });
-    await inv.adjustStock(f.admin, { productId: p.id, type: "ADJUSTMENT", direction: "DECREASE", quantity: 1, reason: "count correction" });
+    await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 2, reason: "count correction" });
+    await inv.adjustStock(f.admin, { productId: p.id, type: "ADJUSTMENT", quantity: 1, reason: "count correction" });
     const rows = await prisma.inventoryTransaction.findMany({ where: { productId: p.id }, orderBy: { createdAt: "asc" } });
     expect(rows.map((row) => [row.quantity, row.previousQuantity, row.newQuantity])).toEqual([[5, 0, 5], [2, 5, 7], [-1, 7, 6]]);
   });
@@ -112,13 +112,13 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
   it("rejects count adjustments for serialized products and requires a valid IMEI", async () => {
     const f = await fixtures();
     const phone = await f.mk("SERADJ", { trackingType: "IMEI" });
-    await expect(inv.adjustStock(f.admin, { productId: phone.id, type: "ADJUSTMENT", direction: "INCREASE", quantity: 1, reason: "count" })).rejects.toThrow(/serialized products can't be adjusted by count/i);
+    await expect(inv.adjustStock(f.admin, { productId: phone.id, type: "ADJUSTMENT", quantity: 1, reason: "count" })).rejects.toThrow(/serialized products can't be adjusted by count/i);
     await expect(inv.addStock(f.admin, { productId: phone.id, type: "PURCHASE", serials: ["12345678901234"] })).rejects.toThrow(/IMEI/i);
   });
 
   it("enforces unique SKU and barcode", async () => {
     const f = await fixtures();
-    const base = { name: "Test item", categoryId: f.category.id, purchasePrice: 1, sellingPrice: 2, discountPercent: 0, minStock: 1, trackingType: "QUANTITY", status: "ACTIVE" };
+    const base = { name: "Test item", categoryId: f.category.id, purchasePrice: 1, sellingPrice: 2, maxDiscountPercent: 5, trackingType: "QUANTITY" };
     await products.createProduct(f.admin, { ...base, sku: "DUP", barcode: "123" });
     expect((await prisma.product.findUniqueOrThrow({ where: { sku: "DUP" } })).sku).toBe("DUP");
     await expect(products.createProduct(f.admin, { ...base, sku: "dup" })).rejects.toMatchObject({ code: "P2002" }); // SKU is upper-cased
@@ -138,16 +138,17 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     expect(await products.getProductBySlug(p.slug, false)).not.toHaveProperty("purchasePrice");
   });
 
-  it("does not allow tracking mode changes after stock exists and blocks deleting history", async () => {
+  it("does not allow tracking mode changes after stock exists and retains history when deleting a stocked product", async () => {
     const f = await fixtures();
     const p = await f.mk("LOCKTRACK");
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 1, reason: "test" });
     const { categoryId, name, purchasePrice, sellingPrice } = p;
     await expect(products.updateProduct(f.admin, p.id, {
-      sku: p.sku, name, categoryId, purchasePrice: Number(purchasePrice), sellingPrice: Number(sellingPrice), discountPercent: 0,
-      minStock: p.minStock, trackingType: "IMEI", status: "ACTIVE",
+      sku: p.sku, name, categoryId, purchasePrice: Number(purchasePrice), sellingPrice: Number(sellingPrice), maxDiscountPercent: 5,
+      trackingType: "IMEI",
     })).rejects.toThrow(/tracking type can't be changed/i);
-    await expect(products.deleteProduct(f.admin, p.id)).rejects.toThrow(/history/i);
+    await expect(products.deleteProduct(f.admin, p.id)).resolves.toMatchObject({ archived: true, slug: p.slug });
+    expect(await prisma.product.findUniqueOrThrow({ where: { id: p.id } })).toMatchObject({ status: "DISCONTINUED", quantity: 1 });
   });
 
   it("IMEIs are unique and a sold IMEI can never be sold again", async () => {
@@ -246,7 +247,7 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
 
   it("allows zero-total paid and pending sales but rejects a zero-total partial payment", async () => {
     const f = await fixtures();
-    const p = await f.mk("FREE", { purchasePrice: "0.00", sellingPrice: "0.00", discountPercent: "100.00" });
+    const p = await f.mk("FREE", { purchasePrice: "0.00", sellingPrice: "0.00" });
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 3, reason: "test" });
     const base = { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" as const };
     const paid = await sales.createSale(f.emp, { ...base, paymentStatus: "PAID" });
@@ -294,14 +295,14 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
 
   it("stores the new sale discount split and checks the optional effective discount ceiling", async () => {
     const f = await fixtures();
-    const p = await f.mk("SPLIT", { discountPercent: "10.00" });
+    const p = await f.mk("SPLIT", { maxDiscountPercent: "10.00" });
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 10, reason: "test" });
     await prisma.setting.create({ data: { key: "employeeMaxTotalDiscountPercent", value: 15 } });
     const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1, discount: { type: "FIXED", value: 20 } }], paymentMethod: "CASH" });
     const saved = await prisma.sale.findUniqueOrThrow({ where: { id: sale.id }, include: { items: true } });
-    expect(saved.promoDiscount?.toString()).toBe("100");
+    expect(saved.promoDiscount?.toString()).toBe("0");
     expect(saved.manualDiscount?.toString()).toBe("20");
-    expect(saved.items[0]!.promoDiscount?.toString()).toBe("100");
+    expect(saved.items[0]!.promoDiscount?.toString()).toBe("0");
     expect(saved.items[0]!.saleDiscount?.toString()).toBe("20");
     await prisma.setting.update({ where: { key: "employeeMaxTotalDiscountPercent" }, data: { value: 12 } });
     await expect(sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1, discount: { type: "PERCENT", value: 5 } }], paymentMethod: "CASH" })).rejects.toThrow(/total discount/i);

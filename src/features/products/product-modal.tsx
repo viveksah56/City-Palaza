@@ -28,17 +28,18 @@ export function ProductModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger ?? <Button><Plus aria-hidden /> Add product</Button>}
+        {trigger ?? <Button type="button"><Plus aria-hidden /> Add product</Button>}
       </DialogTrigger>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader className="pr-8">
           <DialogTitle>{mode === "create" ? "Add product" : "Edit product"}</DialogTitle>
           <DialogDescription>
-            {mode === "create" ? "Create a product variant and optionally record opening stock." : "Update product details, pricing and stock rules."}
+            {mode === "create" ? "Create a product variant and optionally enter its opening stock." : "Update product details and pricing. Manage stock from Inventory."}
           </DialogDescription>
         </DialogHeader>
         {open && (
           <ProductForm
+            key={product?.id ?? "new-product"}
             mode={mode}
             productId={product?.id}
             categories={categories}

@@ -21,6 +21,16 @@ describe.skipIf(!TEST_DB)("product CSV import (PostgreSQL)", () => {
     expect(await prisma.auditLog.count({ where: { entityId: product.id, action: "PRODUCT_CREATE" } })).toBe(1);
   });
 
+  it("generates a SKU and imports opening stock and the employee discount when SKU is omitted", async () => {
+    const f = await fixtures();
+    const result = await products.importProductsCsv(f.admin, "name,category,purchasePrice,sellingPrice,quantity,maxDiscountPercent\nAuto SKU product,Phones,100,150,4,7.5");
+    expect(result).toMatchObject({ imported: 1, issues: [] });
+    const product = await prisma.product.findFirstOrThrow({ where: { name: "Auto SKU product" } });
+    expect(product.sku).toMatch(/^CP-[A-F0-9]{16}$/);
+    expect(product.quantity).toBe(4);
+    expect(product.maxDiscountPercent.toString()).toBe("7.5");
+  });
+
   it("rejects blank prices instead of silently importing zero", async () => {
     const f = await fixtures();
     const result = await products.importProductsCsv(f.admin, "sku,name,category,purchasePrice,sellingPrice,quantity,trackingType\nBLANK,Blank price,Phones,,150,3,QUANTITY");

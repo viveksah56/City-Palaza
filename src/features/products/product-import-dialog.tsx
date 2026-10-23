@@ -76,7 +76,7 @@ export function ProductImportDialog() {
           <Card className="gap-2 rounded-xl bg-muted/50 py-3 shadow-none">
             <CardHeader className="gap-1 px-4">
               <CardTitle className="text-sm">Before you import</CardTitle>
-              <CardDescription className="text-xs leading-5"><span className="font-medium text-foreground">Required columns:</span> sku, name, category, purchasePrice, sellingPrice, trackingType.</CardDescription>
+              <CardDescription className="text-xs leading-5"><span className="font-medium text-foreground">Required columns:</span> name, category, purchasePrice, sellingPrice. SKU, stock, tracking type, serials, and maximum employee discount are optional.</CardDescription>
             </CardHeader>
             <div className="px-4 text-xs leading-5 text-muted-foreground">Categories and brands are created when missing. Use <span className="font-medium text-foreground">QUANTITY</span> for count-tracked items or <span className="font-medium text-foreground">IMEI</span> / <span className="font-medium text-foreground">SERIALIZED</span> for devices. List identifiers separated by a pipe (|); quantity must match.</div>
             {file && <div className="px-4"><Badge variant="secondary">Selected: {file.name}</Badge></div>}

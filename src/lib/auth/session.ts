@@ -43,6 +43,7 @@ export async function createSession(subject: AccessTokenSubject, meta: { ip?: st
     await tx.session.deleteMany({ where: { userId: subject.userId } });
     return tx.session.create({
       data: { userId: subject.userId, expiresAt, refreshTokenId, ipAddress: meta.ip ?? null, userAgent: meta.userAgent?.slice(0, 255) ?? null },
+      select: { id: true },
     });
   });
   const [accessToken, refreshToken] = await Promise.all([
@@ -62,7 +63,12 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   if (!verified) return null;
   const session = await prisma.session.findUnique({
     where: { id: verified.sessionId },
-    include: { user: { select: { id: true, firstName: true, lastName: true, email: true, role: true, status: true } } },
+    select: {
+      id: true,
+      userId: true,
+      expiresAt: true,
+      user: { select: { id: true, firstName: true, lastName: true, email: true, role: true, status: true } },
+    },
   });
   if (!session || session.expiresAt < new Date() || session.user.status !== "ACTIVE") return null;
   const { status: _status, ...user } = session.user;

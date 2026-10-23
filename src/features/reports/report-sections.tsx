@@ -97,7 +97,6 @@ export async function InventoryReport() {
           <DataTable empty={<EmptyState title="Nothing is running low" />} rows={low} rowKey={(x) => x.id} columns={[
             { key: "n", header: "Product", cell: (x) => <Link className="hover:underline" href={`/products/${x.slug}`}>{x.name}</Link> },
             { key: "q", header: "On hand", align: "right", cell: (x) => <span className="num">{x.quantity}</span> },
-            { key: "m", header: "Min", align: "right", cell: (x) => <span className="num text-muted-foreground">{x.minStock}</span> },
           ] satisfies Column<(typeof low)[number]>[]} /></Card>
         <Card className="gap-0 py-0"><CardHeader className="p-4"><CardTitle>Out of stock</CardTitle></CardHeader>
           <DataTable empty={<EmptyState title="Everything has stock" />} rows={out} rowKey={(x) => x.id} columns={[

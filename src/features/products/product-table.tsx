@@ -5,7 +5,6 @@ import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { TRACKING_LABELS } from "@/lib/constants";
 import type { ProductRow } from "@/server/products.service";
 import { SkuCode } from "@/components/shared/sku-code";
-import { StockActions } from "@/features/inventory/inventory-adjustment-form";
 import { ProductAdminActions } from "./product-admin-actions";
 import { IconButton } from "@/components/shared/icon-button";
 import { Pencil } from "lucide-react";
@@ -44,7 +43,7 @@ export function ProductTable({
     { key: "price", header: "Price", sortKey: "sellingPrice", align: "right", cell: (p) => <CurrencyDisplay value={p.sellingPrice} currency={currency} className="font-medium" /> },
     { key: "qty", header: "Stock", sortKey: "quantity", align: "right", cell: (p) => <span className="num">{p.quantity}</span> },
     { key: "status", header: "Availability", cell: (p) => (p.status === "ACTIVE" ? <StockBadge status={p.stockStatus} /> : <StatusBadge status={p.status} />) },
-    ...(hasPermission(role, PERMISSION.INVENTORY_ADD) || hasPermission(role, PERMISSION.INVENTORY_ADJUST) || hasPermission(role, PERMISSION.PRODUCT_UPDATE) || hasPermission(role, PERMISSION.PRODUCT_DELETE) ? [{
+    ...(hasPermission(role, PERMISSION.PRODUCT_UPDATE) || hasPermission(role, PERMISSION.PRODUCT_DELETE) ? [{
       key: "actions", header: <span className="sr-only">Actions</span>, align: "right" as const,
       cell: (p: ProductRow) => <div className="flex items-center justify-end gap-1.5">
         {hasPermission(role, PERMISSION.PRODUCT_UPDATE) && (
@@ -63,18 +62,14 @@ export function ProductTable({
                 brandId: p.brandId ?? "",
                 purchasePrice: Number(p.purchasePrice ?? 0),
                 sellingPrice: Number(p.sellingPrice),
-                discountPercent: Number(p.discountPercent),
-                minStock: p.minStock,
-                maxStock: p.maxStock ?? NaN,
+                maxDiscountPercent: Number(p.maxDiscountPercent),
                 trackingType: p.trackingType,
-                status: p.status,
               } satisfies Partial<ProductFormValues>,
             }}
             trigger={<IconButton label={`Edit ${p.name}`} variant="outline"><Pencil /></IconButton>}
           />
         )}
-        {(hasPermission(role, PERMISSION.INVENTORY_ADD) || hasPermission(role, PERMISSION.INVENTORY_ADJUST)) && <StockActions product={{ id: p.id, name: p.name, sku: p.sku, trackingType: p.trackingType, quantity: p.quantity }} canAdd={hasPermission(role, PERMISSION.INVENTORY_ADD)} canAdjust={hasPermission(role, PERMISSION.INVENTORY_ADJUST)} compact />}
-        {(hasPermission(role, PERMISSION.PRODUCT_UPDATE) || hasPermission(role, PERMISSION.PRODUCT_DELETE)) && <ProductAdminActions id={p.id} status={p.status} canUpdate={hasPermission(role, PERMISSION.PRODUCT_UPDATE)} canDelete={hasPermission(role, PERMISSION.PRODUCT_DELETE)} compact />}
+        {hasPermission(role, PERMISSION.PRODUCT_DELETE) && <ProductAdminActions id={p.id} canDelete compact />}
       </div>,
     }] : []),
   ];

@@ -1,4 +1,12 @@
 export const APP_NAME = "CityPlaza";
+export const DEFAULT_BUSINESS_DETAILS = {
+  name: APP_NAME,
+  address: "",
+  city: "Kathmandu",
+  phone: "",
+  email: "",
+  panNumber: "612865374",
+} as const;
 export const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Kathmandu";
 export const SESSION_COOKIE = "cp_session";
 export const REFRESH_COOKIE = "cp_refresh";

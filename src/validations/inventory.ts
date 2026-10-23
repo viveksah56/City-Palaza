@@ -3,7 +3,7 @@ import { moneyField } from "./common";
 
 export const addStockSchema = z.object({
   productId: z.string().min(1),
-  type: z.enum(["PURCHASE", "INITIAL_STOCK"]),
+  type: z.literal("PURCHASE"),
   quantity: z.number().int().min(1, "Enter a quantity of at least 1").optional().or(z.nan()),
   serialsText: z.string().optional(),
   reference: z.string().trim().max(80).optional(),
@@ -11,11 +11,11 @@ export const addStockSchema = z.object({
   unitCost: moneyField("Unit cost").optional(),
 });
 export type AddStockValues = z.infer<typeof addStockSchema>;
+export type AddStockInput = z.input<typeof addStockSchema>;
 
 export const adjustStockSchema = z.object({
   productId: z.string().min(1),
   type: z.enum(["ADJUSTMENT", "DAMAGE", "LOST"]),
-  direction: z.enum(["INCREASE", "DECREASE"]),
   quantity: z.number().int().min(1, "Enter a quantity of at least 1").optional().or(z.nan()),
   serialsText: z.string().optional(),
   reason: z.string().trim().min(3, "Tell us why (at least 3 characters)").max(300),

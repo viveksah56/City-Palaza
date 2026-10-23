@@ -18,6 +18,6 @@ export async function fixtures() {
   const emp = await prisma.user.create({ data: { slug: "eve-emp", firstName: "Eve", lastName: "Emp", email: "emp@t.local", passwordHash: "x", role: "EMPLOYEE" } });
   const category = await prisma.category.create({ data: { name: "Phones", slug: "phones" } });
   const mk = (sku: string, over: Record<string, unknown> = {}) =>
-    prisma.product.create({ data: { slug: `product-${sku.toLowerCase()}`, sku, name: `Product ${sku}`, categoryId: category.id, purchasePrice: "800.00", sellingPrice: "1000.00", minStock: 1, ...over } });
+    prisma.product.create({ data: { slug: `product-${sku.toLowerCase()}`, sku, name: `Product ${sku}`, categoryId: category.id, purchasePrice: "800.00", sellingPrice: "1000.00", ...over } });
   return { admin: { id: admin.id, role: "ADMIN" as const }, emp: { id: emp.id, role: "EMPLOYEE" as const }, category, mk };
 }

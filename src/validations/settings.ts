@@ -6,6 +6,7 @@ export const settingsSchema = z.object({
   city: z.string().trim().max(80),
   phone: z.string().trim().max(30),
   email: z.string().trim().email("Enter a valid email").or(z.literal("")),
+  panNumber: z.string().trim().regex(/^\d{9}$/, "Enter a valid 9-digit PAN number"),
   currency: z.string().trim().min(3).max(3, "Use a 3-letter code such as NPR").toUpperCase(),
   taxRate: z.number({ invalid_type_error: "Enter 0 for no tax" }).min(0).max(100),
   invoicePrefix: z.string().trim().min(1, "Invoice prefix is required").max(8).regex(/^[A-Za-z0-9]+$/, "Letters and numbers only"),

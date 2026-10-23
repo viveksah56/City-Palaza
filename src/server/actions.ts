@@ -7,7 +7,7 @@ import {PERMISSION} from "@/lib/rbac/permission";
 import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { ProductStatus, UserStatus } from "@/generated/prisma/client";
+import type { UserStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { run, DomainError, type ActionResult } from "@/lib/errors";
 import { assertPermission } from "@/lib/auth/guards";
@@ -61,24 +61,17 @@ export async function updateProductAction(id: string, raw: unknown) {
     return undefined;
   });
 }
-export async function setProductStatusAction(id: string, status: ProductStatus) {
-  return run(async () => {
-    const actor = await assertPermission(PERMISSION.PRODUCT_UPDATE);
-    z.enum(["ACTIVE", "INACTIVE", "DISCONTINUED"]).parse(status);
-    const slug = await products.setProductStatus(actor, id, status);
-    updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
-    revalidatePath("/products");
-    revalidatePath(`/products/${slug}`);
-    return undefined;
-  });
-}
 export async function deleteProductAction(id: string) {
   return run(async () => {
+    id = z.string().trim().min(1).max(64).parse(id);
     const actor = await assertPermission(PERMISSION.PRODUCT_DELETE);
-    await products.deleteProduct(actor, id);
+    const result = await products.deleteProduct(actor, id);
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/products");
-    return undefined;
+    revalidatePath(`/products/${result.slug}`);
+    revalidatePath("/inventory");
+    revalidatePath("/dashboard");
+    return result;
   });
 }
 
@@ -148,7 +141,6 @@ export async function adjustStockAction(raw: unknown) {
     const res = await inventory.adjustStock(actor, {
       productId: v.productId,
       type: v.type,
-      direction: v.direction,
       quantity: typeof v.quantity === "number" && Number.isFinite(v.quantity) ? v.quantity : undefined,
       serials: splitSerials(v.serialsText),
       reason: v.reason,

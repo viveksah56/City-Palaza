@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { intField, moneyField, optionalText } from "./common";
+import { moneyField, optionalText } from "./common";
 import { PRODUCT_CATEGORY_SELECTION } from "@/lib/constants/categories";
 
 export const productSchema = z
@@ -14,19 +14,23 @@ export const productSchema = z
     brandId: z.string().optional(),
     purchasePrice: moneyField("Purchase price"),
     sellingPrice: moneyField("Selling price"),
-    discountPercent: z.number({ invalid_type_error: "Enter 0 if none" }).min(0).max(100),
-    minStock: intField("Minimum stock"),
-    maxStock: z.number().int().min(0).optional().or(z.nan()),
+    maxDiscountPercent: z.number({ invalid_type_error: "Enter 0 if none" }).min(0).max(100).default(5),
     trackingType: z.enum(["QUANTITY", "SERIALIZED", "IMEI"]),
-    status: z.enum(["ACTIVE", "INACTIVE", "DISCONTINUED"]),
-    // only used on create
-    initialQuantity: z.number().int().min(0).optional().or(z.nan()),
-    initialSerials: z.string().optional(),
+    openingQuantity: z.number().int().min(0).max(100_000).default(0),
+    openingSerialsText: z.string().max(20_000).optional().default(""),
   })
   .refine((v) => v.sellingPrice >= 0 && v.purchasePrice >= 0, { message: "Prices must be positive", path: ["sellingPrice"] })
   .refine((v) => v.categoryId !== PRODUCT_CATEGORY_SELECTION.CUSTOM || v.customCategory.trim().length >= 2, {
     message: "Enter a category name with at least 2 characters",
     path: ["customCategory"],
+  })
+  .refine((v) => v.trackingType === "QUANTITY" || v.openingQuantity === 0, {
+    message: "Enter opening stock using IMEI or serial numbers for this tracking type",
+    path: ["openingQuantity"],
+  })
+  .refine((v) => v.trackingType === "QUANTITY" || !v.openingSerialsText.trim() || v.openingSerialsText.trim().split(/[\s,;]+/).filter(Boolean).length <= 500, {
+    message: "Enter no more than 500 serial numbers at a time",
+    path: ["openingSerialsText"],
   });
 
 export type ProductFormValues = z.infer<typeof productSchema>;

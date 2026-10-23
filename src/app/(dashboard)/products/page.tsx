@@ -62,7 +62,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <FilterSelect param="category" label="Category" options={categories.map((c) => ({ value: c.slug, label: c.name }))} />
           <FilterSelect param="brand" label="Brand" options={brands.map((b) => ({ value: b.id, label: b.name }))} />
           <FilterSelect param="stock" label="Stock" options={[{ value: "in", label: "In stock" }, { value: "low", label: "Low stock" }, { value: "out", label: "Out of stock" }]} />
-          {hasPermission(user.role, PERMISSION.PRODUCT_UPDATE) && <FilterSelect param="status" label="Status" options={[{ value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }, { value: "DISCONTINUED", label: "Discontinued" }]} />}
         </div>
         <ProductTable
           rows={result.rows}

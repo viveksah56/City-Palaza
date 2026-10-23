@@ -6,7 +6,7 @@ import { D, money, sum, ZERO, Decimal, type MoneyInput } from "./money";
  * Pure, server-authoritative sale maths (also reused client-side for a live PREVIEW only).
  *
  * Per line:  subtotal = unitPrice × qty
- *            promo    = subtotal × product.discountPercent / 100
+ *            promo    = no product-level automatic promotion
  * Sale-level discount (percent or fixed) applies to Σ(subtotal − promo) and is allocated
  * proportionally to lines (last line absorbs rounding) so per-line profit stays exact.
  * Tax (exclusive) = (subtotal − line discount) × taxRate / 100.

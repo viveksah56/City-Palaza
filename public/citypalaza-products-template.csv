@@ -1,1 +1,1 @@
-sku,name,variantLabel,category,brand,barcode,purchasePrice,sellingPrice,discountPercent,quantity,minStock,trackingType,serials,description
+sku,name,variantLabel,category,brand,barcode,purchasePrice,sellingPrice,maxDiscountPercent,quantity,trackingType,serials,description

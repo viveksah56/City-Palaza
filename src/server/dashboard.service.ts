@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import { LOW_STOCK_NOTIFICATIONS_CACHE_TAG } from "@/lib/constants";
 import { resolveRange, type DateRange } from "@/lib/dates";
 import { D } from "@/lib/money";
-import { stockStatus } from "@/lib/stock";
+import { LOW_STOCK_THRESHOLD, stockStatus } from "@/lib/stock";
 import { ROLE } from "@/lib/constants/roles";
 import * as reports from "./reports.service";
 import { timeServerOperation } from "./timing";
@@ -72,7 +72,7 @@ export async function getEmployeeDashboard(userId: string) {
     todaySales: summary.total,
     todayOrders: summary.count,
     availableProducts: available,
-    lowStock: lowStock.map((p) => ({ ...p, status: stockStatus(p.quantity, p.minStock) })),
+    lowStock: lowStock.map((p) => ({ ...p, status: stockStatus(p.quantity) })),
     recent,
     salesTrend,
   };
@@ -83,7 +83,7 @@ export const getNotifications = unstable_cache(async () => {
   const [items, rows] = await Promise.all([
     reports.getLowStockProducts(5),
     prisma.$queryRaw<{ count: number }[]>`
-      SELECT COUNT(*)::int AS count FROM "citypalaza_database"."Product" WHERE "status"='ACTIVE' AND "quantity" <= "minStock"`,
+      SELECT COUNT(*)::int AS count FROM "citypalaza_database"."Product" WHERE "status"='ACTIVE' AND "quantity" > 0 AND "quantity" <= ${LOW_STOCK_THRESHOLD}`,
   ]);
   return { lowStockCount: rows[0]?.count ?? 0, items };
 }, [LOW_STOCK_NOTIFICATIONS_CACHE_TAG], { revalidate: 30, tags: [LOW_STOCK_NOTIFICATIONS_CACHE_TAG] });

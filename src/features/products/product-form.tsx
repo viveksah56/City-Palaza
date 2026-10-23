@@ -28,18 +28,19 @@ export function ProductForm({
   onSaved?: () => void;
 }) {
   const router = useRouter();
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<ProductFormInput, unknown, ProductFormValues>({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<ProductFormInput, unknown, ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       sku: "", barcode: "", name: "", variantLabel: "", description: "", categoryId: "", customCategory: "", brandId: "",
-      purchasePrice: 0, sellingPrice: 0, discountPercent: 0, minStock: 5, maxStock: NaN,
-      trackingType: "QUANTITY", status: "ACTIVE", initialQuantity: 0, initialSerials: "",
+      purchasePrice: 0, sellingPrice: 0, maxDiscountPercent: 5,
+      trackingType: "QUANTITY", openingQuantity: 0, openingSerialsText: "",
       ...defaults,
     },
   });
-  const tracking = watch("trackingType");
   const categoryId = watch("categoryId");
+  const trackingType = watch("trackingType");
   const num = { valueAsNumber: true } as const;
+  const trackingTypeField = register("trackingType");
 
   return (
     <form
@@ -63,8 +64,8 @@ export function ProductForm({
           <Field label="Variant" htmlFor="variantLabel" hint="Optional, e.g. Black · 256 GB. Give each variant its own SKU and stock.">
             <Input id="variantLabel" placeholder="Black · 256 GB" aria-invalid={!!errors.variantLabel} {...register("variantLabel")} />
           </Field>
-          <Field label="SKU" htmlFor="sku" error={errors.sku?.message} hint={mode === "create" ? "Optional. Leave blank to generate one automatically." : "Optional. Leave blank to keep the current SKU."}>
-            <Input id="sku" className="font-mono" aria-invalid={!!errors.sku} {...register("sku")} />
+          <Field label="SKU" htmlFor="sku" error={errors.sku?.message} hint={mode === "create" ? "Generated automatically. You can enter a custom SKU if needed." : "Leave blank to keep the current SKU."}>
+            <Input id="sku" className="font-mono" placeholder={mode === "create" ? "Generated automatically" : undefined} aria-invalid={!!errors.sku} {...register("sku")} />
           </Field>
           <Field label="Barcode" htmlFor="barcode" error={errors.barcode?.message} hint="Optional, must be unique if set.">
             <Input id="barcode" className="font-mono" {...register("barcode")} />
@@ -95,61 +96,45 @@ export function ProductForm({
 
       <Card>
         <CardHeader><CardTitle>Pricing</CardTitle><CardDescription>Only admins can see or change purchase prices. Past sales keep the prices they were sold at.</CardDescription></CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="Purchase price" htmlFor="purchasePrice" required error={errors.purchasePrice?.message}>
             <Input id="purchasePrice" type="number" step="0.01" min="0" inputMode="decimal" aria-invalid={!!errors.purchasePrice} {...register("purchasePrice", num)} />
           </Field>
           <Field label="Selling price" htmlFor="sellingPrice" required error={errors.sellingPrice?.message}>
             <Input id="sellingPrice" type="number" step="0.01" min="0" inputMode="decimal" aria-invalid={!!errors.sellingPrice} {...register("sellingPrice", num)} />
           </Field>
-          <Field label="Standing discount (%)" htmlFor="discountPercent" error={errors.discountPercent?.message} hint="Applied automatically at the counter.">
-            <Input id="discountPercent" type="number" step="0.01" min="0" max="100" inputMode="decimal" {...register("discountPercent", num)} />
+          <Field label="Maximum item discount (%)" htmlFor="maxDiscountPercent" error={errors.maxDiscountPercent?.message} hint="Caps the discount an employee can apply to this product. The shop-wide sale discount limit also applies.">
+            <Input id="maxDiscountPercent" type="number" step="0.01" min="0" max="100" inputMode="decimal" aria-invalid={!!errors.maxDiscountPercent} {...register("maxDiscountPercent", num)} />
           </Field>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Stock rules</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+        <CardHeader><CardTitle>Stock tracking</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="How is it tracked?" htmlFor="trackingType" hint="Phones: IMEI. Items with serials: Serial number. Cables, cases: Quantity.">
-            <NativeSelect id="trackingType" {...register("trackingType")}>
+            <NativeSelect id="trackingType" {...trackingTypeField} onChange={(event) => {
+              void trackingTypeField.onChange(event);
+              if (event.target.value !== "QUANTITY") setValue("openingQuantity", 0);
+            }}>
               <option value="QUANTITY">Quantity only</option>
               <option value="IMEI">IMEI (each phone)</option>
               <option value="SERIALIZED">Serial number</option>
             </NativeSelect>
           </Field>
-          <Field label="Minimum stock" htmlFor="minStock" required error={errors.minStock?.message} hint="Low-stock alert at or below this.">
-            <Input id="minStock" type="number" min="0" {...register("minStock", num)} />
-          </Field>
-          <Field label="Maximum stock" htmlFor="maxStock" error={errors.maxStock?.message}>
-            <Input id="maxStock" type="number" min="0" {...register("maxStock", num)} />
-          </Field>
-          <Field label="Status" htmlFor="status">
-            <NativeSelect id="status" {...register("status")}>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-              <option value="DISCONTINUED">Discontinued</option>
-            </NativeSelect>
-          </Field>
+          {mode === "create" && trackingType === "QUANTITY" && (
+            <Field label="Opening stock" htmlFor="openingQuantity" error={errors.openingQuantity?.message} hint="Optional. Stock can also be managed from Inventory.">
+              <Input id="openingQuantity" type="number" min="0" step="1" inputMode="numeric" aria-invalid={!!errors.openingQuantity} {...register("openingQuantity", num)} />
+            </Field>
+          )}
+          {mode === "create" && trackingType !== "QUANTITY" && (
+            <Field label={trackingType === "IMEI" ? "Opening IMEI numbers" : "Opening serial numbers"} htmlFor="openingSerialsText" error={errors.openingSerialsText?.message} hint="Optional. Enter one number per line or separate values with commas.">
+              <Textarea id="openingSerialsText" rows={3} aria-invalid={!!errors.openingSerialsText} {...register("openingSerialsText")} />
+            </Field>
+          )}
+          {mode === "edit" && <p className="self-center text-sm text-muted-foreground">On-hand stock is managed from Inventory.</p>}
         </CardContent>
       </Card>
-
-      {mode === "create" && (
-        <Card>
-          <CardHeader><CardTitle>Opening stock</CardTitle><CardDescription>Optional. Recorded as an “Initial stock” inventory entry.</CardDescription></CardHeader>
-          <CardContent>
-            {tracking === "QUANTITY" ? (
-              <Field label="Units on hand" htmlFor="initialQuantity" error={errors.initialQuantity?.message} className="max-w-xs">
-                <Input id="initialQuantity" type="number" min="0" {...register("initialQuantity", num)} />
-              </Field>
-            ) : (
-              <Field label={tracking === "IMEI" ? "IMEI numbers" : "Serial numbers"} htmlFor="initialSerials" hint="One per line, or separated by commas. Each must be unique." error={errors.initialSerials?.message}>
-                <Textarea id="initialSerials" rows={5} className="font-mono" {...register("initialSerials")} />
-              </Field>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel ?? (() => router.back())}>Cancel</Button>

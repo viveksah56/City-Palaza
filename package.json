@@ -18,7 +18,7 @@
     "db:migrate:prod": "PRISMA_ENV_FILE=.env.prod NODE_ENV=production prisma migrate deploy",
     "db:constraints": "PRISMA_ENV_FILE=.env tsx scripts/apply-constraints.ts",
     "db:constraints:prod": "PRISMA_ENV_FILE=.env.prod NODE_ENV=production tsx scripts/apply-constraints.ts",
-    "db:seed": "SEED_ENV_FILE=.env tsx prisma/seed.ts",
+    "db:seed": "SEED_ENV_FILE=.env tsx --tsconfig tsconfig.seed.json prisma/seed.ts",
     "db:seed:users": "SEED_ENV_FILE=.env node --import tsx prisma/seed-users.ts",
     "db:seed:accounts": "SEED_ENV_FILE=.env node --import tsx prisma/seed-users.ts",
     "db:setup:prod": "npm run db:migrate:prod && npm run db:constraints:prod",

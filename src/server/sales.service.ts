@@ -78,13 +78,21 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
           unitPrice: x.product.sellingPrice,
           unitCost: x.product.purchasePrice,
           quantity: x.quantity,
-          promoPercent: x.product.discountPercent,
+          promoPercent: 0,
           discount: merged.get(x.product.id)?.discount,
         })),
         discount: input.discount && D(input.discount.value).gt(0) ? input.discount : null,
         taxRatePercent: settings.taxRate,
       });
       assertDiscountAllowed(calc.manualDiscount, calc.netAfterPromo, actor.role, settings.employeeDiscountLimit, settings.currency);
+      if (actor.role !== ROLE.ADMIN) {
+        const productDiscountLimitExceeded = calc.lines.some((line) => {
+          const product = byId.get(line.productId);
+          if (!product) return true;
+          return line.itemManualDiscount.gt(money(line.subtotal.times(product.maxDiscountPercent).div(100)));
+        });
+        if (productDiscountLimitExceeded) throw new DomainError("DISCOUNT_NOT_ALLOWED", "A product discount exceeds its admin-set limit. Ask an admin to update the product limit.");
+      }
       if (actor.role !== ROLE.ADMIN && settings.employeeMaxTotalDiscountPercent !== null) {
         const maximum = money(calc.subtotal.times(settings.employeeMaxTotalDiscountPercent).div(100));
         if (calc.discount.gt(maximum)) throw new DomainError("DISCOUNT_NOT_ALLOWED", `Total discount exceeds the ${settings.employeeMaxTotalDiscountPercent}% limit.`);
@@ -115,15 +123,8 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
       }
 
       // payment
-      const paymentStatus = input.paymentStatus ?? "PAID";
-      if (paymentStatus !== "PAID" && calc.total.gt(0) && !customerId) throw new DomainError("VALIDATION", "A customer is required for pending or partial payments.");
-      if (paymentStatus === "REFUNDED") throw new DomainError("VALIDATION", "A new sale can't be marked as refunded.");
-      let amountPaid = calc.total;
-      if (paymentStatus === "PENDING") amountPaid = D(0);
-      if (paymentStatus === "PARTIAL") {
-        amountPaid = money(input.amountPaid ?? 0);
-        if (amountPaid.lte(0) || amountPaid.gte(calc.total)) throw new DomainError("VALIDATION", "For a partial payment enter an amount above 0 and below the total.");
-      }
+      const paymentStatus = "PAID" as const;
+      const amountPaid = calc.total;
 
       const seq = await nextCounter(tx, "sale");
       const saleNumber = `${settings.invoicePrefix}-${String(seq).padStart(6, "0")}`;

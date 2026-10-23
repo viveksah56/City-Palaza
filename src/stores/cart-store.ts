@@ -7,7 +7,7 @@ export type CartItem = {
   name: string;
   sku: string;
   unitPrice: string;
-  discountPercent: string;
+  maxDiscountPercent: string;
   trackingType: "QUANTITY" | "SERIALIZED" | "IMEI";
   available: number;
   quantity: number;

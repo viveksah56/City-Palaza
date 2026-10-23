@@ -1,5 +1,6 @@
 import {PERMISSION, assertRolePermission} from "@/lib/rbac/permission";
 import { Prisma, type TrackingType } from "@/generated/prisma/client";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
@@ -14,11 +15,12 @@ import { timeServerOperation } from "./timing";
 
 const MAX_ROWS = 250;
 const MAX_CSV_CHARS = 1_000_000;
-const REQUIRED_HEADERS = ["sku", "name", "category", "purchasePrice", "sellingPrice", "quantity", "trackingType"];
+const REQUIRED_HEADERS = ["name", "category", "purchasePrice", "sellingPrice"];
 const HEADER_ALIASES: Record<string, string> = {
   product: "name", productname: "name", variant: "variantLabel", variantlabel: "variantLabel", cost: "purchasePrice", purchaseprice: "purchasePrice",
-  price: "sellingPrice", sellingprice: "sellingPrice", discount: "discountPercent", discountpercent: "discountPercent", openingstock: "quantity",
-  stock: "quantity", quantity: "quantity", minstock: "minStock", trackingtype: "trackingType", serialnumbers: "serials",
+  price: "sellingPrice", sellingprice: "sellingPrice", openingstock: "quantity",
+  stock: "quantity", quantity: "quantity", trackingtype: "trackingType", serialnumbers: "serials",
+  discount: "maxDiscountPercent", discountpercent: "maxDiscountPercent", maxdiscountpercent: "maxDiscountPercent", maximumemployeediscount: "maxDiscountPercent", employeediscount: "maxDiscountPercent",
 };
 
 export type ImportIssue = { row: number; sku?: string; message: string };
@@ -100,8 +102,6 @@ function parseRows(source: string): { products: ParsedProduct[]; issues: ImportI
     const quantityRaw = String(record.quantity ?? "").trim();
     const quantity = quantityRaw ? Number(quantityRaw) : trackingType === "QUANTITY" ? 0 : serials.length;
     if (!Number.isSafeInteger(quantity) || quantity < 0) issues.push({ row: rowNumber, sku, message: "Quantity must be a non-negative whole number." });
-    if (!sku) issues.push({ row: rowNumber, message: "SKU is required for bulk imports." });
-
     if (sku && skus.has(sku)) issues.push({ row: rowNumber, sku, message: "SKU is repeated in this file." });
     if (sku) skus.add(sku);
     const barcode = String(record.barcode ?? "").trim();
@@ -121,12 +121,10 @@ function parseRows(source: string): { products: ParsedProduct[]; issues: ImportI
       brandId: undefined,
       purchasePrice: Number(record.purchasePrice),
       sellingPrice: Number(record.sellingPrice),
-      discountPercent: record.discountPercent ? Number(record.discountPercent) : 0,
-      minStock: record.minStock ? Number(record.minStock) : 5,
+      maxDiscountPercent: record.maxDiscountPercent === undefined || record.maxDiscountPercent === "" ? undefined : Number(record.maxDiscountPercent),
       trackingType,
-      status: record.status ? String(record.status).toUpperCase() : "ACTIVE",
-      initialQuantity: quantity,
-      initialSerials: serials.join("\n"),
+      openingQuantity: trackingType === "QUANTITY" ? quantity : 0,
+      openingSerialsText: serials.join("\n"),
     });
     if (!value.success) {
       for (const issue of value.error.issues) issues.push({ row: rowNumber, sku, message: issue.message });
@@ -210,6 +208,15 @@ async function resolveBrands(tx: Prisma.TransactionClient, actor: Actor, names: 
   return byName;
 }
 
+async function generateImportSku(tx: Prisma.TransactionClient): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const sku = `CP-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
+    const exists = await tx.product.findUnique({ where: { sku }, select: { id: true } });
+    if (!exists) return sku;
+  }
+  throw new DomainError("CONFLICT", "A unique SKU could not be generated. Please retry the import.");
+}
+
 export async function importProductsCsv(actor: Actor, csv: string) {
   return timeServerOperation("products.bulk-import", async () => {
   assertRolePermission(actor.role, PERMISSION.PRODUCT_CREATE);
@@ -217,14 +224,14 @@ export async function importProductsCsv(actor: Actor, csv: string) {
   if (parsed.issues.length) return { imported: 0, issues: parsed.issues };
 
   const result = await prisma.$transaction(async (tx) => {
-    const skus = parsed.products.map((product) => product.sku);
+    const skus = parsed.products.map((product) => product.sku).filter(Boolean);
     const barcodes = parsed.products.map((product) => product.value.barcode).filter((barcode): barcode is string => !!barcode);
     const [existingSkus, existingBarcodes] = await Promise.all([
       tx.product.findMany({ where: { sku: { in: skus } }, select: { sku: true } }),
       barcodes.length ? tx.product.findMany({ where: { barcode: { in: barcodes } }, select: { barcode: true } }) : [],
     ]);
     const issues: ImportIssue[] = [];
-    const rowBySku = new Map(parsed.products.map((product) => [product.sku, product.row]));
+    const rowBySku = new Map(parsed.products.filter((product) => product.sku).map((product) => [product.sku, product.row]));
     for (const product of existingSkus) issues.push({ row: rowBySku.get(product.sku) ?? 0, sku: product.sku, message: "SKU already exists. Existing products are not overwritten." });
     const rowByBarcode = new Map(parsed.products.filter((product) => product.value.barcode).map((product) => [product.value.barcode!, product.row]));
     for (const product of existingBarcodes) if (product.barcode) issues.push({ row: rowByBarcode.get(product.barcode) ?? 0, message: `Barcode ${product.barcode} already exists.` });
@@ -239,12 +246,13 @@ export async function importProductsCsv(actor: Actor, csv: string) {
       const brand = product.brandName ? brands.get(product.brandName.toLocaleLowerCase("en")) : null;
       if (!category) throw new DomainError("CONFLICT", `Could not resolve category “${product.categoryName}”.`);
       const value = product.value;
+      const sku = product.sku || await generateImportSku(tx);
       const slugBase = value.variantLabel ? `${value.name} ${value.variantLabel}` : value.name;
       const slug = await uniqueSlug(slugBase, async (candidate) => !!(await tx.product.findUnique({ where: { slug: candidate }, select: { id: true } })));
       const created = await tx.product.create({
         data: {
           slug,
-          sku: product.sku,
+          sku,
           barcode: value.barcode?.trim() || null,
           name: value.name.trim(),
           variantLabel: value.variantLabel?.trim() || null,
@@ -253,10 +261,8 @@ export async function importProductsCsv(actor: Actor, csv: string) {
           brandId: brand?.id ?? null,
           purchasePrice: toDb(value.purchasePrice),
           sellingPrice: toDb(value.sellingPrice),
-          discountPercent: money(value.discountPercent).toFixed(2),
-          minStock: value.minStock,
           trackingType: value.trackingType,
-          status: value.status,
+          status: "ACTIVE",
         },
       });
       if (product.trackingType === "QUANTITY" && product.quantity > 0) {

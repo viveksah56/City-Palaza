@@ -27,6 +27,7 @@ function createReceipt(sale: NonNullable<Awaited<ReturnType<typeof getSaleForUse
     document.moveDown(0.25).font("Helvetica").fontSize(9).fillColor("#596273");
     document.text([settings.address, settings.city].filter(Boolean).join(", "), { align: "center" });
     document.text([settings.phone, settings.email].filter(Boolean).join(" · "), { align: "center" });
+    document.text(`PAN: ${settings.panNumber}`, { align: "center" });
     document.moveDown(1).strokeColor("#d9dee7").moveTo(48, document.y).lineTo(547, document.y).stroke();
     document.moveDown(0.8).font("Helvetica-Bold").fontSize(15).fillColor("#111827").text("Sales receipt");
     document.moveDown(0.5);
@@ -65,7 +66,7 @@ function createReceipt(sale: NonNullable<Awaited<ReturnType<typeof getSaleForUse
     document.moveDown(0.5).strokeColor("#d9dee7").moveTo(48, document.y).lineTo(547, document.y).stroke().moveDown(0.7);
     line("Subtotal", money(sale.subtotal));
     line("Discount", `-${money(sale.discount)}`);
-    line(`Tax (${sale.taxRate.toString()}%)`, money(sale.tax));
+    line(`VAT (${sale.taxRate.toString()}%)`, money(sale.tax));
     line("Total", money(sale.total), true);
     line("Payment", sale.paymentMethod.replaceAll("_", " "));
     line("Payment status", sale.paymentStatus);

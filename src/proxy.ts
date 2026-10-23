@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { REFRESH_COOKIE, SESSION_COOKIE } from "@/lib/constants";
-import { verifyAccessToken } from "@/lib/auth/token";
+import { AuthConfigurationError, verifyAccessToken } from "@/lib/auth/token";
 import { hasPermission, PERMISSION, type Permission } from "@/lib/rbac/permission";
 
 const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
@@ -74,7 +74,17 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (PUBLIC_AUTH_ROUTES.has(request.nextUrl.pathname)) return NextResponse.next();
 
   const accessToken = request.cookies.get(SESSION_COOKIE)?.value;
-  const claims = accessToken ? await verifyAccessToken(accessToken) : null;
+  let claims: Awaited<ReturnType<typeof verifyAccessToken>> = null;
+  try {
+    claims = await verifyAccessToken(accessToken);
+  } catch (error) {
+    if (!(error instanceof AuthConfigurationError)) throw error;
+    console.error("[auth configuration] Session verification is unavailable.", error);
+    if (isApiRequest(request)) {
+      return NextResponse.json({ error: "AUTH_UNAVAILABLE", message: "The sign-in service is temporarily unavailable. Please try again shortly." }, { status: 503 });
+    }
+    return new NextResponse("The sign-in service is temporarily unavailable. Please try again shortly.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+  }
 
   if (!claims) {
     if (isPrefetch(request)) return new NextResponse(null, { status: 401 });

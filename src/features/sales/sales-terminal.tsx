@@ -34,8 +34,6 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
   const [discType, setDiscType] = React.useState<"PERCENT" | "FIXED">("PERCENT");
   const [discValue, setDiscValue] = React.useState("");
   const [method, setMethod] = React.useState<PaymentMethodValue>("CASH");
-  const [status, setStatus] = React.useState<"PAID" | "PARTIAL" | "PENDING">("PAID");
-  const [amountPaid, setAmountPaid] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const searchRef = React.useRef<HTMLInputElement>(null);
@@ -60,15 +58,19 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
 
   const discNum = discValue === "" ? 0 : Number(discValue);
   const { calc, calcError } = React.useMemo<{ calc: SaleCalculation | null; calcError: string | null }>(() => {
-    const lines = cart.items.filter((i) => i.quantity > 0).map((i) => ({ productId: i.productId, unitPrice: i.unitPrice, unitCost: 0, quantity: i.quantity, promoPercent: i.discountPercent, discount: i.discount ? { ...i.discount, value: Number(i.discount.value) } : null }));
+    const lines = cart.items.filter((i) => i.quantity > 0).map((i) => ({ productId: i.productId, unitPrice: i.unitPrice, unitCost: 0, quantity: i.quantity, discount: i.discount ? { ...i.discount, value: Number(i.discount.value) } : null }));
     if (!lines.length) return { calc: null, calcError: null };
     try { return { calc: calculateSale({ lines, discount: discNum > 0 ? { type: discType, value: discNum } : null, taxRatePercent: taxRate }), calcError: null }; }
     catch (e) { return { calc: null, calcError: (e as Error).message }; }
   }, [cart.items, discNum, discType, taxRate]);
 
   const overManualLimit = !isAdmin && !!calc && calc.manualDiscount.gt(money(calc.netAfterPromo.times(discountLimit).div(100)));
+  const overProductLimit = !isAdmin && !!calc && calc.lines.some((line) => {
+    const item = cart.items.find((entry) => entry.productId === line.productId);
+    return !!item && line.itemManualDiscount.gt(money(line.subtotal.times(item.maxDiscountPercent).div(100)));
+  });
   const overTotalLimit = !isAdmin && totalDiscountLimit !== null && !!calc && calc.discount.gt(money(calc.subtotal.times(totalDiscountLimit).div(100)));
-  const overLimit = overManualLimit || overTotalLimit;
+  const overLimit = overManualLimit || overProductLimit || overTotalLimit;
 
   async function submit() {
     setSubmitting(true);
@@ -80,8 +82,6 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
       newCustomer: !customer && newCust?.name ? { name: newCust.name, phone: newCust.phone || null } : null,
       discount: discNum > 0 ? { type: discType, value: discNum } : null,
       paymentMethod: method,
-      paymentStatus: status,
-      amountPaid: status === "PARTIAL" ? Number(amountPaid) : null,
       notes: notes || null,
       idempotencyKey: idempotencyKey.current,
     });
@@ -97,7 +97,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
     }
   }
 
-  const canSubmit = !!calc && !submitting && !overLimit && cart.items.every((i) => i.quantity > 0) && (status === "PAID" || !!customer || !!newCust?.name.trim());
+  const canSubmit = !!calc && !submitting && !overLimit && cart.items.every((i) => i.quantity > 0);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_24rem] xl:grid-cols-[1fr_26rem]">
@@ -113,7 +113,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
               <li key={p.id}>
                 <button
                   type="button" disabled={out}
-                  onClick={() => cart.add({ productId: p.id, slug: p.slug, name: p.variantLabel ? `${p.name} · ${p.variantLabel}` : p.name, sku: p.sku, unitPrice: p.sellingPrice, discountPercent: p.discountPercent, trackingType: p.trackingType, available: p.quantity })}
+                  onClick={() => cart.add({ productId: p.id, slug: p.slug, name: p.variantLabel ? `${p.name} · ${p.variantLabel}` : p.name, sku: p.sku, unitPrice: p.sellingPrice, maxDiscountPercent: p.maxDiscountPercent, trackingType: p.trackingType, available: p.quantity })}
                   className="flex w-full items-start justify-between gap-3 rounded-xl border border-border bg-card p-3.5 text-left transition-[border-color,background-color] duration-150 hover:border-primary/45 hover:bg-accent/35 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}{p.variantLabel ? ` · ${p.variantLabel}` : ""}</span><span className="block font-mono text-xs text-muted-foreground">{p.sku}</span><span className="mt-1 block num mt-0.5 text-[15px] font-semibold">{formatCurrency(p.sellingPrice, currency)}</span></span>
@@ -123,17 +123,18 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
             );
           })}
         </ul>
-        {!searching && results.length === 0 && <p role={productSearch.isError ? "alert" : undefined} className={`py-10 text-center text-sm ${productSearch.isError ? "text-destructive" : "text-muted-foreground"}`}>{productSearch.isError ? "Products could not be loaded. Try your search again." : term ? "No active product matches that search." : "Start typing to find a product."}</p>}
+        {!searching && results.length === 0 && <p role={productSearch.isError ? "alert" : undefined} className={`py-10 text-center text-sm ${productSearch.isError ? "text-destructive" : "text-muted-foreground"}`}>{productSearch.isError ? "Products could not be loaded. Try your search again." : term ? "No active product matches that search." : "No active products are available for sale."}</p>}
+        {!searching && results.length > 0 && !term && <p className="pt-2 text-center text-xs text-muted-foreground">Showing available products. Search by name, SKU, barcode or IMEI to narrow the list.</p>}
       </section>
 
       <aside id="cart" aria-label="Current sale" className="grid scroll-mt-20 content-start gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
         <Card className="gap-4">
           <CardHeader><CardTitle>Current sale <span className="text-sm font-normal text-muted-foreground">({cart.items.length} product{cart.items.length === 1 ? "" : "s"})</span></CardTitle></CardHeader>
           <CardContent className="grid gap-4">
-            <SaleCart currency={currency} />
+            <SaleCart currency={currency} isAdmin={isAdmin} />
 
             <div className="grid gap-1.5">
-              <p className="text-sm font-medium">Customer <span className="font-normal text-muted-foreground">{status === "PAID" ? "(optional)" : "(required for unpaid balance)"}</span></p>
+              <p className="text-sm font-medium">Customer <span className="font-normal text-muted-foreground">(optional)</span></p>
               {customer ? (
                 <div className="flex items-center justify-between rounded-md border bg-accent px-4 py-2.5 text-sm text-accent-foreground"><span>{customer.name}{customer.phone ? ` · ${customer.phone}` : ""}</span><IconButton label="Remove customer" variant="ghost" className="size-7" onClick={() => setCustomer(null)}><X /></IconButton></div>
               ) : newCust ? (
@@ -158,15 +159,12 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
                 <div className="w-28"><NativeSelect aria-label="Discount type" value={discType} onChange={(e) => setDiscType(e.target.value as "PERCENT" | "FIXED")}><option value="PERCENT">%</option><option value="FIXED">{currency}</option></NativeSelect></div>
               </div>
               {overManualLimit && <p role="alert" className="text-xs font-medium text-destructive">Manual discounts are above your {discountLimit}% limit. Ask an admin to apply it.</p>}
+              {overProductLimit && <p role="alert" className="text-xs font-medium text-destructive">A product discount is above its admin-set limit. Reduce the discount or ask an admin to update the product limit.</p>}
               {overTotalLimit && <p role="alert" className="text-xs font-medium text-destructive">Promotions and manual discounts exceed your {totalDiscountLimit}% total limit.</p>}
               {calcError && <p role="alert" className="text-xs font-medium text-destructive">{calcError}</p>}
             </div>
 
             <div className="grid gap-1.5"><p className="text-sm font-medium">Payment</p><PaymentMethodSelector value={method} onChange={setMethod} /></div>
-            <div className="grid grid-cols-2 gap-2">
-              <NativeSelect aria-label="Payment status" value={status} onChange={(e) => setStatus(e.target.value as typeof status)}><option value="PAID">Paid in full</option><option value="PARTIAL">Part paid</option><option value="PENDING">Pay later</option></NativeSelect>
-              {status === "PARTIAL" && <Input aria-label="Amount paid" type="number" min="0" step="0.01" placeholder="Amount paid" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />}
-            </div>
             <Textarea aria-label="Notes" rows={2} placeholder="Note (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
 
             <SaleSummary calc={calc} currency={currency} taxRate={taxRate} />

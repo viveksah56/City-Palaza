@@ -2,6 +2,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { APP_TIMEZONE } from "@/lib/constants";
 import { D } from "@/lib/money";
+import { LOW_STOCK_THRESHOLD } from "@/lib/stock";
 
 /**
  * Reports are derived ONLY from historical records (Sale / SaleItem snapshots and Product stock),
@@ -178,7 +179,7 @@ export async function getInventorySummary() {
            COALESCE(SUM("quantity"),0)::int AS units,
            COALESCE(SUM("quantity" * "purchasePrice"),0)::text AS cost,
            COALESCE(SUM("quantity" * "sellingPrice"),0)::text AS retail,
-           COUNT(*) FILTER (WHERE "quantity" > 0 AND "quantity" <= "minStock")::int AS low,
+           COUNT(*) FILTER (WHERE "quantity" > 0 AND "quantity" <= ${LOW_STOCK_THRESHOLD})::int AS low,
            COUNT(*) FILTER (WHERE "quantity" <= 0)::int AS out
       FROM "citypalaza_database"."Product" WHERE "status" = 'ACTIVE'`;
   const row = r!;
@@ -194,9 +195,9 @@ export async function getInventorySummary() {
 }
 
 export function getLowStockProducts(limit = 50) {
-  return prisma.$queryRaw<{ id: string; slug: string; name: string; sku: string; quantity: number; minStock: number }[]>`
-    SELECT "id", "slug", "name", "sku", "quantity", "minStock" FROM "citypalaza_database"."Product"
-     WHERE "status" = 'ACTIVE' AND "quantity" > 0 AND "quantity" <= "minStock"
+  return prisma.$queryRaw<{ id: string; slug: string; name: string; sku: string; quantity: number }[]>`
+    SELECT "id", "slug", "name", "sku", "quantity" FROM "citypalaza_database"."Product"
+     WHERE "status" = 'ACTIVE' AND "quantity" > 0 AND "quantity" <= ${LOW_STOCK_THRESHOLD}
      ORDER BY "quantity" ASC, "name" ASC LIMIT ${limit}`;
 }
 
@@ -205,6 +206,6 @@ export function getOutOfStockProducts(limit = 50) {
     where: { status: "ACTIVE", quantity: { lte: 0 } },
     orderBy: { name: "asc" },
     take: limit,
-    select: { id: true, slug: true, name: true, sku: true, minStock: true, category: { select: { name: true } } },
+    select: { id: true, slug: true, name: true, sku: true, category: { select: { name: true } } },
   });
 }

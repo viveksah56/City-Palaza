@@ -13,9 +13,16 @@ export type AccessTokenClaims = {
 
 export type AccessTokenSubject = Omit<AccessTokenClaims, "sessionId" | "expiresAt">;
 
+export class AuthConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthConfigurationError";
+  }
+}
+
 function validated(name: string, secret: string | undefined): Uint8Array {
   if (!secret || secret.length < 32 || /replace-with|your-secret|changeme|example/i.test(secret)) {
-    throw new Error(`${name} must be set and at least 32 characters long.`);
+    throw new AuthConfigurationError(`${name} must be set and at least 32 characters long.`);
   }
   return new TextEncoder().encode(secret);
 }
@@ -46,9 +53,11 @@ export async function signRefreshToken(sessionId: string, tokenId: string, expir
     .sign(refreshKey());
 }
 
-export async function verifyAccessToken(token: string): Promise<AccessTokenClaims | null> {
+export async function verifyAccessToken(token: string | null | undefined): Promise<AccessTokenClaims | null> {
+  if (!token) return null;
+  const secret = key();
   try {
-    const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     if (payload.typ !== "access" || typeof payload.sid !== "string" || typeof payload.sub !== "string" || typeof payload.firstName !== "string" || typeof payload.lastName !== "string" || typeof payload.email !== "string" || typeof payload.role !== "string" || !ROLE_VALUES.some((role) => role === payload.role) || typeof payload.exp !== "number") return null;
     return { sessionId: payload.sid, userId: payload.sub, firstName: payload.firstName, lastName: payload.lastName, email: payload.email, role: payload.role as Role, expiresAt: new Date(payload.exp * 1000) };
   } catch {
@@ -56,9 +65,11 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenClaim
   }
 }
 
-export async function verifyRefreshToken(token: string): Promise<{ sessionId: string; tokenId: string } | null> {
+export async function verifyRefreshToken(token: string | null | undefined): Promise<{ sessionId: string; tokenId: string } | null> {
+  if (!token) return null;
+  const secret = refreshKey();
   try {
-    const { payload } = await jwtVerify(token, refreshKey(), { algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     if (payload.typ !== "refresh" || typeof payload.sid !== "string" || typeof payload.jti !== "string") return null;
     return { sessionId: payload.sid, tokenId: payload.jti };
   } catch {

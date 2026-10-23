@@ -23,6 +23,11 @@ const statements = [
      END IF;
    END $$;`,
   `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = 'citypalaza_database' AND conname = 'product_max_discount_percent_range') THEN
+       ALTER TABLE "citypalaza_database"."Product" ADD CONSTRAINT product_max_discount_percent_range CHECK ("maxDiscountPercent" >= 0 AND "maxDiscountPercent" <= 100);
+     END IF;
+   END $$;`,
+  `DO $$ BEGIN
      IF NOT EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = 'citypalaza_database' AND conname = 'saleitem_quantity_positive') THEN
        ALTER TABLE "citypalaza_database"."SaleItem" ADD CONSTRAINT saleitem_quantity_positive CHECK ("quantity" > 0);
      END IF;

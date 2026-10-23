@@ -8,9 +8,10 @@ import type { ProductRow } from "@/server/products.service";
 export type CustomerSearchResult = { id: string; name: string; phone: string | null };
 
 export function useProductSearch(query: string) {
-  return useQuery({
+  return useQuery<ProductRow[]>({
     queryKey: ["products", "search", query],
-    enabled: query.trim().length > 0,
+    staleTime: 30_000,
+    placeholderData: (previousData) => previousData,
     queryFn: async ({ signal }): Promise<ProductRow[]> => {
       const response: AxiosResponse<{ products: ProductRow[] }> = await api.get("/products/search", { params: { q: query }, signal });
       return response.data.products;
@@ -19,7 +20,7 @@ export function useProductSearch(query: string) {
 }
 
 export function useCustomerSearch(query: string) {
-  return useQuery({
+  return useQuery<CustomerSearchResult[]>({
     queryKey: ["customers", "search", query],
     enabled: query.trim().length > 0,
     queryFn: async ({ signal }): Promise<CustomerSearchResult[]> => {

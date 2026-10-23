@@ -9,9 +9,8 @@ import { toDb, money } from "@/lib/money";
 import { emptyToNull } from "@/validations/common";
 import { parsePage, paged, type PageQuery } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
-import { stockStatus, type StockStatus } from "@/lib/stock";
+import { LOW_STOCK_THRESHOLD, stockStatus, type StockStatus } from "@/lib/stock";
 import { productSchema, type ProductFormValues } from "@/validations/product";
-import { splitSerials } from "@/validations/inventory";
 import { addStockTx, type Actor } from "./inventory.service";
 import { PRODUCT_CATEGORY_SELECTION, TAXONOMY_CACHE_TAG, TAXONOMY_KIND } from "@/lib/constants/categories";
 import { slugify } from "@/lib/format";
@@ -32,10 +31,8 @@ export type ProductRow = {
   sellingPrice: string;
   /** only present when the viewer may see costs (never sent to employees) */
   purchasePrice?: string;
-  discountPercent: string;
-  maxStock: number | null;
+  maxDiscountPercent: string;
   quantity: number;
-  minStock: number;
   trackingType: TrackingType;
   status: ProductStatus;
   stockStatus: StockStatus;
@@ -85,13 +82,11 @@ export function toProductRow(p: ProductWithRels, canSeeCost: boolean): ProductRo
     description: p.description,
     sellingPrice: p.sellingPrice.toString(),
     ...(canSeeCost && { purchasePrice: p.purchasePrice.toString() }),
-    discountPercent: p.discountPercent.toString(),
-    maxStock: p.maxStock,
+    maxDiscountPercent: p.maxDiscountPercent.toString(),
     quantity: p.quantity,
-    minStock: p.minStock,
     trackingType: p.trackingType,
     status: p.status,
-    stockStatus: stockStatus(p.quantity, p.minStock),
+    stockStatus: stockStatus(p.quantity),
   };
 }
 
@@ -109,10 +104,10 @@ export function buildProductWhere(q: Pick<ProductQuery, "search" | "categoryId" 
     });
   }
   if (q.stock === "out") and.push({ quantity: { lte: 0 } });
-  if (q.stock === "low") and.push({ quantity: { gt: 0, lte: prisma.product.fields.minStock } });
-  if (q.stock === "in") and.push({ quantity: { gt: prisma.product.fields.minStock } });
+  if (q.stock === "low") and.push({ quantity: { gt: 0, lte: LOW_STOCK_THRESHOLD } });
+  if (q.stock === "in") and.push({ quantity: { gt: LOW_STOCK_THRESHOLD } });
   return {
-    ...(onlyActive ? { status: "ACTIVE" as const } : q.status && { status: q.status }),
+    ...(onlyActive ? { status: "ACTIVE" as const } : q.status ? { status: q.status } : { status: { not: "DISCONTINUED" as const } }),
     ...(q.categoryId && { categoryId: q.categoryId }),
     ...(q.brandId && { brandId: q.brandId }),
     ...(and.length && { AND: and }),
@@ -155,7 +150,7 @@ export async function getProductBySlug(slug: string, canSeeCost: boolean) {
     include: { category: { select: { name: true } }, brand: { select: { name: true } } },
   });
   if (!p) return null;
-  return { ...toProductRow(p, canSeeCost), description: p.description, maxStock: p.maxStock, createdAt: p.createdAt, updatedAt: p.updatedAt, brandId: p.brandId };
+  return { ...toProductRow(p, canSeeCost), description: p.description, createdAt: p.createdAt, updatedAt: p.updatedAt, brandId: p.brandId };
 }
 
 function toData(v: ProductFormValues, fallbackSku?: string) {
@@ -169,11 +164,9 @@ function toData(v: ProductFormValues, fallbackSku?: string) {
     brandId: v.brandId || null,
     purchasePrice: toDb(v.purchasePrice),
     sellingPrice: toDb(v.sellingPrice),
-    discountPercent: money(Number.isFinite(v.discountPercent) ? v.discountPercent : 0).toFixed(2),
-    minStock: v.minStock,
-    maxStock: typeof v.maxStock === "number" && Number.isFinite(v.maxStock) ? v.maxStock : null,
+    maxDiscountPercent: money(Number.isFinite(v.maxDiscountPercent) ? v.maxDiscountPercent : 5).toFixed(2),
     trackingType: v.trackingType,
-    status: v.status,
+    status: "ACTIVE" as const,
   };
 }
 
@@ -221,16 +214,17 @@ export async function createProduct(actor: Actor, raw: unknown) {
   assertRolePermission(actor.role, PERMISSION.PRODUCT_CREATE);
   const v = productSchema.parse(raw);
   const data = toData(v);
-  if (data.maxStock !== null && data.maxStock < data.minStock) throw new DomainError("VALIDATION", "Maximum stock can't be lower than minimum stock.");
 
   return prisma.$transaction(async (tx) => {
     const categoryId = await resolveProductCategory(tx, actor, v);
     const slug = await uniqueSlug(v.name, async (value) => !!(await tx.product.findUnique({ where: { slug: value }, select: { id: true } })));
     const product = await tx.product.create({ data: { ...data, slug, categoryId } });
-    const serials = splitSerials(v.initialSerials);
-    const qty = typeof v.initialQuantity === "number" && Number.isFinite(v.initialQuantity) ? v.initialQuantity : 0;
-    if (v.trackingType === "QUANTITY" ? qty > 0 : serials.length > 0) {
-      await addStockTx(tx, actor, { productId: product.id, type: "INITIAL_STOCK", quantity: qty, serials, reason: "Opening stock" });
+    const openingSerials = v.openingSerialsText.trim().split(/[\s,;]+/).filter(Boolean);
+    if (v.trackingType === "QUANTITY" && v.openingQuantity > 0) {
+      await addStockTx(tx, actor, { productId: product.id, type: "INITIAL_STOCK", quantity: v.openingQuantity, reason: "Opening stock" });
+    }
+    if (v.trackingType !== "QUANTITY" && openingSerials.length > 0) {
+      await addStockTx(tx, actor, { productId: product.id, type: "INITIAL_STOCK", serials: openingSerials, reason: "Opening stock" });
     }
     await writeAudit(tx, {
       actorId: actor.id,
@@ -249,8 +243,7 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
   return prisma.$transaction(async (tx) => {
     const before = await tx.product.findUnique({ where: { id }, include: { _count: { select: { serials: true } } } });
     if (!before) throw new DomainError("NOT_FOUND", "Product not found.");
-    const data = toData(v, before.sku);
-    if (data.maxStock !== null && data.maxStock < data.minStock) throw new DomainError("VALIDATION", "Maximum stock can't be lower than minimum stock.");
+    const { status: _status, ...data } = toData(v, before.sku);
     const categoryId = await resolveProductCategory(tx, actor, v);
     data.categoryId = categoryId;
     if (before.trackingType !== data.trackingType && (before.quantity > 0 || before._count.serials > 0)) {
@@ -259,7 +252,7 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
     const updated = await tx.product.update({ where: { id }, data, select: { slug: true } });
 
     const changes: string[] = [];
-    const watch = ["name", "variantLabel", "sku", "barcode", "purchasePrice", "sellingPrice", "discountPercent", "minStock", "maxStock", "status", "categoryId", "brandId"] as const;
+    const watch = ["name", "variantLabel", "sku", "barcode", "purchasePrice", "sellingPrice", "maxDiscountPercent", "categoryId", "brandId"] as const;
     for (const k of watch) {
       const a = String(before[k] ?? "");
       const b = String(data[k] ?? "");
@@ -276,34 +269,25 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
   });
 }
 
-export async function setProductStatus(actor: Actor, id: string, status: ProductStatus) {
-  assertRolePermission(actor.role, PERMISSION.PRODUCT_UPDATE);
-  await prisma.$transaction(async (tx) => {
-    const p = await tx.product.update({ where: { id }, data: { status }, select: { name: true, sku: true, slug: true } });
-    await writeAudit(tx, {
-      actorId: actor.id,
-      action: status === "ACTIVE" ? PERMISSION.PRODUCT_UPDATE : "PRODUCT_DEACTIVATE",
-      entityType: "Product",
-      entityId: id,
-      description: `${status === "ACTIVE" ? "Reactivated" : `Set to ${status}:`} ${p.name} (${p.sku})`,
-    });
-    return p.slug;
-  });
-}
-
-export async function deleteProduct(actor: Actor, id: string) {
+export async function deleteProduct(actor: Actor, id: string): Promise<{ archived: boolean; slug: string }> {
   assertRolePermission(actor.role, PERMISSION.PRODUCT_DELETE);
-  await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "citypalaza_database"."Product" WHERE "id" = ${id} FOR UPDATE`;
+    if (locked.length === 0) throw new DomainError("NOT_FOUND", "Product not found.");
     const p = await tx.product.findUnique({
       where: { id },
-      select: { name: true, sku: true, _count: { select: { saleItems: true, inventoryTransactions: true, serials: true } } },
+      select: { name: true, slug: true, sku: true, status: true, quantity: true, _count: { select: { saleItems: true, inventoryTransactions: true, serials: true } } },
     });
     if (!p) throw new DomainError("NOT_FOUND", "Product not found.");
-    if (p._count.saleItems || p._count.inventoryTransactions || p._count.serials) {
-      throw new DomainError("CONFLICT", "This product has stock or sales history. Deactivate it instead of deleting.");
+    const archived = p.quantity > 0 || p._count.saleItems > 0 || p._count.inventoryTransactions > 0 || p._count.serials > 0;
+    if (archived) {
+      await tx.product.update({ where: { id }, data: { status: "DISCONTINUED" } });
+      await writeAudit(tx, { actorId: actor.id, action: PERMISSION.PRODUCT_DELETE, entityType: "Product", entityId: id, description: `Removed ${p.name} (${p.sku}) from the active catalogue; history retained` });
+      return { archived: true, slug: p.slug };
     }
     await tx.product.delete({ where: { id } });
     await writeAudit(tx, { actorId: actor.id, action: PERMISSION.PRODUCT_DELETE, entityType: "Product", entityId: id, description: `Deleted product ${p.name} (${p.sku})` });
+    return { archived: false, slug: p.slug };
   });
 }
 

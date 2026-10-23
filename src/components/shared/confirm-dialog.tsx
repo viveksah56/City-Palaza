@@ -18,7 +18,7 @@ export function ConfirmDialog({
   successMessage,
   redirectTo,
   triggerLabel,
-  triggerAsChild = false,
+  triggerAsChild = true,
 }: {
   trigger: React.ReactNode;
   title: string;
@@ -26,7 +26,7 @@ export function ConfirmDialog({
   confirmLabel: string;
   destructive?: boolean;
   onConfirm: () => Promise<ActionResult<unknown>>;
-  successMessage: string;
+  successMessage: string | ((data: unknown) => string);
   redirectTo?: string;
   triggerLabel?: string;
   triggerAsChild?: boolean;
@@ -54,12 +54,16 @@ export function ConfirmDialog({
             disabled={pending}
             onClick={() =>
               start(async () => {
-                const res = await onConfirm();
-                if (!res.ok) return void toast.error(res.error);
-                toast.success(successMessage);
-                setOpen(false);
-                if (redirectTo) router.push(redirectTo);
-                router.refresh();
+                try {
+                  const res = await onConfirm();
+                  if (!res.ok) return void toast.error(res.error);
+                  toast.success(typeof successMessage === "function" ? successMessage(res.data) : successMessage);
+                  setOpen(false);
+                  if (redirectTo) router.push(redirectTo);
+                  router.refresh();
+                } catch {
+                  toast.error("The action could not be completed. Check your connection and try again.");
+                }
               })
             }
           >

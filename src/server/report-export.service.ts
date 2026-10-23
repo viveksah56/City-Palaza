@@ -4,6 +4,7 @@ import type { DateRange } from "@/lib/dates";
 import type { SessionUser } from "@/lib/auth/session";
 import * as reports from "@/server/reports.service";
 import { PERMISSION, assertRolePermission, hasPermission } from "@/lib/rbac/permission";
+import { APP_NAME, APP_TIMEZONE } from "@/lib/constants";
 
 export type ExportSection = {
   title: string;
@@ -15,6 +16,7 @@ export type ReportExportData = {
   title: string;
   period: string;
   currency: string;
+  business: { name: string; address: string; city: string; phone: string; email: string; panNumber: string };
   summary: [string, string | number][];
   sections: ExportSection[];
 };
@@ -23,7 +25,7 @@ const money = (value: string, currency: string) => `${currency} ${D(value).toFix
 
 export type ReportTab = "sales" | "profit" | "inventory" | "employees";
 
-export async function getSalesExportData(user: SessionUser, range: DateRange, currency: string): Promise<ReportExportData> {
+export async function getSalesExportData(user: SessionUser, range: DateRange, currency: string, business: ReportExportData["business"]): Promise<ReportExportData> {
   assertRolePermission(user.role, PERMISSION.SALE_VIEW);
   const employeeId = hasPermission(user.role, PERMISSION.SALE_VIEW_ALL) ? undefined : user.id;
   const [sales, trend, categories, products, payments, rows] = await Promise.all([
@@ -35,15 +37,66 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
     prisma.sale.findMany({
       where: { status: "COMPLETED", createdAt: { gte: range.from, lt: range.to }, ...(employeeId ? { employeeId } : {}) },
       orderBy: { createdAt: "desc" },
-      take: 1000,
-      select: { saleNumber: true, createdAt: true, customer: { select: { name: true } }, paymentStatus: true, paymentMethod: true, total: true },
+      select: {
+        saleNumber: true,
+        createdAt: true,
+        employee: { select: { firstName: true, lastName: true } },
+        customer: { select: { name: true, phone: true } },
+        paymentStatus: true,
+        paymentMethod: true,
+        subtotal: true,
+        discount: true,
+        taxRate: true,
+        tax: true,
+        total: true,
+        amountPaid: true,
+        notes: true,
+        items: { select: { productName: true, categoryName: true, sku: true, quantity: true, serialSnapshot: true, unitPrice: true, subtotal: true, discount: true, promoDiscount: true, saleDiscount: true, tax: true, total: true } },
+        payments: { select: { amount: true, method: true, receivedAt: true, note: true, receivedBy: { select: { firstName: true, lastName: true } } }, orderBy: { receivedAt: "asc" } },
+      },
     }),
   ]);
   const scope = employeeId ? "My sales" : "Store sales";
+  const soldProductRows: (string | number)[][] = rows.flatMap((sale) => sale.items.map((item) => [
+    sale.saleNumber,
+    sale.createdAt.toLocaleString("en-GB", { timeZone: APP_TIMEZONE }),
+    `${sale.employee.firstName} ${sale.employee.lastName}`.trim(),
+    sale.customer?.name ?? "Walk-in",
+    sale.customer?.phone ?? "",
+    sale.paymentMethod,
+    item.productName,
+    item.sku,
+    item.categoryName,
+    item.quantity,
+    item.serialSnapshot.join(", "),
+    Number(item.unitPrice.toString()),
+    Number(item.subtotal.toString()),
+    Number(item.promoDiscount?.toString() ?? "0"),
+    Number(item.discount.toString()),
+    Number(item.saleDiscount?.toString() ?? "0"),
+    Number(item.tax.toString()),
+    Number(item.total.toString()),
+    sale.notes ?? "",
+  ]));
+  const soldTotals = soldProductRows.reduce((total, row) => ({
+    quantity: total.quantity + Number(row[9] ?? 0),
+    gross: total.gross.plus(D(Number(row[12] ?? 0))),
+    promotion: total.promotion.plus(D(Number(row[13] ?? 0))),
+    discount: total.discount.plus(D(Number(row[14] ?? 0))),
+    saleDiscount: total.saleDiscount.plus(D(Number(row[15] ?? 0))),
+    tax: total.tax.plus(D(Number(row[16] ?? 0))),
+    lineTotal: total.lineTotal.plus(D(Number(row[17] ?? 0))),
+  }), { quantity: 0, gross: D(0), promotion: D(0), discount: D(0), saleDiscount: D(0), tax: D(0), lineTotal: D(0) });
+  if (soldProductRows.length) soldProductRows.push([
+    "TOTAL", "", "", "", "", "", "", "", "", soldTotals.quantity, "", "",
+    Number(soldTotals.gross.toFixed(2)), Number(soldTotals.promotion.toFixed(2)), Number(soldTotals.discount.toFixed(2)),
+    Number(soldTotals.saleDiscount.toFixed(2)), Number(soldTotals.tax.toFixed(2)), Number(soldTotals.lineTotal.toFixed(2)), "",
+  ]);
   return {
-    title: `CityPlaza ${scope.toLowerCase()} report`,
-    period: `${range.label} · ${range.from.toLocaleDateString("en-GB")} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB")}`,
+    title: `${business.name || APP_NAME} ${scope.toLowerCase()} report`,
+    period: `${range.label} · ${range.from.toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })}`,
     currency,
+    business,
     summary: [
       ["Completed sales", sales.count],
       ["Gross sales", money(sales.grossSales, currency)],
@@ -61,15 +114,48 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
       { title: "Top products", columns: ["Product", "SKU", "Units", `Net sales (${currency})`], rows: products.map((row) => [row.name, row.sku, row.units, Number(row.revenue)]) },
       { title: "Payment methods", columns: ["Method", "Payments", `Collected (${currency})`], rows: payments.map((row) => [row.method, row.count, Number(row.total)]) },
       {
-        title: "Sale transactions (up to 1,000)",
-        columns: ["Sale", "Date", "Customer", "Payment status", "Payment method", `Total (${currency})`],
-        rows: rows.map((row) => [row.saleNumber, row.createdAt.toLocaleString("en-GB"), row.customer?.name ?? "Walk-in", row.paymentStatus, row.paymentMethod, Number(row.total.toString())]),
+        title: "Sale transactions",
+        columns: ["Sale", "Date and time", "Employee", "Customer", "Phone", "Payment status", "Payment method", `Subtotal (${currency})`, `Discount (${currency})`, "VAT rate", `VAT (${currency})`, `Total (${currency})`, `Paid (${currency})`, `Balance (${currency})`, "Notes"],
+        rows: rows.map((row) => [
+          row.saleNumber,
+          row.createdAt.toLocaleString("en-GB", { timeZone: APP_TIMEZONE }),
+          `${row.employee.firstName} ${row.employee.lastName}`.trim(),
+          row.customer?.name ?? "Walk-in",
+          row.customer?.phone ?? "",
+          row.paymentStatus,
+          row.paymentMethod,
+          Number(row.subtotal.toString()),
+          Number(row.discount.toString()),
+          Number(row.taxRate.toString()),
+          Number(row.tax.toString()),
+          Number(row.total.toString()),
+          Number(row.amountPaid.toString()),
+          Number(D(row.total).minus(row.amountPaid).toFixed(2)),
+          row.notes ?? "",
+        ]),
+      },
+      {
+        title: "Sold products",
+        columns: ["Sale", "Sold at", "Employee", "Customer", "Phone", "Payment method", "Product", "SKU", "Category at sale", "Quantity", "IMEI / serial numbers", `Unit price (${currency})`, `Gross amount (${currency})`, `Promotion discount (${currency})`, `Total line discount (${currency})`, `Sale discount allocation (${currency})`, `VAT (${currency})`, `Line total (${currency})`, "Notes"],
+        rows: soldProductRows,
+      },
+      {
+        title: "Payment transactions",
+        columns: ["Sale", "Received at", "Received by", "Method", `Amount (${currency})`, "Note"],
+        rows: rows.flatMap((sale) => sale.payments.map((payment) => [
+          sale.saleNumber,
+          payment.receivedAt.toLocaleString("en-GB", { timeZone: APP_TIMEZONE }),
+          `${payment.receivedBy.firstName} ${payment.receivedBy.lastName}`.trim(),
+          payment.method,
+          Number(payment.amount.toString()),
+          payment.note ?? "",
+        ])),
       },
     ],
   };
 }
 
-export async function getReportExportData(user: SessionUser, range: DateRange, currency: string, tab: ReportTab): Promise<ReportExportData> {
+export async function getReportExportData(user: SessionUser, range: DateRange, currency: string, tab: ReportTab, business: ReportExportData["business"]): Promise<ReportExportData> {
   assertRolePermission(user.role, PERMISSION.REPORT_VIEW);
   const requiredPermission = {
     sales: PERMISSION.REPORT_SALES,
@@ -79,13 +165,14 @@ export async function getReportExportData(user: SessionUser, range: DateRange, c
   }[tab];
   assertRolePermission(user.role, requiredPermission);
 
-  if (tab === "sales") return getSalesExportData(user, range, currency);
+  if (tab === "sales") return getSalesExportData(user, range, currency, business);
   if (tab === "profit") {
     const [summary, trend, products] = await Promise.all([reports.getProfitSummary(range), reports.getProfitOverTime(range), reports.getProfitByProduct(range)]);
     return {
-      title: "CityPlaza profit report",
-      period: `${range.label} · ${range.from.toLocaleDateString("en-GB")} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB")}`,
+      title: `${business.name || APP_NAME} profit report`,
+      period: `${range.label} · ${range.from.toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })}`,
       currency,
+      business,
       summary: [["Revenue", money(summary.revenue, currency)], ["Cost of goods sold", money(summary.cost, currency)], ["Gross profit", money(summary.profit, currency)], ["Margin", `${summary.marginPercent}%`]],
       sections: [
         { title: "Profit over time", columns: ["Date", `Gross profit (${currency})`], rows: trend.map((row) => [row.label, row.value]) },
@@ -96,21 +183,23 @@ export async function getReportExportData(user: SessionUser, range: DateRange, c
   if (tab === "inventory") {
     const [summary, low, out] = await Promise.all([reports.getInventorySummary(), reports.getLowStockProducts(), reports.getOutOfStockProducts()]);
     return {
-      title: "CityPlaza inventory report",
-      period: `Current inventory · generated ${new Date().toLocaleDateString("en-GB")}`,
+      title: `${business.name || APP_NAME} inventory report`,
+      period: `Current inventory · generated ${new Date().toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })}`,
       currency,
+      business,
       summary: [["Active products", summary.products], ["Units in stock", summary.units], ["Inventory cost value", money(summary.costValue, currency)], ["Inventory selling value", money(summary.sellingValue, currency)], ["Potential gross profit", money(summary.potentialProfit, currency)], ["Low stock", summary.lowStock], ["Out of stock", summary.outOfStock]],
       sections: [
-        { title: "Low stock", columns: ["Product", "SKU", "On hand", "Minimum"], rows: low.map((row) => [row.name, row.sku, row.quantity, row.minStock]) },
+        { title: "Low stock", columns: ["Product", "SKU", "On hand"], rows: low.map((row) => [row.name, row.sku, row.quantity]) },
         { title: "Out of stock", columns: ["Product", "SKU", "Category"], rows: out.map((row) => [row.name, row.sku, row.category.name]) },
       ],
     };
   }
   const employees = await reports.getEmployeePerformance(range);
   return {
-    title: "CityPlaza employee performance report",
-    period: `${range.label} · ${range.from.toLocaleDateString("en-GB")} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB")}`,
+    title: `${business.name || APP_NAME} employee performance report`,
+    period: `${range.label} · ${range.from.toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })}`,
     currency,
+    business,
     summary: [["Employees with sales", employees.length], ["Sales", employees.reduce((total, row) => total + row.sales, 0)], ["Revenue", money(employees.reduce((total, row) => total.plus(row.revenue), D(0)).toFixed(2), currency)]],
     sections: [{ title: "Employee performance", columns: ["Employee", "Sales", "Units", `Revenue (${currency})`, `Manual discounts (${currency})`, `Gross profit (${currency})`, `Average sale (${currency})`], rows: employees.map((row) => [row.name, row.sales, row.units, Number(row.revenue), row.discounts === null ? "Unknown for legacy sales" : Number(row.discounts), Number(row.profit), Number(row.average)]) }],
   };

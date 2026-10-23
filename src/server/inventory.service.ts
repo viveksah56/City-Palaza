@@ -5,7 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { normalizeSerials } from "@/lib/imei";
 import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
-import { stockStatus } from "@/lib/stock";
+import { LOW_STOCK_THRESHOLD, stockStatus } from "@/lib/stock";
 import { resolveRange } from "@/lib/dates";
 import { TX_TYPES } from "@/lib/constants";
 import type { Role } from "@/lib/constants/roles";
@@ -134,8 +134,6 @@ export function addStock(actor: Actor, input: AddStockInput) {
 export type AdjustStockInput = {
   productId: string;
   type: "ADJUSTMENT" | "DAMAGE" | "LOST";
-  /** ADJUSTMENT only */
-  direction?: "INCREASE" | "DECREASE";
   quantity?: number;
   /** serialized products: the devices being written off */
   serials?: string[];
@@ -158,7 +156,7 @@ export async function adjustStock(actor: Actor, input: AdjustStockInput) {
     if (product.trackingType === "QUANTITY") {
       const q = input.quantity ?? 0;
       if (!Number.isInteger(q) || q < 1) throw new DomainError("VALIDATION", "Enter a quantity of at least 1.");
-      delta = input.type === "ADJUSTMENT" && input.direction === "INCREASE" ? q : -q;
+      delta = -q;
     } else {
       if (input.type === "ADJUSTMENT") {
         throw new DomainError("VALIDATION", "Serialized products can't be adjusted by count. Add devices via “Add stock” or mark them damaged/lost.");
@@ -220,8 +218,8 @@ export async function listInventory(q: InventoryQuery) {
       ],
     }),
     ...(q.stock === "out" && { quantity: { lte: 0 } }),
-    ...(q.stock === "low" && { quantity: { gt: 0, lte: prisma.product.fields.minStock } }),
-    ...(q.stock === "in" && { quantity: { gt: prisma.product.fields.minStock } }),
+    ...(q.stock === "low" && { quantity: { gt: 0, lte: LOW_STOCK_THRESHOLD } }),
+    ...(q.stock === "in" && { quantity: { gt: LOW_STOCK_THRESHOLD } }),
   };
   const sortable = ["name", "sku", "quantity", "purchasePrice", "sellingPrice"];
   const orderBy = { [sortable.includes(q.sort) ? q.sort : "name"]: q.order } as Prisma.ProductOrderByWithRelationInput;
@@ -240,11 +238,9 @@ export async function listInventory(q: InventoryQuery) {
       brand: p.brand?.name ?? null,
       trackingType: p.trackingType,
       quantity: p.quantity,
-      minStock: p.minStock,
-      maxStock: p.maxStock,
       purchasePrice: p.purchasePrice.toString(),
       sellingPrice: p.sellingPrice.toString(),
-      stockStatus: stockStatus(p.quantity, p.minStock),
+      stockStatus: stockStatus(p.quantity),
     })),
     total,
     q,

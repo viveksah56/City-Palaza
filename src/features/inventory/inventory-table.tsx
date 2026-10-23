@@ -18,7 +18,6 @@ export function InventoryTable({ rows, currency, canAdd, canAdjust, url, sort, e
     { key: "name", header: "Product", sortKey: "name", cell: (p) => (<div className="min-w-44"><Link href={`/products/${p.slug}`} className="font-medium hover:text-primary hover:underline">{p.name}</Link><p className="text-xs text-muted-foreground">{p.variantLabel ? `${p.variantLabel} · ` : ""}{p.category} · {TRACKING_LABELS[p.trackingType]}</p></div>) },
     { key: "sku", header: "SKU", sortKey: "sku", cell: (p) => <span className="font-mono text-[13px]">{p.sku}</span> },
     { key: "qty", header: "On hand", sortKey: "quantity", align: "right", cell: (p) => <span className="num font-medium">{p.quantity}</span> },
-    { key: "min", header: "Min", align: "right", cell: (p) => <span className="num text-muted-foreground">{p.minStock}</span> },
     { key: "cost", header: "Stock value (cost)", align: "right", cell: (p) => <CurrencyDisplay value={Number(p.purchasePrice) * p.quantity} currency={currency} className="text-muted-foreground" /> },
     { key: "status", header: "Status", cell: (p) => <StockBadge status={p.stockStatus} /> },
     { key: "actions", header: <span className="sr-only">Actions</span>, align: "right", cell: (p) => <StockActions product={{ id: p.id, name: p.name, sku: p.sku, trackingType: p.trackingType, quantity: p.quantity }} canAdd={canAdd} canAdjust={canAdjust} /> },

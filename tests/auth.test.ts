@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { signSessionToken, verifySessionToken } from "@/lib/auth/token";
+import { AuthConfigurationError, signSessionToken, verifyAccessToken, verifySessionToken } from "@/lib/auth/token";
 import { ROLE } from "@/lib/constants/roles";
 import { loginSchema, employeeCreateSchema } from "@/validations/employee";
 
@@ -23,6 +23,19 @@ describe("authentication primitives", () => {
     const expired = await signSessionToken({ userId: "user_1", firstName: "Test", lastName: "Employee", email: "employee@example.com", role: ROLE.EMPLOYEE }, "sess_1", new Date(Date.now() - 10_000));
     expect(await verifySessionToken(expired)).toBeNull();
     expect(await verifySessionToken("garbage")).toBeNull();
+    expect(await verifyAccessToken(undefined)).toBeNull();
+  });
+
+  it("does not disguise missing authentication configuration as a bad user token", async () => {
+    const previous = process.env.AUTH_SECRET;
+    delete process.env.AUTH_SECRET;
+    try {
+      await expect(verifyAccessToken("malformed-token")).rejects.toBeInstanceOf(AuthConfigurationError);
+      expect(await verifyAccessToken(null)).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.AUTH_SECRET;
+      else process.env.AUTH_SECRET = previous;
+    }
   });
 
   it("validates login input", () => {

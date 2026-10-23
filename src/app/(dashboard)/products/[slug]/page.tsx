@@ -66,16 +66,13 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                   brandId: product.brandId ?? "",
                   purchasePrice: Number(product.purchasePrice ?? 0),
                   sellingPrice: Number(product.sellingPrice),
-                  discountPercent: Number(product.discountPercent),
-                  minStock: product.minStock,
-                  maxStock: product.maxStock ?? NaN,
+                  maxDiscountPercent: Number(product.maxDiscountPercent),
                   trackingType: product.trackingType,
-                  status: product.status,
                 },
               }}
               trigger={<Button variant="outline"><Pencil /> Edit product</Button>}
             />
-            <ProductAdminActions id={product.id} status={product.status} canUpdate={false} canDelete={hasPermission(user.role, PERMISSION.PRODUCT_DELETE)} />
+            <ProductAdminActions id={product.id} canDelete={hasPermission(user.role, PERMISSION.PRODUCT_DELETE)} />
           </>
         }
       />

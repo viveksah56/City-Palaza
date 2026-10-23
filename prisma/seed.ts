@@ -40,39 +40,39 @@ async function bootstrap() {
   const CATEGORIES = ["Smartphones", "Feature Phones", "Chargers", "Cables", "Earphones", "Headphones", "Power Banks", "Smart Watches", "Cases", "Screen Protectors", "Memory Cards", "Speakers", "Other"];
   const BRANDS = ["Apple", "Samsung", "Xiaomi", "OnePlus", "Realme", "Oppo", "Vivo", "Huawei", "Anker", "JBL", "Sony"];
 
-  // sku, name, category, brand, cost, price, tracking, min, opening qty
-  type P = [string, string, string, string | null, number, number, "QUANTITY" | "IMEI", number, number];
+  // sku, name, category, brand, cost, price, tracking, opening qty
+  type P = [string, string, string, string | null, number, number, "QUANTITY" | "IMEI", number];
   const PRODUCTS: P[] = [
-    ["IP15-128-BLK", "iPhone 15 128GB Black", "Smartphones", "Apple", 98000, 112000, "IMEI", 2, 6],
-    ["IP15P-256-NAT", "iPhone 15 Pro 256GB Natural", "Smartphones", "Apple", 142000, 159000, "IMEI", 2, 4],
-    ["SGS24-256-GRY", "Samsung Galaxy S24 256GB", "Smartphones", "Samsung", 96000, 109000, "IMEI", 2, 5],
-    ["SGA55-256-NVY", "Samsung Galaxy A55 8/256GB", "Smartphones", "Samsung", 54000, 62500, "IMEI", 3, 8],
-    ["SGA15-128-BLU", "Samsung Galaxy A15 4/128GB", "Smartphones", "Samsung", 21500, 25500, "IMEI", 3, 10],
-    ["XRN13-128-BLK", "Xiaomi Redmi Note 13 6/128GB", "Smartphones", "Xiaomi", 24500, 29000, "IMEI", 3, 12],
-    ["XRN13P-256-PRP", "Xiaomi Redmi Note 13 Pro 8/256GB", "Smartphones", "Xiaomi", 37500, 43500, "IMEI", 3, 7],
-    ["OP12R-256-BLU", "OnePlus 12R 8/256GB", "Smartphones", "OnePlus", 56000, 65000, "IMEI", 2, 3],
-    ["RM12P-256-GRN", "Realme 12 Pro 8/256GB", "Smartphones", "Realme", 38000, 44500, "IMEI", 2, 6],
-    ["OPPA3-128-BLK", "Oppo A3 6/128GB", "Smartphones", "Oppo", 19500, 23500, "IMEI", 3, 9],
-    ["VV30-256-GRN", "Vivo V30 12/256GB", "Smartphones", "Vivo", 49000, 57000, "IMEI", 2, 4],
-    ["NK105", "Nokia 105 Feature Phone", "Feature Phones", null, 2800, 3500, "QUANTITY", 5, 25],
-    ["SG-CH25W", "Samsung 25W Fast Charger", "Chargers", "Samsung", 1100, 1800, "QUANTITY", 10, 40],
-    ["AP-CH20W", "Apple 20W USB-C Charger", "Chargers", "Apple", 2400, 3500, "QUANTITY", 8, 18],
-    ["AN-CH30", "Anker 30W Nano Charger", "Chargers", "Anker", 1700, 2600, "QUANTITY", 8, 22],
-    ["AN-CBL-C2C", "Anker USB-C to USB-C Cable 1m", "Cables", "Anker", 650, 1200, "QUANTITY", 15, 60],
-    ["AP-CBL-LTN", "Apple Lightning Cable 1m", "Cables", "Apple", 1400, 2200, "QUANTITY", 10, 5],
-    ["SN-WH1000", "Sony WH-1000XM5 Headphones", "Headphones", "Sony", 38000, 46000, "QUANTITY", 2, 4],
-    ["JBL-T110", "JBL Tune 110 Wired Earphones", "Earphones", "JBL", 750, 1400, "QUANTITY", 10, 30],
-    ["XM-BUDS4", "Xiaomi Redmi Buds 4 Active", "Earphones", "Xiaomi", 1700, 2600, "QUANTITY", 8, 20],
-    ["AN-PB20K", "Anker 20,000mAh Power Bank", "Power Banks", "Anker", 4200, 6200, "QUANTITY", 5, 12],
-    ["XM-PB10K", "Xiaomi 10,000mAh Power Bank", "Power Banks", "Xiaomi", 2000, 3200, "QUANTITY", 6, 3],
-    ["XM-BAND8", "Xiaomi Smart Band 8", "Smart Watches", "Xiaomi", 4300, 6000, "QUANTITY", 4, 10],
-    ["SG-WATCH6", "Samsung Galaxy Watch6 44mm", "Smart Watches", "Samsung", 31000, 37500, "QUANTITY", 2, 0],
-    ["CS-IP15-CLR", "iPhone 15 Clear Case", "Cases", null, 450, 1100, "QUANTITY", 10, 35],
-    ["CS-SGA55-BLK", "Galaxy A55 Silicone Case", "Cases", null, 350, 900, "QUANTITY", 10, 28],
-    ["SP-UNIV-TG", "Tempered Glass Universal 6.5\"", "Screen Protectors", null, 120, 450, "QUANTITY", 30, 90],
-    ["SD-EVO-128", "Samsung EVO Plus 128GB microSD", "Memory Cards", "Samsung", 1500, 2300, "QUANTITY", 6, 16],
-    ["JBL-GO3", "JBL Go 3 Bluetooth Speaker", "Speakers", "JBL", 3800, 5200, "QUANTITY", 4, 9],
-    ["JBL-FLIP6", "JBL Flip 6 Bluetooth Speaker", "Speakers", "JBL", 10500, 13500, "QUANTITY", 3, 6],
+    ["IP15-128-BLK", "iPhone 15 128GB Black", "Smartphones", "Apple", 98000, 112000, "IMEI", 6],
+    ["IP15P-256-NAT", "iPhone 15 Pro 256GB Natural", "Smartphones", "Apple", 142000, 159000, "IMEI", 4],
+    ["SGS24-256-GRY", "Samsung Galaxy S24 256GB", "Smartphones", "Samsung", 96000, 109000, "IMEI", 5],
+    ["SGA55-256-NVY", "Samsung Galaxy A55 8/256GB", "Smartphones", "Samsung", 54000, 62500, "IMEI", 8],
+    ["SGA15-128-BLU", "Samsung Galaxy A15 4/128GB", "Smartphones", "Samsung", 21500, 25500, "IMEI", 10],
+    ["XRN13-128-BLK", "Xiaomi Redmi Note 13 6/128GB", "Smartphones", "Xiaomi", 24500, 29000, "IMEI", 12],
+    ["XRN13P-256-PRP", "Xiaomi Redmi Note 13 Pro 8/256GB", "Smartphones", "Xiaomi", 37500, 43500, "IMEI", 7],
+    ["OP12R-256-BLU", "OnePlus 12R 8/256GB", "Smartphones", "OnePlus", 56000, 65000, "IMEI", 3],
+    ["RM12P-256-GRN", "Realme 12 Pro 8/256GB", "Smartphones", "Realme", 38000, 44500, "IMEI", 6],
+    ["OPPA3-128-BLK", "Oppo A3 6/128GB", "Smartphones", "Oppo", 19500, 23500, "IMEI", 9],
+    ["VV30-256-GRN", "Vivo V30 12/256GB", "Smartphones", "Vivo", 49000, 57000, "IMEI", 4],
+    ["NK105", "Nokia 105 Feature Phone", "Feature Phones", null, 2800, 3500, "QUANTITY", 25],
+    ["SG-CH25W", "Samsung 25W Fast Charger", "Chargers", "Samsung", 1100, 1800, "QUANTITY", 40],
+    ["AP-CH20W", "Apple 20W USB-C Charger", "Chargers", "Apple", 2400, 3500, "QUANTITY", 18],
+    ["AN-CH30", "Anker 30W Nano Charger", "Chargers", "Anker", 1700, 2600, "QUANTITY", 22],
+    ["AN-CBL-C2C", "Anker USB-C to USB-C Cable 1m", "Cables", "Anker", 650, 1200, "QUANTITY", 60],
+    ["AP-CBL-LTN", "Apple Lightning Cable 1m", "Cables", "Apple", 1400, 2200, "QUANTITY", 5],
+    ["SN-WH1000", "Sony WH-1000XM5 Headphones", "Headphones", "Sony", 38000, 46000, "QUANTITY", 4],
+    ["JBL-T110", "JBL Tune 110 Wired Earphones", "Earphones", "JBL", 750, 1400, "QUANTITY", 30],
+    ["XM-BUDS4", "Xiaomi Redmi Buds 4 Active", "Earphones", "Xiaomi", 1700, 2600, "QUANTITY", 20],
+    ["AN-PB20K", "Anker 20,000mAh Power Bank", "Power Banks", "Anker", 4200, 6200, "QUANTITY", 12],
+    ["XM-PB10K", "Xiaomi 10,000mAh Power Bank", "Power Banks", "Xiaomi", 2000, 3200, "QUANTITY", 3],
+    ["XM-BAND8", "Xiaomi Smart Band 8", "Smart Watches", "Xiaomi", 4300, 6000, "QUANTITY", 10],
+    ["SG-WATCH6", "Samsung Galaxy Watch6 44mm", "Smart Watches", "Samsung", 31000, 37500, "QUANTITY", 0],
+    ["CS-IP15-CLR", "iPhone 15 Clear Case", "Cases", null, 450, 1100, "QUANTITY", 35],
+    ["CS-SGA55-BLK", "Galaxy A55 Silicone Case", "Cases", null, 350, 900, "QUANTITY", 28],
+    ["SP-UNIV-TG", "Tempered Glass Universal 6.5\"", "Screen Protectors", null, 120, 450, "QUANTITY", 90],
+    ["SD-EVO-128", "Samsung EVO Plus 128GB microSD", "Memory Cards", "Samsung", 1500, 2300, "QUANTITY", 16],
+    ["JBL-GO3", "JBL Go 3 Bluetooth Speaker", "Speakers", "JBL", 3800, 5200, "QUANTITY", 9],
+    ["JBL-FLIP6", "JBL Flip 6 Bluetooth Speaker", "Speakers", "JBL", 10500, 13500, "QUANTITY", 6],
   ];
 
   const PAYMENTS = ["CASH", "CASH", "CASH", "ESEWA", "ESEWA", "KHALTI", "CARD", "BANK_TRANSFER"] as const;
@@ -125,9 +125,9 @@ async function bootstrap() {
       console.log("Products already exist – skipping catalogue, stock and sales seed.");
     } else {
       let imeiSeq = 1;
-      for (const [sku, name, cat, brand, cost, price, tracking, min, qty] of PRODUCTS) {
+      for (const [sku, name, cat, brand, cost, price, tracking, qty] of PRODUCTS) {
         const p = await prisma.product.create({
-          data: { slug: `${slugify(name)}-${slugify(sku)}`, sku, name, categoryId: catId[cat]!, brandId: brand ? brandId[brand] : null, purchasePrice: cost, sellingPrice: price, minStock: min, trackingType: tracking, description: `${name} – CityPlaza demo item` },
+          data: { slug: `${slugify(name)}-${slugify(sku)}`, sku, name, categoryId: catId[cat]!, brandId: brand ? brandId[brand] : null, purchasePrice: cost, sellingPrice: price, trackingType: tracking, description: `${name} – CityPlaza demo item` },
         });
         if (qty > 0) {
           const serials = tracking === "IMEI" ? Array.from({ length: qty }, () => imeiFromBody(`35${String(imeiSeq++).padStart(12, "0")}`)) : undefined;

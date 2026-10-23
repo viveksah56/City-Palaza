@@ -13,6 +13,7 @@ export function Receipt({ sale, settings }: { sale: Sale; settings: Settings }) 
         <h2 className="font-heading text-xl font-semibold">{settings.shopName}</h2>
         <p className="text-xs text-muted-foreground">{[settings.address, settings.city].filter(Boolean).join(", ")}</p>
         <p className="text-xs text-muted-foreground">{[settings.phone, settings.email].filter(Boolean).join(" · ")}</p>
+        <p className="text-xs text-muted-foreground">PAN: {settings.panNumber}</p>
       </header>
       {sale.status === "VOIDED" && <p className="my-3 border-2 border-destructive py-1 text-center font-bold tracking-wide text-destructive">VOIDED</p>}
       <dl className="my-4 grid grid-cols-2 gap-x-3 gap-y-1 border-y py-3 text-[13px]">
@@ -33,7 +34,7 @@ export function Receipt({ sale, settings }: { sale: Sale; settings: Settings }) 
       <dl className="mt-3 grid gap-1 border-t pt-3">
         <div className="flex justify-between text-muted-foreground"><dt>Subtotal</dt><dd className="num">{m(sale.subtotal)}</dd></div>
         <div className="flex justify-between text-muted-foreground"><dt>Discount</dt><dd className="num">-{m(sale.discount)}</dd></div>
-        <div className="flex justify-between text-muted-foreground"><dt>Tax ({sale.taxRate.toString()}%)</dt><dd className="num">{m(sale.tax)}</dd></div>
+        <div className="flex justify-between text-muted-foreground"><dt>VAT ({sale.taxRate.toString()}%)</dt><dd className="num">{m(sale.tax)}</dd></div>
         <div className="flex justify-between border-t pt-2 text-base font-semibold"><dt>Total</dt><dd className="num">{m(sale.total)}</dd></div>
         <div className="flex justify-between text-muted-foreground"><dt>Paid by</dt><dd>{PAYMENT_METHOD_LABELS[sale.paymentMethod]} · {sale.paymentStatus.toLowerCase()}</dd></div>
         <div className="flex justify-between text-muted-foreground"><dt>Collected</dt><dd className="num">{m(sale.amountPaid)}</dd></div>
