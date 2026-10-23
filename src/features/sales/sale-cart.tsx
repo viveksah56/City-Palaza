@@ -7,6 +7,7 @@ import { useCart, type CartItem } from "@/stores/cart-store";
 import { formatCurrency } from "@/lib/format";
 import { money } from "@/lib/money";
 import { IconButton } from "@/components/shared/icon-button";
+import { api } from "@/lib/axios";
 
 export function SaleCart({ currency }: { currency: string }) {
   const { items, setQuantity, remove, setDiscount } = useCart();
@@ -47,16 +48,19 @@ export function SaleCart({ currency }: { currency: string }) {
 function SerialPicker({ item, currency }: { item: CartItem; currency: string }) {
   const setSerials = useCart((s) => s.setSerials);
   const [list, setList] = React.useState<{ id: string; serial: string }[] | null>(null);
+  const [error, setError] = React.useState(false);
   React.useEffect(() => {
     let live = true;
-    fetch(`/api/products/${item.slug}/serials`).then((r) => r.json()).then((d) => live && setList(d.serials ?? []));
+    api.get<{ serials: { id: string; serial: string }[] }>(`/products/${item.slug}/serials`)
+      .then(({ data }) => { if (live) setList(data.serials); })
+      .catch(() => { if (live) setError(true); });
     return () => { live = false; };
   }, [item.slug]);
   const toggle = (s: string) => setSerials(item.productId, item.serials.includes(s) ? item.serials.filter((x) => x !== s) : [...item.serials, s]);
   return (
     <fieldset className="grid gap-1.5">
       <legend className="mb-1 text-xs font-medium text-muted-foreground">Choose the {item.trackingType === "IMEI" ? "IMEI" : "serial"} being sold</legend>
-      {list === null ? <p className="text-xs text-muted-foreground">Loading devices…</p> : list.length === 0 ? <p className="text-xs text-destructive">No devices in stock.</p> : (
+      {error ? <p role="alert" className="text-xs text-destructive">Could not load available devices. Try removing and adding this product again.</p> : list === null ? <p className="text-xs text-muted-foreground">Loading devices…</p> : list.length === 0 ? <p className="text-xs text-destructive">No devices in stock.</p> : (
         <div className="grid max-h-32 gap-1 overflow-y-auto">
           {list.map((d) => (
             <label key={d.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 font-mono text-[13px] hover:bg-card">

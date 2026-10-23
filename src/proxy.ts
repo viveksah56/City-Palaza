@@ -27,6 +27,13 @@ const EXACT_PERMISSIONS: Readonly<Record<string, Permission>> = {
   "/api/products/bulk": PERMISSION.PRODUCT_CREATE,
 };
 
+const PUBLIC_AUTH_ROUTES = new Set([
+  "/api/auth/forgot-password",
+  "/api/auth/login",
+  "/api/auth/refresh",
+  "/api/auth/reset-password",
+]);
+
 function routePermission(pathname: string): Permission | null {
   const exact = EXACT_PERMISSIONS[pathname];
   if (exact) return exact;
@@ -63,13 +70,15 @@ function denyUnauthenticated(request: NextRequest): NextResponse {
 }
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
+  if (PUBLIC_AUTH_ROUTES.has(request.nextUrl.pathname)) return NextResponse.next();
+
   const accessToken = request.cookies.get(SESSION_COOKIE)?.value;
   const claims = accessToken ? await verifyAccessToken(accessToken) : null;
 
   if (!claims) {
     if (isPrefetch(request)) return new NextResponse(null, { status: 401 });
 
-    if (request.cookies.has(REFRESH_COOKIE) && !isApiRequest(request)) {
+    if (request.cookies.has(REFRESH_COOKIE) && (!isApiRequest(request) || request.method === "GET" || request.method === "HEAD")) {
       const refreshUrl = new URL("/api/auth/refresh", request.url);
       refreshUrl.searchParams.set("next", internalDestination(request));
       return NextResponse.redirect(refreshUrl);
@@ -102,6 +111,6 @@ export const config = {
     "/reports/:path*",
     "/settings/:path*",
     "/audit-logs/:path*",
-    "/api/((?!auth/refresh).*)",
+    "/api/:path*",
   ],
 };
