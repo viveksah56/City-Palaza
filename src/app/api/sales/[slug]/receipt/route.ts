@@ -5,6 +5,7 @@ import { PERMISSION, hasPermission } from "@/lib/rbac/permission";
 import { formatCurrency, formatDateTime, fullName } from "@/lib/format";
 import { getSaleForUserBySlug } from "@/server/sales.service";
 import { readSettings } from "@/server/settings.service";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 function createReceipt(sale: NonNullable<Awaited<ReturnType<typeof getSaleForUserBySlug>>>, settings: Awaited<ReturnType<typeof readSettings>>) {
   return new Promise<Buffer>((resolve, reject) => {
@@ -80,6 +81,8 @@ function createReceipt(sale: NonNullable<Awaited<ReturnType<typeof getSaleForUse
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  const limited = await rateLimitResponse(_request, "sales:receipt", { limit: 30, windowSeconds: 300 });
+  if (limited) return limited;
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   if (!hasPermission(user.role, PERMISSION.SALE_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });

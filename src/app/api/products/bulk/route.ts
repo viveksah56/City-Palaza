@@ -4,8 +4,11 @@ import { NextResponse } from "next/server";
 import { DomainError, toActionError } from "@/lib/errors";
 import { assertPermission } from "@/lib/auth/guards";
 import { importProductsCsv } from "@/server/product-import.service";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const limited = await rateLimitResponse(request, "products:bulk-import", { limit: 10, windowSeconds: 300 });
+  if (limited) return limited;
   try {
     const actor = await assertPermission(PERMISSION.PRODUCT_CREATE);
     const formData = await request.formData();

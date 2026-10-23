@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { loginSchema, type LoginValues } from "@/validations/employee";
-import { loginAction } from "@/server/actions";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { formatCooldown, useCooldown } from "@/hooks/use-cooldown";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [error, setError] = React.useState<string | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
+  const { seconds: cooldownSeconds, start: startCooldown } = useCooldown();
   const { register, handleSubmit, formState } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
 
   return (
@@ -22,18 +23,29 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       onSubmit={handleSubmit(async (values) => {
         setError(null);
         try {
-          const res = await loginAction(values, redirectTo);
-          if (!res.ok) {
-            setError(res.error);
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...values, redirectTo }),
+          });
+          const result = await response.json() as { ok?: boolean; redirectTo?: string; error?: string; retryAfterSeconds?: number };
+          if (response.status === 429) {
+            const seconds = Number(response.headers.get("Retry-After")) || result.retryAfterSeconds || 300;
+            startCooldown(seconds);
+            setError(result.error ?? "Too many sign-in attempts. Please wait before trying again.");
             return;
           }
-          window.location.assign(res.data.redirectTo);
+          if (!response.ok || !result.ok || !result.redirectTo) {
+            setError(result.error ?? "We couldn’t complete sign-in. Please check your details and try again.");
+            return;
+          }
+          window.location.assign(result.redirectTo);
         } catch {
-          setError("We couldn’t sign you in right now. Check your connection and try again.");
+          setError("We couldn’t reach the sign-in service. Check your connection and try again shortly.");
         }
       })}
     >
-      {error && <p role="alert" className="rounded-xl bg-red/10 px-4 py-3 text-sm font-medium text-destructive">{error}</p>}
+      {error && <p role="alert" aria-live="polite" className="rounded-xl bg-red/10 px-4 py-3 text-sm font-medium text-destructive">{error}{cooldownSeconds > 0 && <> Try again in {formatCooldown(cooldownSeconds)}.</>}</p>}
       <Field label="Email" htmlFor="email" error={formState.errors.email?.message}>
         <Input id="email" type="email" autoComplete="username" autoFocus aria-invalid={!!formState.errors.email} {...register("email")} />
       </Field>
@@ -57,7 +69,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       <div className="-mt-2 flex justify-end">
         <Link href="/forgot-password" className="text-sm font-medium text-primary underline-offset-4 hover:underline">Forgot password?</Link>
       </div>
-      <Button type="submit" size="lg" className="mt-2 w-full" disabled={formState.isSubmitting}>{formState.isSubmitting ? "Signing in…" : "Sign in"}</Button>
+      <Button type="submit" size="lg" className="mt-2 w-full" disabled={formState.isSubmitting || cooldownSeconds > 0}>{formState.isSubmitting ? "Signing in…" : cooldownSeconds > 0 ? `Try again in ${formatCooldown(cooldownSeconds)}` : "Sign in"}</Button>
     </form>
   );
 }

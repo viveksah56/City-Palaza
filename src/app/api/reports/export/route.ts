@@ -9,6 +9,7 @@ import { resolveRange } from "@/lib/dates";
 import { getSettings } from "@/server/settings.service";
 import { getReportExportData, getSalesExportData, type ReportExportData, type ReportTab } from "@/server/report-export.service";
 import { DomainError } from "@/lib/errors";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 function safeCell(value: string | number): string | number {
   if (typeof value !== "string") return value;
@@ -84,6 +85,8 @@ async function createPdf(data: ReportExportData): Promise<Buffer> {
 }
 
 export async function GET(request: Request) {
+  const limited = await rateLimitResponse(request, "reports:export", { limit: 12, windowSeconds: 300 });
+  if (limited) return limited;
   try {
     const url = new URL(request.url);
     const format = url.searchParams.get("format");

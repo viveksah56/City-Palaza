@@ -24,7 +24,7 @@ async function requestMeta(): Promise<{ ip: string | null; ua: string | null }> 
   try {
     const { headers } = await import("next/headers");
     const h = await headers();
-    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip");
+    const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim();
     return { ip: ip ?? null, ua: h.get("user-agent")?.slice(0, 255) ?? null };
   } catch {
     return { ip: null, ua: null }; // outside a request (seed, tests)

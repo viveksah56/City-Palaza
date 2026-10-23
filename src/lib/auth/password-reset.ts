@@ -6,6 +6,13 @@ import { DomainError } from "@/lib/errors";
 
 const RESET_TTL_MINUTES = 30;
 
+export class PasswordResetDeliveryUnavailableError extends Error {
+  constructor() {
+    super("Password reset delivery is not configured.");
+    this.name = "PasswordResetDeliveryUnavailableError";
+  }
+}
+
 function digest(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -34,6 +41,10 @@ async function sendResetEmail(email: string, url: string) {
 }
 
 export async function createPasswordReset(email: string) {
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "");
+  const smtpReady = !!process.env.SMTP_HOST && Number(process.env.SMTP_PORT) > 0 && !!process.env.SMTP_USER && !!process.env.SMTP_PASSWORD && !!process.env.SMTP_FROM;
+  if (!appUrl || !smtpReady) throw new PasswordResetDeliveryUnavailableError();
+
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, status: true } });
   if (!user || user.status !== "ACTIVE") return;
 
@@ -42,12 +53,12 @@ export async function createPasswordReset(email: string) {
   await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
   await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: digest(token), expiresAt } });
 
-  const appUrl = process.env.APP_URL?.replace(/\/$/, "");
-  if (!appUrl) {
-    await prisma.passwordResetToken.deleteMany({ where: { tokenHash: digest(token) } });
-    return;
+  let delivered = false;
+  try {
+    delivered = await sendResetEmail(user.email, `${appUrl}/reset-password?token=${encodeURIComponent(token)}`);
+  } catch (error) {
+    console.error("[password reset email delivery failure]", error);
   }
-  const delivered = await sendResetEmail(user.email, `${appUrl}/reset-password?token=${encodeURIComponent(token)}`);
   if (!delivered) await prisma.passwordResetToken.deleteMany({ where: { tokenHash: digest(token) } });
 }
 

@@ -12,14 +12,9 @@ import { prisma } from "@/lib/db";
 import { run, DomainError, type ActionResult } from "@/lib/errors";
 import { assertPermission } from "@/lib/auth/guards";
 import { TAXONOMY_CACHE_TAG, TAXONOMY_KIND } from "@/lib/constants/categories";
-import { createSession, destroySession, getSessionUser } from "@/lib/auth/session";
-import { safeInternalRedirect } from "@/lib/auth/redirects";
+import { destroySession, getSessionUser } from "@/lib/auth/session";
 import { LOW_STOCK_NOTIFICATIONS_CACHE_TAG } from "@/lib/constants";
-import { consumePasswordReset, createPasswordReset } from "@/lib/auth/password-reset";
-import { getDummyHash, verifyPassword } from "@/lib/auth/password";
-import { clearLoginFailures, isLoginLimited, recordLoginFailure } from "@/lib/auth/login-rate-limit";
-import { requestMeta, writeAudit } from "@/lib/audit";
-import { forgotPasswordSchema, loginSchema, resetPasswordSchema } from "@/validations/employee";
+import { writeAudit } from "@/lib/audit";
 import { settingsSchema } from "@/validations/settings";
 import { addStockSchema, adjustStockSchema, splitSerials } from "@/validations/inventory";
 import * as products from "./products.service";
@@ -31,53 +26,6 @@ import * as employees from "./employees.service";
 import { updateSettings } from "./settings.service";
 
 // ---------- auth ----------
-export async function loginAction(raw: unknown, requestedRedirect?: unknown): Promise<ActionResult<{ redirectTo: string }>> {
-  return run(async () => {
-    let stage = "request validation";
-    try {
-      const { email, password } = loginSchema.parse(raw);
-      stage = "request metadata";
-      const meta = await requestMeta();
-      stage = "rate limit check";
-      if (await isLoginLimited(email, meta.ip)) throw new DomainError("UNAUTHENTICATED", "Too many sign-in attempts. Wait 15 minutes and try again.");
-      stage = "user lookup";
-      const user = await prisma.user.findUnique({ where: { email } });
-      stage = "password verification";
-      const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
-      if (!user || !ok) {
-        stage = "failed sign-in recording";
-        await recordLoginFailure(email, meta.ip);
-        throw new DomainError("UNAUTHENTICATED", "Email or password is incorrect.");
-      }
-      if (user.status !== "ACTIVE") throw new DomainError("FORBIDDEN", "This account is disabled. Ask an admin to reactivate it.");
-      stage = "session creation";
-      await createSession({ userId: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }, { ip: meta.ip, userAgent: meta.ua });
-      stage = "post-login bookkeeping";
-      const bookkeeping = await Promise.allSettled([
-        clearLoginFailures(email, meta.ip),
-        prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
-        writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` }),
-      ]);
-      for (const result of bookkeeping) {
-        if (result.status === "rejected") console.error("[login post-session bookkeeping error]", result.reason);
-      }
-      return { redirectTo: safeInternalRedirect(requestedRedirect) };
-    } catch (error) {
-      if (error instanceof z.ZodError) throw error;
-      if (!(error instanceof DomainError)) {
-        console.error(`[login failure: ${stage}]`, error);
-        const message = stage === "session creation"
-          ? "Your account was verified, but we couldn’t start a secure sign-in session. Please try again shortly. If this keeps happening, contact your administrator and ask them to check the production authentication settings and database migrations."
-          : stage === "rate limit check" || stage === "user lookup" || stage === "failed sign-in recording"
-            ? "We couldn’t check your account with the sign-in service. Please try again in a few minutes. If the problem continues, contact your administrator and ask them to check the production database connection and migrations."
-            : "We couldn’t complete sign-in because of a temporary service problem. Please try again shortly. If it continues, contact your administrator and share the time of this attempt.";
-        throw new DomainError("CONFLICT", message);
-      }
-      throw error;
-    }
-  });
-}
-
 export async function logoutAction() {
   try {
     const user = await getSessionUser();
@@ -87,26 +35,6 @@ export async function logoutAction() {
     return { ok: false as const };
   }
   redirect("/login");
-}
-
-export async function requestPasswordResetAction(raw: unknown): Promise<ActionResult> {
-  const input = forgotPasswordSchema.safeParse(raw);
-  if (input.success) {
-    try {
-      await createPasswordReset(input.data.email);
-    } catch {
-      return { ok: true, data: undefined };
-    }
-  }
-  return { ok: true, data: undefined };
-}
-
-export async function resetPasswordAction(raw: unknown): Promise<ActionResult> {
-  return run(async () => {
-    const input = resetPasswordSchema.parse(raw);
-    await consumePasswordReset(input.token, input.password);
-    return undefined;
-  });
 }
 
 // ---------- products ----------

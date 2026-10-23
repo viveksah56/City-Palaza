@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { ACCESS_TOKEN_TTL_MINUTES, REFRESH_COOKIE, SESSION_COOKIE } from "@/lib/constants";
 import { safeInternalRedirect } from "@/lib/auth/redirects";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/lib/auth/token";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 const cookieOptions = (expires: Date) => ({
   httpOnly: true,
@@ -47,6 +48,8 @@ async function rotateRefreshToken(): Promise<boolean> {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const limited = await rateLimitResponse(request, "auth:refresh", { limit: 40, windowSeconds: 300 });
+  if (limited) return limited;
   if (!(await rotateRefreshToken())) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", safeInternalRedirect(request.nextUrl.searchParams.get("next")));
@@ -56,7 +59,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   return NextResponse.redirect(new URL(next, request.url));
 }
 
-export async function POST(): Promise<NextResponse> {
+export async function POST(request: Request): Promise<NextResponse> {
+  const limited = await rateLimitResponse(request, "auth:refresh", { limit: 40, windowSeconds: 300 });
+  if (limited) return limited;
   if (!(await rotateRefreshToken())) {
     return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
   }
