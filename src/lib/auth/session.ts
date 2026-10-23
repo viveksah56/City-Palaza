@@ -37,7 +37,9 @@ export async function createSession(subject: AccessTokenSubject, meta: { ip?: st
   const accessExpiresAt = new Date(now + ACCESS_TOKEN_TTL_MINUTES * 60_000);
   const refreshTokenId = randomUUID();
   const session = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${subject.userId}))`;
+    // pg_advisory_xact_lock returns Postgres `void`, which Prisma 7's pg adapter cannot deserialize,
+    // so it must run through $executeRaw (never $queryRaw). Serialises concurrent logins per user.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${subject.userId}))`;
     await tx.session.deleteMany({ where: { userId: subject.userId } });
     return tx.session.create({
       data: { userId: subject.userId, expiresAt, refreshTokenId, ipAddress: meta.ip ?? null, userAgent: meta.userAgent?.slice(0, 255) ?? null },
