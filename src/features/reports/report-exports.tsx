@@ -20,12 +20,12 @@ export function ReportExports({ range, scope, reportTab }: { range?: DateRange; 
   params.set("format", "xlsx");
   const excelQuery = `?${params}`;
   return (
-    <div className="flex items-center gap-1.5">
-      <Button asChild variant="outline" size="sm">
-        <a href={`/api/reports/export${pdfQuery}`}><FileText aria-hidden /> <span className="sr-only sm:not-sr-only">PDF</span></a>
+    <div className="flex items-center gap-2" role="group" aria-label="Export report">
+      <Button asChild variant="outline">
+        <a href={`/api/reports/export${pdfQuery}`} aria-label="Export PDF"><FileText aria-hidden="true" /> <span className="sr-only sm:not-sr-only">PDF</span></a>
       </Button>
-      <Button asChild variant="outline" size="sm">
-        <a href={`/api/reports/export${excelQuery}`}><FileSpreadsheet aria-hidden /> <span className="sr-only sm:not-sr-only">Excel</span></a>
+      <Button asChild variant="outline">
+        <a href={`/api/reports/export${excelQuery}`} aria-label="Export Excel"><FileSpreadsheet aria-hidden="true" /> <span className="sr-only sm:not-sr-only">Excel</span></a>
       </Button>
     </div>
   );
