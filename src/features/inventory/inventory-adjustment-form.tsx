@@ -44,10 +44,11 @@ function StockDialog({ mode, product, onClose }: { mode: "add" | "adjust"; produ
 function AddForm({ product, onClose }: { product: StockProduct; onClose: () => void }) {
   const router = useRouter();
   const serialized = product.trackingType !== "QUANTITY";
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<AddStockValues>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<AddStockValues>({
     resolver: zodResolver(addStockSchema),
     defaultValues: { productId: product.id, type: "PURCHASE", quantity: serialized ? undefined : 1, serialsText: "", reference: "", reason: "" },
   });
+  const type = watch("type");
   return (
     <form
       noValidate className="grid gap-4"
@@ -70,6 +71,7 @@ function AddForm({ product, onClose }: { product: StockProduct; onClose: () => v
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Type" htmlFor="type"><NativeSelect id="type" {...register("type")}><option value="PURCHASE">Purchase / restock</option><option value="INITIAL_STOCK">Opening stock</option></NativeSelect></Field>
+        {type === "PURCHASE" && <Field label="Unit cost" htmlFor="unitCost" hint="Leave blank to use the product's current cost." error={errors.unitCost?.message}><Input id="unitCost" type="number" min="0" step="0.01" inputMode="decimal" {...register("unitCost", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} /></Field>}
         <Field label="Supplier invoice / reference" htmlFor="reference" error={errors.reference?.message}><Input id="reference" {...register("reference")} /></Field>
       </div>
       <Field label="Note" htmlFor="reason" hint="Optional if you entered a reference."><Input id="reason" {...register("reason")} /></Field>

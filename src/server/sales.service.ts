@@ -11,7 +11,7 @@ import { resolveRange } from "@/lib/dates";
 import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
 import { PAYMENT_METHODS } from "@/lib/constants";
-import { createSaleSchema, voidSaleSchema, type CreateSaleInput } from "@/validations/sale";
+import { createSaleSchema, settleSalePaymentSchema, voidSaleSchema, type CreateSaleInput } from "@/validations/sale";
 import { changeStock, normalizeSerials, type Actor } from "./inventory.service";
 import { readSettings } from "./settings.service";
 import { uniqueSlug } from "@/lib/slug";
@@ -24,7 +24,7 @@ async function nextCounter(tx: Tx, key: string): Promise<number> {
   return rows[0]!.value;
 }
 
-type Prepared = { product: Prisma.ProductGetPayload<object>; quantity: number; serials: string[] };
+type Prepared = { product: Prisma.ProductGetPayload<{ include: { category: { select: { name: true } } } }>; quantity: number; serials: string[] };
 
 /**
  * Creates a sale. EVERYTHING happens in one DB transaction:
@@ -34,6 +34,13 @@ type Prepared = { product: Prisma.ProductGetPayload<object>; quantity: number; s
 export async function createSale(actor: Actor, raw: unknown): Promise<{ id: string; slug: string; saleNumber: string }> {
   assertRolePermission(actor.role, PERMISSION.SALE_CREATE);
   const input: CreateSaleInput = createSaleSchema.parse(raw);
+  if (input.idempotencyKey) {
+    const existing = await prisma.sale.findUnique({ where: { idempotencyKey: input.idempotencyKey }, select: { id: true, slug: true, saleNumber: true, employeeId: true } });
+    if (existing) {
+      if (existing.employeeId !== actor.id && actor.role !== ROLE.ADMIN) throw new DomainError("CONFLICT", "This sale request has already been completed.");
+      return { id: existing.id, slug: existing.slug, saleNumber: existing.saleNumber };
+    }
+  }
 
   // merge duplicate product lines
   const merged = new Map<string, { quantity: number; serials: string[]; discount: CreateSaleInput["items"][number]["discount"] }>();
@@ -47,10 +54,11 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
   if (merged.size === 0) throw new DomainError("EMPTY_SALE", "Add at least one product to the sale.");
   const ids = [...merged.keys()].sort(); // deterministic lock order → no deadlocks
 
-  return prisma.$transaction(
+  try {
+  return await prisma.$transaction(
     async (tx) => {
       const settings = await readSettings(tx);
-      const products = await tx.product.findMany({ where: { id: { in: ids } } });
+      const products = await tx.product.findMany({ where: { id: { in: ids } }, include: { category: { select: { name: true } } } });
       const byId = new Map(products.map((p) => [p.id, p]));
 
       const prepared: Prepared[] = ids.map((id) => {
@@ -81,8 +89,16 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
         const maximum = money(calc.subtotal.times(settings.employeeMaxTotalDiscountPercent).div(100));
         if (calc.discount.gt(maximum)) throw new DomainError("DISCOUNT_NOT_ALLOWED", `Total discount exceeds the ${settings.employeeMaxTotalDiscountPercent}% limit.`);
       }
+      const manualDiscountCausedBelowCost = calc.lines.some((line) => {
+        const cost = line.unitCost.times(line.quantity);
+        const beforeManualDiscount = line.subtotal.minus(line.promoDiscount);
+        const afterManualDiscount = beforeManualDiscount.minus(line.itemManualDiscount).minus(line.saleDiscount);
+        return beforeManualDiscount.gte(cost) && afterManualDiscount.lt(cost);
+      });
+      if (actor.role !== ROLE.ADMIN && manualDiscountCausedBelowCost) {
+        throw new DomainError("DISCOUNT_NOT_ALLOWED", "Manual discount would price a product below cost. Ask an admin to approve it.");
+      }
       const soldBelowCost = calc.lines.some((line) => line.subtotal.minus(line.discount).lt(line.unitCost.times(line.quantity)));
-      if (actor.role !== ROLE.ADMIN && soldBelowCost) throw new DomainError("DISCOUNT_NOT_ALLOWED", "This discount needs admin approval.");
 
       // customer (optional → walk-in)
       let customerId: string | null = input.customerId ?? null;
@@ -100,6 +116,7 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
 
       // payment
       const paymentStatus = input.paymentStatus ?? "PAID";
+      if (paymentStatus !== "PAID" && calc.total.gt(0) && !customerId) throw new DomainError("VALIDATION", "A customer is required for pending or partial payments.");
       if (paymentStatus === "REFUNDED") throw new DomainError("VALIDATION", "A new sale can't be marked as refunded.");
       let amountPaid = calc.total;
       if (paymentStatus === "PENDING") amountPaid = D(0);
@@ -130,6 +147,7 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
           paymentMethod: input.paymentMethod,
           paymentStatus,
           amountPaid: toDb(amountPaid),
+          idempotencyKey: input.idempotencyKey,
           notes: input.notes?.trim() || null,
           items: {
             create: calc.lines.map((l, i) => ({
@@ -137,6 +155,7 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
               productName: prepared[i]!.product.variantLabel
                 ? `${prepared[i]!.product.name} · ${prepared[i]!.product.variantLabel}`
                 : prepared[i]!.product.name,
+              categoryName: prepared[i]!.product.category.name,
               sku: prepared[i]!.product.sku,
               quantity: l.quantity,
               serialSnapshot: prepared[i]!.serials,
@@ -153,6 +172,8 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
         },
         include: { items: true },
       });
+
+      if (amountPaid.gt(0)) await tx.salePayment.create({ data: { saleId: sale.id, amount: toDb(amountPaid), method: input.paymentMethod, receivedById: actor.id } });
 
       for (const prep of prepared) {
         const item = sale.items.find((i) => i.productId === prep.product.id)!;
@@ -188,6 +209,36 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
     },
     { timeout: 20_000, maxWait: 10_000 },
   );
+  } catch (error) {
+    if (input.idempotencyKey && typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+      const existing = await prisma.sale.findUnique({ where: { idempotencyKey: input.idempotencyKey }, select: { id: true, slug: true, saleNumber: true, employeeId: true } });
+      if (existing && (existing.employeeId === actor.id || actor.role === ROLE.ADMIN)) return { id: existing.id, slug: existing.slug, saleNumber: existing.saleNumber };
+    }
+    throw error;
+  }
+}
+
+export async function settleSalePayment(actor: Actor, raw: unknown) {
+  assertRolePermission(actor.role, PERMISSION.SALE_SETTLE);
+  const input = settleSalePaymentSchema.parse(raw);
+  return prisma.$transaction(async (tx) => {
+    const sale = await tx.sale.findUnique({ where: { id: input.saleId }, select: { id: true, slug: true, saleNumber: true, employeeId: true, status: true, total: true, amountPaid: true, customerId: true } });
+    if (!sale) throw new DomainError("NOT_FOUND", "Sale not found.");
+    if (actor.role !== ROLE.ADMIN && sale.employeeId !== actor.id) throw new DomainError("FORBIDDEN", "You can only record payments for your own sales.");
+    if (sale.status !== "COMPLETED") throw new DomainError("CONFLICT", "Payments can only be added to completed sales.");
+    if (!sale.customerId) throw new DomainError("VALIDATION", "A customer is required before this balance can be settled.");
+    const nextPaid = money(sale.amountPaid.plus(input.amount));
+    if (nextPaid.gt(sale.total)) throw new DomainError("VALIDATION", "Payment exceeds the remaining balance.");
+    const updated = await tx.sale.updateMany({
+      where: { id: sale.id, amountPaid: sale.amountPaid, total: { gte: nextPaid }, status: "COMPLETED" },
+      data: { amountPaid: toDb(nextPaid), paymentStatus: nextPaid.eq(sale.total) ? "PAID" : "PARTIAL" },
+    });
+    if (updated.count !== 1) throw new DomainError("CONFLICT", "The sale balance changed while recording payment. Refresh and try again.");
+    await tx.salePayment.create({ data: { saleId: sale.id, amount: toDb(input.amount), method: input.method, receivedById: actor.id, note: input.note?.trim() || null } });
+    const paymentStatus = nextPaid.eq(sale.total) ? "PAID" : "PARTIAL";
+    await writeAudit(tx, { actorId: actor.id, action: PERMISSION.SALE_SETTLE, entityType: "Sale", entityId: sale.id, description: `Payment received for ${sale.saleNumber}: ${input.amount.toFixed(2)} ${input.method}` });
+    return { slug: sale.slug, saleNumber: sale.saleNumber, amountPaid: nextPaid.toFixed(2), balance: money(sale.total.minus(nextPaid)).toFixed(2), paymentStatus };
+  });
 }
 
 export async function voidSale(actor: Actor, raw: unknown) {
@@ -293,6 +344,7 @@ export async function getSaleForUser(user: { id: string; role: Role }, id: strin
       voidedBy: { select: { firstName: true, lastName: true } },
       customer: true,
       items: { include: { serials: { select: { serial: true } } }, orderBy: { productName: "asc" } },
+      payments: { include: { receivedBy: { select: { firstName: true, lastName: true } } }, orderBy: { receivedAt: "asc" } },
     },
   });
   if (!sale) return null;
@@ -309,6 +361,7 @@ export async function getSaleForUserBySlug(user: { id: string; role: Role }, slu
       voidedBy: { select: { firstName: true, lastName: true } },
       customer: true,
       items: { include: { serials: { select: { serial: true } } }, orderBy: { productName: "asc" } },
+      payments: { include: { receivedBy: { select: { firstName: true, lastName: true } } }, orderBy: { receivedAt: "asc" } },
     },
   });
   if (!sale) return null;

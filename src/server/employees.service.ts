@@ -124,7 +124,7 @@ export async function deleteEmployee(actor: Actor, id: string) {
   const deletedPasswordHash = await hashPassword(randomUUID());
   await prisma.$transaction(async (tx) => {
     await lockAdminAccessChanges(tx);
-    const existing = await tx.user.findFirst({ where: { id, deletedAt: null }, select: { id: true, email: true, role: true, status: true } });
+    const existing = await tx.user.findFirst({ where: { id, deletedAt: null }, select: { id: true, slug: true, firstName: true, lastName: true, email: true, role: true, status: true } });
     if (!existing) throw new DomainError("NOT_FOUND", "Account not found.");
     if (existing.role === ROLE.ADMIN && existing.status === "ACTIVE") await requireAnotherActiveAdmin(tx, id);
     const now = new Date();
@@ -134,6 +134,7 @@ export async function deleteEmployee(actor: Actor, id: string) {
         data: {
           firstName: "Deleted",
           lastName: "Account",
+          slug: `deleted-${id}`,
           email: `deleted+${id}@deleted.citypalaza.invalid`,
           phone: null,
           passwordHash: deletedPasswordHash,
@@ -143,9 +144,10 @@ export async function deleteEmployee(actor: Actor, id: string) {
       }),
       tx.session.deleteMany({ where: { userId: id } }),
       tx.passwordResetToken.deleteMany({ where: { userId: id } }),
-      tx.auditLog.updateMany({ where: { actorId: id }, data: { description: "Activity recorded for an anonymized account." } }),
-      tx.auditLog.updateMany({ where: { entityType: "User", entityId: id }, data: { description: "Account management event for an anonymized account." } }),
     ]);
+    await tx.$executeRaw`UPDATE "citypalaza_database"."AuditLog"
+      SET "description" = replace(replace("description", ${existing.email}, 'deleted account'), ${`${existing.firstName} ${existing.lastName}`}, 'Deleted Account')
+      WHERE "actorId" = ${id} OR ("entityType" = 'User' AND "entityId" = ${id})`;
     await writeAudit(tx, {
       actorId: actor.id,
       action: PERMISSION.EMPLOYEE_DELETE,

@@ -39,6 +39,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
   const [notes, setNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const idempotencyKey = React.useRef<string | null>(null);
   const productSearch = useProductSearch(debouncedTerm);
   const customerSearch = useCustomerSearch(debouncedCustomerTerm);
   const results = productSearch.data ?? [];
@@ -71,6 +72,8 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
 
   async function submit() {
     setSubmitting(true);
+    idempotencyKey.current ??= crypto.randomUUID();
+    try {
     const res = await createSaleAction({
       items: cart.items.filter((i) => i.quantity > 0).map((i) => ({ productId: i.productId, quantity: i.quantity, serials: i.trackingType === "QUANTITY" ? undefined : i.serials, discount: i.discount ? { type: i.discount.type, value: Number(i.discount.value) } : undefined })),
       customerId: customer?.id ?? null,
@@ -80,15 +83,21 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
       paymentStatus: status,
       amountPaid: status === "PARTIAL" ? Number(amountPaid) : null,
       notes: notes || null,
+      idempotencyKey: idempotencyKey.current,
     });
-    setSubmitting(false);
     if (!res.ok) return void toast.error(res.error);
     toast.success(`Sale ${res.data.saleNumber} completed`);
+    idempotencyKey.current = null;
     cart.clear();
     router.push(`/sales/${res.data.slug}?new=1`);
+    } catch {
+      toast.error("The sale could not be completed. Try again; the request is safe to retry.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  const canSubmit = !!calc && !submitting && !overLimit && cart.items.every((i) => i.quantity > 0);
+  const canSubmit = !!calc && !submitting && !overLimit && cart.items.every((i) => i.quantity > 0) && (status === "PAID" || !!customer || !!newCust?.name.trim());
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_24rem] xl:grid-cols-[1fr_26rem]">
@@ -124,7 +133,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
             <SaleCart currency={currency} />
 
             <div className="grid gap-1.5">
-              <p className="text-sm font-medium">Customer <span className="font-normal text-muted-foreground">(optional)</span></p>
+              <p className="text-sm font-medium">Customer <span className="font-normal text-muted-foreground">{status === "PAID" ? "(optional)" : "(required for unpaid balance)"}</span></p>
               {customer ? (
                 <div className="flex items-center justify-between rounded-md border bg-accent px-4 py-2.5 text-sm text-accent-foreground"><span>{customer.name}{customer.phone ? ` · ${customer.phone}` : ""}</span><IconButton label="Remove customer" variant="ghost" className="size-7" onClick={() => setCustomer(null)}><X /></IconButton></div>
               ) : newCust ? (

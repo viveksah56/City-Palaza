@@ -100,11 +100,6 @@ describe("employee discount limit", () => {
   it("is unrestricted for admins", () => {
     expect(() => assertDiscountAllowed(60, 100, "ADMIN", 5)).not.toThrow();
   });
-  it("measures the manual discount percentage from the calculation", () => {
-    const c = calculateSale({ lines: [line()], discount: { type: "FIXED", value: 100 } }); // 100 / 2000
-    expect(c.manualDiscountPercent.toFixed(2)).toBe("5.00");
-  });
-
   it("preserves discount invariants across 5,000 deterministic randomized carts", () => {
     let seed = 942_381;
     const random = (max: number) => {

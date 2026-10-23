@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "./password";
+import { DomainError } from "@/lib/errors";
 
 const RESET_TTL_MINUTES = 30;
 
@@ -53,12 +54,12 @@ export async function createPasswordReset(email: string) {
 export async function consumePasswordReset(token: string, password: string) {
   const tokenHash = digest(token);
   const reset = await prisma.passwordResetToken.findUnique({ where: { tokenHash }, select: { id: true, userId: true, expiresAt: true, usedAt: true } });
-  if (!reset || reset.usedAt || reset.expiresAt <= new Date()) throw new Error("This reset link is invalid or has expired.");
+  if (!reset || reset.usedAt || reset.expiresAt <= new Date()) throw new DomainError("VALIDATION", "This reset link is invalid or has expired.");
   const passwordHash = await hashPassword(password);
 
   await prisma.$transaction(async (tx) => {
     const claimed = await tx.passwordResetToken.updateMany({ where: { id: reset.id, usedAt: null, expiresAt: { gt: new Date() } }, data: { usedAt: new Date() } });
-    if (claimed.count !== 1) throw new Error("This reset link is invalid or has expired.");
+    if (claimed.count !== 1) throw new DomainError("VALIDATION", "This reset link is invalid or has expired.");
 
     await tx.user.update({ where: { id: reset.userId }, data: { passwordHash } });
     await tx.session.deleteMany({ where: { userId: reset.userId } });

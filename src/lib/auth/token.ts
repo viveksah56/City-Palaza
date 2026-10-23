@@ -15,7 +15,7 @@ export type AccessTokenSubject = Omit<AccessTokenClaims, "sessionId" | "expiresA
 
 function key(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
-  if (!secret || secret.length < 32) {
+  if (!secret || secret.length < 32 || /replace-with|your-secret|changeme|example/i.test(secret)) {
     throw new Error("AUTH_SECRET must be set and at least 32 characters long.");
   }
   return new TextEncoder().encode(secret);

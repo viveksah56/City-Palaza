@@ -48,10 +48,9 @@ async function rotateRefreshToken(): Promise<boolean> {
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await rotateRefreshToken())) {
-    const response = NextResponse.redirect(new URL("/login", request.url));
-    response.cookies.delete(SESSION_COOKIE);
-    response.cookies.delete(REFRESH_COOKIE);
-    return response;
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", safeInternalRedirect(request.nextUrl.searchParams.get("next")));
+    return NextResponse.redirect(loginUrl);
   }
   const next = safeInternalRedirect(request.nextUrl.searchParams.get("next"));
   return NextResponse.redirect(new URL(next, request.url));
@@ -59,10 +58,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(): Promise<NextResponse> {
   if (!(await rotateRefreshToken())) {
-    const response = NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
-    response.cookies.delete(SESSION_COOKIE);
-    response.cookies.delete(REFRESH_COOKIE);
-    return response;
+    return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
   }
   return NextResponse.json({ ok: true });
 }

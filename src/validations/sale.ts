@@ -30,6 +30,7 @@ export const createSaleSchema = z.object({
   paymentStatus: z.enum(PAYMENT_STATUSES).default("PAID"),
   amountPaid: z.number().min(0).nullish(),
   notes: z.string().trim().max(500).nullish(),
+  idempotencyKey: z.string().uuid().optional(),
 });
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 
@@ -38,3 +39,11 @@ export const voidSaleSchema = z.object({
   reason: z.string().trim().min(5, "Please give a reason (at least 5 characters)").max(300),
 });
 export type VoidSaleValues = z.infer<typeof voidSaleSchema>;
+
+export const settleSalePaymentSchema = z.object({
+  saleId: z.string().min(1),
+  amount: moneyField("Payment").refine((amount) => Number(amount) > 0, "Payment must be greater than zero"),
+  method: z.enum(PAYMENT_METHODS),
+  note: z.string().trim().max(300).nullish(),
+});
+export type SettleSalePaymentInput = z.infer<typeof settleSalePaymentSchema>;

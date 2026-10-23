@@ -10,6 +10,7 @@ import { resolveRange } from "@/lib/dates";
 import { TX_TYPES } from "@/lib/constants";
 import type { Role } from "@/lib/constants/roles";
 import { PERMISSION, assertRolePermission } from "@/lib/rbac/permission";
+import { money } from "@/lib/money";
 
 export { normalizeSerials };
 export type Actor = { id: string; role: Role };
@@ -23,6 +24,7 @@ export type StockChange = {
   referenceId?: string | null;
   reason?: string | null;
   userId: string;
+  unitCost?: string | number | Prisma.Decimal | null;
 };
 
 /**
@@ -55,6 +57,7 @@ export async function changeStock(tx: Tx, c: StockChange): Promise<number> {
       quantity: c.delta,
       previousQuantity: newQuantity - c.delta,
       newQuantity,
+      unitCost: c.unitCost === undefined || c.unitCost === null ? null : new Prisma.Decimal(c.unitCost),
       referenceType: c.referenceType ?? null,
       referenceId: c.referenceId ?? null,
       reason: c.reason ?? null,
@@ -71,13 +74,15 @@ export type AddStockInput = {
   serials?: string[];
   reason?: string | null;
   reference?: string | null;
+  unitCost?: number;
 };
 
 export async function addStockTx(tx: Tx, actor: Actor, input: AddStockInput) {
   assertRolePermission(actor.role, PERMISSION.INVENTORY_ADD);
+  await tx.$queryRaw`SELECT "id" FROM "citypalaza_database"."Product" WHERE "id" = ${input.productId} FOR UPDATE`;
   const product = await tx.product.findUnique({
     where: { id: input.productId },
-    select: { id: true, name: true, sku: true, trackingType: true },
+    select: { id: true, name: true, sku: true, trackingType: true, quantity: true, purchasePrice: true },
   });
   if (!product) throw new DomainError("NOT_FOUND", "Product not found.");
 
@@ -95,6 +100,8 @@ export async function addStockTx(tx: Tx, actor: Actor, input: AddStockInput) {
   }
 
   const reason = input.reason?.trim() || (input.reference ? null : input.type === "INITIAL_STOCK" ? "Opening stock" : "Stock received");
+  const unitCost = input.unitCost ?? Number(product.purchasePrice);
+  if (!Number.isFinite(unitCost) || unitCost < 0) throw new DomainError("VALIDATION", "Enter a valid non-negative unit cost.");
   const newQuantity = await changeStock(tx, {
     productId: product.id,
     delta: quantity,
@@ -103,7 +110,12 @@ export async function addStockTx(tx: Tx, actor: Actor, input: AddStockInput) {
     referenceId: input.reference?.trim() || null,
     reason,
     userId: actor.id,
+    unitCost,
   });
+  if (input.type === "PURCHASE" && newQuantity > 0) {
+    const weightedCost = money((Number(product.purchasePrice) * product.quantity + unitCost * quantity) / newQuantity);
+    await tx.product.update({ where: { id: product.id }, data: { purchasePrice: weightedCost.toFixed(2) } });
+  }
   await writeAudit(tx, {
     actorId: actor.id,
     action: "STOCK_ADD",

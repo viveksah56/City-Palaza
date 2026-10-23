@@ -250,7 +250,7 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
     if (before.trackingType !== data.trackingType && (before.quantity > 0 || before._count.serials > 0)) {
       throw new DomainError("CONFLICT", "Tracking type can't be changed once the product has stock or registered devices.");
     }
-    await tx.product.update({ where: { id }, data });
+    const updated = await tx.product.update({ where: { id }, data, select: { slug: true } });
 
     const changes: string[] = [];
     const watch = ["name", "variantLabel", "sku", "barcode", "purchasePrice", "sellingPrice", "discountPercent", "minStock", "maxStock", "status", "categoryId", "brandId"] as const;
@@ -266,13 +266,14 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
       entityId: id,
       description: `Updated ${data.name} (${data.sku})${changes.length ? ` – ${changes.join("; ")}` : ""}`,
     });
+    return updated.slug;
   });
 }
 
 export async function setProductStatus(actor: Actor, id: string, status: ProductStatus) {
   assertRolePermission(actor.role, PERMISSION.PRODUCT_UPDATE);
   await prisma.$transaction(async (tx) => {
-    const p = await tx.product.update({ where: { id }, data: { status }, select: { name: true, sku: true } });
+    const p = await tx.product.update({ where: { id }, data: { status }, select: { name: true, sku: true, slug: true } });
     await writeAudit(tx, {
       actorId: actor.id,
       action: status === "ACTIVE" ? PERMISSION.PRODUCT_UPDATE : "PRODUCT_DEACTIVATE",
@@ -280,6 +281,7 @@ export async function setProductStatus(actor: Actor, id: string, status: Product
       entityId: id,
       description: `${status === "ACTIVE" ? "Reactivated" : `Set to ${status}:`} ${p.name} (${p.sku})`,
     });
+    return p.slug;
   });
 }
 

@@ -17,6 +17,7 @@ import { safeInternalRedirect } from "@/lib/auth/redirects";
 import { LOW_STOCK_NOTIFICATIONS_CACHE_TAG } from "@/lib/constants";
 import { consumePasswordReset, createPasswordReset } from "@/lib/auth/password-reset";
 import { getDummyHash, verifyPassword } from "@/lib/auth/password";
+import { clearLoginFailures, isLoginLimited, recordLoginFailure } from "@/lib/auth/login-rate-limit";
 import { requestMeta, writeAudit } from "@/lib/audit";
 import { forgotPasswordSchema, loginSchema, resetPasswordSchema } from "@/validations/employee";
 import { settingsSchema } from "@/validations/settings";
@@ -35,14 +36,19 @@ export async function loginAction(raw: unknown, requestedRedirect?: unknown): Pr
     let stage = "input validation";
     try {
       const { email, password } = loginSchema.parse(raw);
+      const meta = await requestMeta();
+      if (await isLoginLimited(email, meta.ip)) throw new DomainError("UNAUTHENTICATED", "Too many sign-in attempts. Wait 15 minutes and try again.");
       stage = "user lookup";
       const user = await prisma.user.findUnique({ where: { email } });
       const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
-      if (!user || !ok) throw new DomainError("UNAUTHENTICATED", "Email or password is incorrect.");
+      if (!user || !ok) {
+        await recordLoginFailure(email, meta.ip);
+        throw new DomainError("UNAUTHENTICATED", "Email or password is incorrect.");
+      }
       if (user.status !== "ACTIVE") throw new DomainError("FORBIDDEN", "This account is disabled. Ask an admin to reactivate it.");
       stage = "session creation";
-      const meta = await requestMeta();
       await createSession({ userId: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }, { ip: meta.ip, userAgent: meta.ua });
+      await clearLoginFailures(email, meta.ip);
       stage = "post-login bookkeeping";
       const bookkeeping = await Promise.allSettled([
         prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
@@ -53,7 +59,13 @@ export async function loginAction(raw: unknown, requestedRedirect?: unknown): Pr
       }
       return { redirectTo: safeInternalRedirect(requestedRedirect) };
     } catch (error) {
-      if (!(error instanceof DomainError)) console.error(`[login failure: ${stage}]`, error);
+      if (!(error instanceof DomainError)) {
+        console.error(`[login failure: ${stage}]`, error);
+        const message = stage === "session creation"
+          ? "Your credentials were accepted, but a session could not be created. Check the database migrations and authentication secret configuration."
+          : "The sign-in service is temporarily unavailable. Please try again shortly.";
+        throw new DomainError("CONFLICT", message);
+      }
       throw error;
     }
   });
@@ -105,11 +117,11 @@ export async function createProductAction(raw: unknown) {
 export async function updateProductAction(id: string, raw: unknown) {
   return run(async () => {
     const actor = await assertPermission(PERMISSION.PRODUCT_UPDATE);
-    await products.updateProduct(actor, id, raw);
+    const slug = await products.updateProduct(actor, id, raw);
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidateTag(TAXONOMY_CACHE_TAG[TAXONOMY_KIND.CATEGORY], "max");
     revalidatePath("/products");
-    revalidatePath("/products");
+    revalidatePath(`/products/${slug}`);
     return undefined;
   });
 }
@@ -117,10 +129,10 @@ export async function setProductStatusAction(id: string, status: ProductStatus) 
   return run(async () => {
     const actor = await assertPermission(PERMISSION.PRODUCT_UPDATE);
     z.enum(["ACTIVE", "INACTIVE", "DISCONTINUED"]).parse(status);
-    await products.setProductStatus(actor, id, status);
+    const slug = await products.setProductStatus(actor, id, status);
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/products");
-    revalidatePath("/products");
+    revalidatePath(`/products/${slug}`);
     return undefined;
   });
 }
@@ -184,6 +196,7 @@ export async function addStockAction(raw: unknown) {
       serials: splitSerials(v.serialsText),
       reason: v.reason,
       reference: v.reference,
+      unitCost: typeof v.unitCost === "number" ? v.unitCost : undefined,
     });
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidatePath("/inventory");
@@ -236,6 +249,17 @@ export async function voidSaleAction(raw: unknown) {
     revalidatePath("/products");
     revalidatePath("/dashboard");
     return undefined;
+  });
+}
+export async function settleSalePaymentAction(raw: unknown) {
+  return run(async () => {
+    const actor = await assertPermission(PERMISSION.SALE_SETTLE);
+    const res = await sales.settleSalePayment(actor, raw);
+    revalidatePath("/sales");
+    revalidatePath(`/sales/${res.slug}`);
+    revalidatePath("/dashboard");
+    revalidatePath("/reports");
+    return res;
   });
 }
 

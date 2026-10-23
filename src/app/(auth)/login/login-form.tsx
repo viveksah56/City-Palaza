@@ -8,13 +8,11 @@ import { Field } from "@/components/ui/field";
 import { loginSchema, type LoginValues } from "@/validations/employee";
 import { loginAction } from "@/server/actions";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [error, setError] = React.useState<string | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
-  const router = useRouter();
   const { register, handleSubmit, formState } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
 
   return (
@@ -23,12 +21,16 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       className="grid gap-4"
       onSubmit={handleSubmit(async (values) => {
         setError(null);
-        const res = await loginAction(values, redirectTo);
-        if (!res.ok) {
-          setError(res.error);
-          return;
+        try {
+          const res = await loginAction(values, redirectTo);
+          if (!res.ok) {
+            setError(res.error);
+            return;
+          }
+          window.location.assign(res.data.redirectTo);
+        } catch {
+          setError("We couldn’t sign you in right now. Check your connection and try again.");
         }
-        router.replace(res.data.redirectTo);
       })}
     >
       {error && <p role="alert" className="rounded-xl bg-red/10 px-4 py-3 text-sm font-medium text-destructive">{error}</p>}

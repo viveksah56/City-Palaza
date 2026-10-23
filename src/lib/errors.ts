@@ -39,7 +39,7 @@ const UNIQUE_LABELS: Record<string, string> = {
   phone: "This phone number is already in use.",
   serial: "One of the IMEI / serial numbers already exists.",
   name: "This name is already in use.",
-  slug: "This name is already in use.",
+  slug: "A similar record was created at the same time. Please try again.",
   saleNumber: "Sale number collision, please try again.",
 };
 

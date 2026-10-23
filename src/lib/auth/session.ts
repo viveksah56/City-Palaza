@@ -27,8 +27,12 @@ export async function createSession(subject: AccessTokenSubject, meta: { ip?: st
   const expiresAt = new Date(now + SESSION_MAX_AGE_HOURS * 60 * 60_000);
   const accessExpiresAt = new Date(now + ACCESS_TOKEN_TTL_MINUTES * 60_000);
   const refreshTokenId = randomUUID();
-  const session = await prisma.session.create({
-    data: { userId: subject.userId, expiresAt, refreshTokenId, ipAddress: meta.ip ?? null, userAgent: meta.userAgent?.slice(0, 255) ?? null },
+  const session = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${subject.userId}))`;
+    await tx.session.deleteMany({ where: { userId: subject.userId } });
+    return tx.session.create({
+      data: { userId: subject.userId, expiresAt, refreshTokenId, ipAddress: meta.ip ?? null, userAgent: meta.userAgent?.slice(0, 255) ?? null },
+    });
   });
   const [accessToken, refreshToken] = await Promise.all([
     signAccessToken(subject, session.id, accessExpiresAt),

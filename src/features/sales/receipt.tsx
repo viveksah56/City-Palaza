@@ -36,8 +36,10 @@ export function Receipt({ sale, settings }: { sale: Sale; settings: Settings }) 
         <div className="flex justify-between text-muted-foreground"><dt>Tax ({sale.taxRate.toString()}%)</dt><dd className="num">{m(sale.tax)}</dd></div>
         <div className="flex justify-between border-t pt-2 text-base font-semibold"><dt>Total</dt><dd className="num">{m(sale.total)}</dd></div>
         <div className="flex justify-between text-muted-foreground"><dt>Paid by</dt><dd>{PAYMENT_METHOD_LABELS[sale.paymentMethod]} · {sale.paymentStatus.toLowerCase()}</dd></div>
-        {sale.paymentStatus === "PARTIAL" && <div className="flex justify-between text-muted-foreground"><dt>Paid so far</dt><dd className="num">{m(sale.amountPaid)}</dd></div>}
+        <div className="flex justify-between text-muted-foreground"><dt>Collected</dt><dd className="num">{m(sale.amountPaid)}</dd></div>
+        {sale.amountPaid.lt(sale.total) && <div className="flex justify-between font-medium"><dt>Balance due</dt><dd className="num">{m(sale.total.minus(sale.amountPaid))}</dd></div>}
       </dl>
+      {sale.payments.length > 0 && <section className="mt-3 border-t pt-3"><h3 className="mb-1 font-medium">Payment history</h3><ul className="grid gap-1 text-xs text-muted-foreground">{sale.payments.map((payment) => <li key={payment.id} className="flex justify-between gap-2"><span>{formatDateTime(payment.receivedAt)} · {PAYMENT_METHOD_LABELS[payment.method]}</span><span className="num">{m(payment.amount)}</span></li>)}</ul></section>}
       <footer className="mt-5 text-center text-xs text-muted-foreground">Thank you for shopping at {settings.shopName}</footer>
     </article>
   );

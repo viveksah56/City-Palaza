@@ -51,13 +51,15 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
       ["Net sales", money(sales.netSales, currency)],
       ["Taxes", money(sales.taxes, currency)],
       ["Sales total", money(sales.total, currency)],
+      ["Collected", money(sales.collected, currency)],
+      ["Outstanding", money(sales.outstanding, currency)],
       ["Average sale", money(sales.averageSale, currency)],
     ],
     sections: [
       { title: "Sales trend", columns: ["Date", `Sales (${currency})`], rows: trend.map((row) => [row.label, row.value]) },
       { title: "Sales by category", columns: ["Category", "Units", `Net sales (${currency})`], rows: categories.map((row) => [row.name, row.units, Number(row.revenue)]) },
       { title: "Top products", columns: ["Product", "SKU", "Units", `Net sales (${currency})`], rows: products.map((row) => [row.name, row.sku, row.units, Number(row.revenue)]) },
-      { title: "Payment methods", columns: ["Method", "Sales", `Collected (${currency})`], rows: payments.map((row) => [row.method, row.count, Number(row.total)]) },
+      { title: "Payment methods", columns: ["Method", "Payments", `Collected (${currency})`], rows: payments.map((row) => [row.method, row.count, Number(row.total)]) },
       {
         title: "Sale transactions (up to 1,000)",
         columns: ["Sale", "Date", "Customer", "Payment status", "Payment method", `Total (${currency})`],

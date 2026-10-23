@@ -7,12 +7,14 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
   let sales: typeof import("@/server/sales.service");
   let products: typeof import("@/server/products.service");
   let employees: typeof import("@/server/employees.service");
+  let reports: typeof import("@/server/reports.service");
 
   beforeEach(async () => {
     inv = await import("@/server/inventory.service");
     sales = await import("@/server/sales.service");
     products = await import("@/server/products.service");
     employees = await import("@/server/employees.service");
+    reports = await import("@/server/reports.service");
     await resetDb();
   });
   afterAll(() => prisma.$disconnect());
@@ -209,7 +211,8 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     const f = await fixtures();
     const p = await f.mk("VOIDRACE");
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 2, reason: "test" });
-    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH", paymentStatus: "PENDING" });
+    const customer = await prisma.customer.create({ data: { slug: "void-credit-customer", name: "Void Credit Customer" } });
+    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], customerId: customer.id, paymentMethod: "CASH", paymentStatus: "PENDING" });
     const results = await Promise.allSettled([
       sales.voidSale(f.admin, { saleId: sale.id, reason: "duplicate sale" }),
       sales.voidSale(f.admin, { saleId: sale.id, reason: "duplicate sale" }),
@@ -222,19 +225,23 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     expect(await prisma.auditLog.count({ where: { action: "SALE_VOID" } })).toBe(1);
   });
 
-  it("validates payment states and allows walk-in credit sales", async () => {
+  it("validates payment states and requires a customer for credit sales", async () => {
     const f = await fixtures();
     const p = await f.mk("PAYMENTS");
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 10, reason: "test" });
     const base = { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" as const };
-    const pending = await sales.createSale(f.emp, { ...base, paymentStatus: "PENDING" });
+    const customer = await prisma.customer.create({ data: { slug: "payment-customer", name: "Payment Customer" } });
+    await expect(sales.createSale(f.emp, { ...base, paymentStatus: "PENDING" })).rejects.toThrow(/customer is required/i);
+    const pending = await sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PENDING" });
     expect((await prisma.sale.findUniqueOrThrow({ where: { id: pending.id } })).amountPaid.toString()).toBe("0");
-    const partial = await sales.createSale(f.emp, { ...base, paymentStatus: "PARTIAL", amountPaid: 400 });
+    expect(await prisma.salePayment.count({ where: { saleId: pending.id } })).toBe(0);
+    const partial = await sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PARTIAL", amountPaid: 400 });
     expect((await prisma.sale.findUniqueOrThrow({ where: { id: partial.id } })).amountPaid.toString()).toBe("400");
-    await expect(sales.createSale(f.emp, { ...base, paymentStatus: "PARTIAL", amountPaid: 0 })).rejects.toThrow(/partial payment/i);
-    await expect(sales.createSale(f.emp, { ...base, paymentStatus: "PARTIAL", amountPaid: 1000 })).rejects.toThrow(/partial payment/i);
+    expect((await prisma.salePayment.findFirstOrThrow({ where: { saleId: partial.id } })).amount.toString()).toBe("400");
+    await expect(sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PARTIAL", amountPaid: 0 })).rejects.toThrow(/partial payment/i);
+    await expect(sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PARTIAL", amountPaid: 1000 })).rejects.toThrow(/partial payment/i);
     await expect(sales.createSale(f.emp, { ...base, paymentStatus: "REFUNDED" })).rejects.toThrow(/refunded/i);
-    await expect(sales.createSale(f.emp, { ...base, paymentStatus: "PARTIAL", amountPaid: 1 })).resolves.toBeDefined();
+    await expect(sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PARTIAL", amountPaid: 1 })).resolves.toBeDefined();
   });
 
   it("allows zero-total paid and pending sales but rejects a zero-total partial payment", async () => {
@@ -259,6 +266,18 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     expect(first.saleNumber).toMatch(/000001$/);
     expect(second.saleNumber).toMatch(/000002$/);
     expect(await prisma.sale.count({ where: { saleNumber: { in: [first.saleNumber, second.saleNumber] } } })).toBe(2);
+  });
+
+  it("returns the original sale for a retried terminal submission", async () => {
+    const f = await fixtures();
+    const p = await f.mk("IDEMPOTENT");
+    await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 3, reason: "test" });
+    const request = { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" as const, idempotencyKey: "941d85d2-dced-4c62-a479-cf6c11e96dbc" };
+    const first = await sales.createSale(f.emp, request);
+    const retry = await sales.createSale(f.emp, request);
+    expect(retry).toEqual(first);
+    expect(await prisma.sale.count()).toBe(1);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: p.id } })).quantity).toBe(2);
   });
 
   it("enforces the employee discount limit on the server; admin is unrestricted", async () => {
@@ -294,9 +313,37 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     const f = await fixtures();
     const p = await f.mk("COST", { purchasePrice: "1200.00" });
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 2, reason: "test" });
-    await expect(sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" })).rejects.toMatchObject({ code: "DISCOUNT_NOT_ALLOWED", message: "This discount needs admin approval." });
+    const employeeSale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
+    expect(employeeSale).toBeDefined();
+    const manual = await f.mk("COST-MANUAL", { purchasePrice: "980.00", sellingPrice: "1000.00" });
+    await inv.addStock(f.admin, { productId: manual.id, type: "PURCHASE", quantity: 2, reason: "test" });
+    await expect(sales.createSale(f.emp, { items: [{ productId: manual.id, quantity: 1, discount: { type: "PERCENT", value: 3 } }], paymentMethod: "CASH" })).rejects.toMatchObject({ code: "DISCOUNT_NOT_ALLOWED", message: expect.stringContaining("Manual discount") });
     const sale = await sales.createSale(f.admin, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
     expect(await prisma.auditLog.findFirstOrThrow({ where: { entityId: sale.id } })).toMatchObject({ description: expect.stringContaining("sold below cost") });
+  });
+
+  it("records repeat payments and updates the outstanding balance", async () => {
+    const f = await fixtures();
+    const p = await f.mk("SETTLE");
+    await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 3, reason: "test" });
+    const customer = await prisma.customer.create({ data: { slug: "settle-customer", name: "Settle Customer" } });
+    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], customerId: customer.id, paymentMethod: "CASH", paymentStatus: "PARTIAL", amountPaid: 400 });
+    const paid = await sales.settleSalePayment(f.emp, { saleId: sale.id, amount: 600, method: "CARD", note: "final balance" });
+    expect(paid).toMatchObject({ amountPaid: "1000.00", balance: "0.00", paymentStatus: "PAID" });
+    expect(await prisma.salePayment.count({ where: { saleId: sale.id } })).toBe(2);
+    await expect(sales.settleSalePayment(f.emp, { saleId: sale.id, amount: 0.01, method: "CASH" })).rejects.toThrow(/exceeds/i);
+  });
+
+  it("uses the category snapshot on historical sales", async () => {
+    const f = await fixtures();
+    const p = await f.mk("CATEGORY-SNAPSHOT");
+    await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 2, reason: "test" });
+    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
+    const other = await prisma.category.create({ data: { slug: "historic-category", name: "Historic Category" } });
+    await prisma.product.update({ where: { id: p.id }, data: { categoryId: other.id } });
+    const range = { from: new Date(Date.now() - 60_000), to: new Date(Date.now() + 60_000) };
+    expect(await reports.getSalesByCategory(range)).toEqual([{ name: "Phones", revenue: "1000.00", units: 1 }]);
+    expect(sale.id).toBeTruthy();
   });
 
   it("keeps legacy manual discount reports unknown when split fields are null", async () => {

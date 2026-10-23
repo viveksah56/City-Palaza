@@ -34,8 +34,9 @@ export function fullName(u: { firstName: string; lastName: string }): string {
 
 export function slugify(s: string): string {
   return s
+    .normalize("NFKC")
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
     .replace(/(^-|-$)/g, "");
 }

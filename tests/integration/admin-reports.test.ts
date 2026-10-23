@@ -28,16 +28,17 @@ describe.skipIf(!TEST_DB)("admin rules, settings and reports (PostgreSQL)", () =
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 5, reason: "test" });
     await prisma.setting.create({ data: { key: "taxRate", value: 13 } });
     const paid = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
-    const pending = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH", paymentStatus: "PENDING" });
+    const customer = await prisma.customer.create({ data: { slug: "credit-customer", name: "Credit Customer" } });
+    const pending = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], customerId: customer.id, paymentMethod: "CASH", paymentStatus: "PENDING" });
     const voided = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
     await sales.voidSale(f.admin, { saleId: voided.id, reason: "incorrect sale" });
     const range = { from: new Date(Date.now() - 60_000), to: new Date(Date.now() + 60_000) };
     const summary = await reports.getSalesSummary(range);
-    expect(summary).toMatchObject({ count: 2, grossSales: "2000.00", discounts: "0.00", netSales: "2000.00", taxes: "260.00", total: "2260.00", averageSale: "1130.00" });
+    expect(summary).toMatchObject({ count: 2, grossSales: "2000.00", discounts: "0.00", netSales: "2000.00", taxes: "260.00", total: "2260.00", collected: "1130.00", outstanding: "1130.00", averageSale: "1000.00" });
     expect(await reports.getProfitSummary(range)).toMatchObject({ revenue: "2000.00", cost: "1600.00", profit: "400.00", marginPercent: "20.0" });
     expect(await reports.getSalesByCategory(range)).toEqual([{ name: "Phones", revenue: "2000.00", units: 2 }]);
-    expect(await reports.getPaymentDistribution(range)).toEqual([{ method: "CASH", count: 2, total: "2260.00" }]);
-    expect(await reports.getEmployeePerformance(range)).toEqual([expect.objectContaining({ id: f.emp.id, sales: 2, units: 2, revenue: "2000.00", profit: "400.00", average: "1130.00" })]);
+    expect(await reports.getPaymentDistribution(range)).toEqual([{ method: "CASH", count: 1, total: "1130.00" }]);
+    expect(await reports.getEmployeePerformance(range)).toEqual([expect.objectContaining({ id: f.emp.id, sales: 2, units: 2, revenue: "2000.00", profit: "400.00", average: "1000.00" })]);
     expect((await prisma.sale.findUniqueOrThrow({ where: { id: paid.id } })).amountPaid.toString()).toBe("1130");
     expect((await prisma.sale.findUniqueOrThrow({ where: { id: pending.id } })).amountPaid.toString()).toBe("0");
   });
@@ -73,14 +74,15 @@ describe.skipIf(!TEST_DB)("admin rules, settings and reports (PostgreSQL)", () =
 
   it("preserves employee audit history while anonymizing and disabling deleted accounts", async () => {
     const f = await fixtures();
-    const event = await prisma.auditLog.create({ data: { actorId: f.emp.id, action: "TEST_EVENT", entityType: "User", entityId: f.emp.id, description: "Eve accessed records" } });
+    const event = await prisma.auditLog.create({ data: { actorId: f.emp.id, action: "TEST_EVENT", entityType: "User", entityId: f.emp.id, description: "Eve Emp accessed records" } });
     await prisma.session.create({ data: { userId: f.emp.id, expiresAt: new Date(Date.now() + 60_000) } });
     await employees.deleteEmployee(f.admin, f.emp.id);
     const account = await prisma.user.findUniqueOrThrow({ where: { id: f.emp.id } });
     expect(account).toMatchObject({ firstName: "Deleted", lastName: "Account", status: "SUSPENDED" });
     expect(account.email).toContain("@deleted.citypalaza.invalid");
     expect(await prisma.session.count({ where: { userId: f.emp.id } })).toBe(0);
-    expect(await prisma.auditLog.findUniqueOrThrow({ where: { id: event.id } })).toMatchObject({ actorId: f.emp.id, description: "Account management event for an anonymized account." });
+    expect(account.slug).toBe(`deleted-${f.emp.id}`);
+    expect(await prisma.auditLog.findUniqueOrThrow({ where: { id: event.id } })).toMatchObject({ actorId: f.emp.id, description: "Deleted Account accessed records" });
   });
 
   it("rejects invalid, expired and used password reset links with a clear error", async () => {

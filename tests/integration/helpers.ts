@@ -2,12 +2,13 @@ import { createPrismaClient } from "@/lib/prisma";
 
 export const TEST_DB = process.env.TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
+else process.env.DATABASE_URL ??= "postgresql://disabled:disabled@127.0.0.1:1/citypalaza_test";
 
-export const prisma = createPrismaClient();
+export const prisma = (TEST_DB ? createPrismaClient() : null) as ReturnType<typeof createPrismaClient>;
 
 export async function resetDb() {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE "citypalaza_database"."AuditLog","citypalaza_database"."InventoryTransaction","citypalaza_database"."ProductSerial","citypalaza_database"."SaleItem","citypalaza_database"."Sale","citypalaza_database"."Customer","citypalaza_database"."Product","citypalaza_database"."Category","citypalaza_database"."Brand","citypalaza_database"."Session","citypalaza_database"."User","citypalaza_database"."Setting","citypalaza_database"."Counter","citypalaza_database"."RolePermission","citypalaza_database"."Permission","citypalaza_database"."Role" RESTART IDENTITY CASCADE`,
+    `TRUNCATE "citypalaza_database"."AuditLog","citypalaza_database"."InventoryTransaction","citypalaza_database"."ProductSerial","citypalaza_database"."SalePayment","citypalaza_database"."SaleItem","citypalaza_database"."Sale","citypalaza_database"."Customer","citypalaza_database"."Product","citypalaza_database"."Category","citypalaza_database"."Brand","citypalaza_database"."Session","citypalaza_database"."User","citypalaza_database"."Setting","citypalaza_database"."Counter","citypalaza_database"."RolePermission","citypalaza_database"."Permission","citypalaza_database"."Role","citypalaza_database"."AuthRateLimit" RESTART IDENTITY CASCADE`,
   );
   for (const key of ["ADMIN", "EMPLOYEE"] as const) await prisma.role.create({ data: { key, name: key } });
 }

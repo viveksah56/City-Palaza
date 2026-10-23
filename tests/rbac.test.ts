@@ -40,7 +40,7 @@ describe("RBAC", () => {
 
   it("defines the complete permission matrix for both application roles", () => {
     const expectedEmployeePermissions = new Set([
-      "DASHBOARD_VIEW", "PRODUCT_VIEW", "CATEGORY_VIEW", "BRAND_VIEW", "SALE_CREATE", "SALE_VIEW",
+      "DASHBOARD_VIEW", "PRODUCT_VIEW", "CATEGORY_VIEW", "BRAND_VIEW", "SALE_CREATE", "SALE_VIEW", "SALE_SETTLE",
       "CUSTOMER_VIEW", "CUSTOMER_CREATE", "CUSTOMER_UPDATE",
     ]);
     expect([...ROLE_PERMISSIONS.ADMIN]).toHaveLength(PERMISSIONS.length);

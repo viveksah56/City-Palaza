@@ -48,8 +48,6 @@ export type SaleCalculation = {
   tax: Decimal;
   total: Decimal;
   profit: Decimal;
-  /** Manual (cashier-applied) discount as % of the pre-discount net – what the employee limit checks. */
-  manualDiscountPercent: Decimal;
   effectiveDiscountPercent: Decimal;
   netAfterPromo: Decimal;
 };
@@ -109,7 +107,6 @@ export function calculateSale(
     tax: sum(lines.map((l) => l.tax)),
     total: sum(lines.map((l) => l.total)),
     profit: sum(lines.map((l) => l.profit)),
-    manualDiscountPercent: netTotal.isZero() ? ZERO : sum(lines.map((l) => l.saleDiscount.plus(l.itemManualDiscount))).div(netTotal).times(100),
     effectiveDiscountPercent: sum(lines.map((l) => l.subtotal)).isZero() ? ZERO : sum(lines.map((l) => l.discount)).div(sum(lines.map((l) => l.subtotal))).times(100),
     netAfterPromo: sum(base.map((b) => b.subtotal.minus(b.promoDiscount))),
   };

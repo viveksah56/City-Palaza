@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { moneyField } from "./common";
 
 export const addStockSchema = z.object({
   productId: z.string().min(1),
@@ -7,6 +8,7 @@ export const addStockSchema = z.object({
   serialsText: z.string().optional(),
   reference: z.string().trim().max(80).optional(),
   reason: z.string().trim().max(300).optional(),
+  unitCost: moneyField("Unit cost").optional(),
 });
 export type AddStockValues = z.infer<typeof addStockSchema>;
 

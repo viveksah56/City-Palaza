@@ -10,6 +10,8 @@ import { Receipt } from "@/features/sales/receipt";
 import { DownloadReceipt, PrintButton, VoidSaleDialog } from "@/features/sales/sale-actions";
 import { getSaleForUserBySlug } from "@/server/sales.service";
 import { getSettings } from "@/server/settings.service";
+import { SettlePaymentDialog } from "@/features/sales/settle-payment-dialog";
+import { money } from "@/lib/money";
 
 export default async function SaleDetailPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ new?: string }> }) {
   const user = await requirePermission(PERMISSION.SALE_VIEW);
@@ -28,6 +30,7 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
               <StatusBadge status={sale.status} />
               <PrintButton />
               <DownloadReceipt slug={sale.slug} />
+              {sale.status === "COMPLETED" && money(sale.total).minus(sale.amountPaid).gt(0) && hasPermission(user.role, PERMISSION.SALE_SETTLE) && <SettlePaymentDialog saleId={sale.id} saleNumber={sale.saleNumber} balance={money(sale.total).minus(sale.amountPaid).toFixed(2)} />}
               {hasPermission(user.role, PERMISSION.SALE_VOID) && sale.status === "COMPLETED" && <VoidSaleDialog saleId={sale.id} saleNumber={sale.saleNumber} />}
               {hasPermission(user.role, PERMISSION.SALE_CREATE) && <Button asChild><Link href="/sales/new">New sale</Link></Button>}
             </>

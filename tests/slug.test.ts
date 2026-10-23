@@ -12,4 +12,8 @@ describe("route slugs", () => {
     const slug = await uniqueSlug("!!!", async () => false);
     expect(slug).toBe("item");
   });
+
+  it("preserves Nepali names in Unicode route slugs", async () => {
+    expect(await uniqueSlug("राम शाह", async () => false)).toBe("राम-शाह");
+  });
 });

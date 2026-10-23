@@ -21,17 +21,22 @@ export type SalesSummary = {
   discounts: string;
   netSales: string; // gross − discounts (ex tax)
   taxes: string;
-  total: string; // net + tax (what customers paid)
+  total: string; // booked sale total, including tax
+  collected: string;
+  outstanding: string;
   averageSale: string;
 };
 
 export async function getSalesSummary(p: Period, employeeId?: string): Promise<SalesSummary> {
-  const [r] = await prisma.$queryRaw<{ count: number; subtotal: string; discount: string; tax: string; total: string }[]>`
+  const [r] = await prisma.$queryRaw<{ count: number; subtotal: string; discount: string; tax: string; total: string; collected: string; outstanding: string }[]>`
     SELECT COUNT(*)::int AS count,
            COALESCE(SUM(s."subtotal"),0)::text AS subtotal,
            COALESCE(SUM(s."discount"),0)::text AS discount,
            COALESCE(SUM(s."tax"),0)::text AS tax,
-           COALESCE(SUM(s."total"),0)::text AS total
+           COALESCE(SUM(s."total"),0)::text AS total,
+           COALESCE((SELECT SUM(sp."amount") FROM "citypalaza_database"."SalePayment" sp JOIN "citypalaza_database"."Sale" ps ON ps."id" = sp."saleId"
+             WHERE ps."status" = 'COMPLETED' AND sp."receivedAt" >= ${p.from} AND sp."receivedAt" < ${p.to} ${employeeId ? Prisma.sql`AND ps."employeeId" = ${employeeId}` : Prisma.empty}),0)::text AS collected,
+           COALESCE(SUM(s."total" - s."amountPaid"),0)::text AS outstanding
       FROM "citypalaza_database"."Sale" s WHERE ${saleWhere(p, employeeId)}`;
   const row = r!;
   return {
@@ -41,7 +46,9 @@ export async function getSalesSummary(p: Period, employeeId?: string): Promise<S
     netSales: D(row.subtotal).minus(row.discount).toFixed(2),
     taxes: row.tax,
     total: row.total,
-    averageSale: row.count ? D(row.total).div(row.count).toFixed(2) : "0.00",
+    collected: row.collected,
+    outstanding: row.outstanding,
+    averageSale: row.count ? D(row.subtotal).minus(row.discount).div(row.count).toFixed(2) : "0.00",
   };
 }
 
@@ -62,13 +69,11 @@ export async function getSalesOverTime(p: Period, employeeId?: string): Promise<
 
 export async function getSalesByCategory(p: Period, employeeId?: string) {
   const rows = await prisma.$queryRaw<{ name: string; revenue: string; units: number }[]>`
-    SELECT c."name", SUM(si."subtotal" - si."discount")::text AS revenue, SUM(si."quantity")::int AS units
+    SELECT si."categoryName" AS name, SUM(si."subtotal" - si."discount")::text AS revenue, SUM(si."quantity")::int AS units
       FROM "citypalaza_database"."SaleItem" si
       JOIN "citypalaza_database"."Sale" s ON s."id" = si."saleId"
-      JOIN "citypalaza_database"."Product" pr ON pr."id" = si."productId"
-      JOIN "citypalaza_database"."Category" c ON c."id" = pr."categoryId"
      WHERE ${saleWhere(p, employeeId)}
-     GROUP BY c."name" ORDER BY SUM(si."subtotal" - si."discount") DESC`;
+     GROUP BY si."categoryName" ORDER BY SUM(si."subtotal" - si."discount") DESC`;
   return rows.map((r) => ({ name: r.name, revenue: r.revenue, units: r.units }));
 }
 
@@ -86,9 +91,11 @@ export async function getTopProducts(p: Period, limit = 10, employeeId?: string)
 
 export async function getPaymentDistribution(p: Period, employeeId?: string) {
   const rows = await prisma.$queryRaw<{ method: string; count: number; total: string }[]>`
-    SELECT s."paymentMethod"::text AS method, COUNT(*)::int AS count, SUM(s."total")::text AS total
-      FROM "citypalaza_database"."Sale" s WHERE ${saleWhere(p, employeeId)}
-     GROUP BY 1 ORDER BY SUM(s."total") DESC`;
+    SELECT sp."method"::text AS method, COUNT(*)::int AS count, SUM(sp."amount")::text AS total
+      FROM "citypalaza_database"."SalePayment" sp
+      JOIN "citypalaza_database"."Sale" s ON s."id" = sp."saleId"
+     WHERE s."status" = 'COMPLETED' AND sp."receivedAt" >= ${p.from} AND sp."receivedAt" < ${p.to} ${employeeId ? Prisma.sql`AND s."employeeId" = ${employeeId}` : Prisma.empty}
+     GROUP BY sp."method" ORDER BY SUM(sp."amount") DESC`;
   return rows;
 }
 
@@ -146,7 +153,7 @@ export async function getEmployeePerformance(p: Period) {
            ed.discounts,
            COALESCE(SUM(si."subtotal" - si."discount" - si."unitCost" * si."quantity"),0)::text AS profit,
            CASE WHEN COUNT(DISTINCT s."id") = 0 THEN '0.00'
-                ELSE (SUM(si."total") / COUNT(DISTINCT s."id"))::numeric(14,2)::text END AS average
+                ELSE (SUM(si."subtotal" - si."discount") / COUNT(DISTINCT s."id"))::numeric(14,2)::text END AS average
       FROM "citypalaza_database"."User" u
       JOIN "citypalaza_database"."Sale" s ON s."employeeId" = u."id" AND s."status" = 'COMPLETED'
                    AND s."createdAt" >= ${p.from} AND s."createdAt" < ${p.to}
