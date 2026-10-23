@@ -3,6 +3,16 @@ export const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Kathmandu";
 export const SESSION_COOKIE = "cp_session";
 export const REFRESH_COOKIE = "cp_refresh";
 export const ACCESS_TOKEN_TTL_MINUTES = 15;
+/** A rotated refresh token presented again after this window is treated as replayed (possibly stolen). */
+export const REFRESH_REUSE_GRACE_SECONDS = 10;
+/** Where we send a browser whose session is gone: clears cookies, then lands on /login with a notice. */
+export const SESSION_EXPIRED_LOGOUT_URL = "/api/auth/logout?reason=expired";
+export const LOGIN_NOTICES = {
+  expired: "Your session has expired. Please sign in again.",
+  security: "You were signed out because this session was used from another place. Please sign in again.",
+  "signed-out": "You have been signed out.",
+} as const;
+export type LoginNoticeKey = keyof typeof LOGIN_NOTICES;
 const configuredSessionMaxAgeHours = Number(process.env.SESSION_MAX_AGE_HOURS);
 export const SESSION_MAX_AGE_HOURS = Number.isInteger(configuredSessionMaxAgeHours) && configuredSessionMaxAgeHours > 0
   ? configuredSessionMaxAgeHours

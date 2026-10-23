@@ -5,6 +5,7 @@ import { ROLE_LABELS } from "@/lib/constants/roles";
 import { NAV_ITEMS } from "@/lib/rbac/navigation";
 import { fullName } from "@/lib/format";
 import { AppShell } from "@/components/layout/app-shell";
+import { SessionExpiryGuard } from "@/components/layout/session-expiry-guard";
 import { getNotifications } from "@/server/dashboard.service";
 import { getSettings } from "@/server/settings.service";
 import { logoutAction } from "@/server/actions";
@@ -30,6 +31,7 @@ async function DashboardLayoutContent({ children }: { children: React.ReactNode 
       notifications={{ count: notes.lowStockCount, items: notes.items.map((i) => ({ id: i.id, slug: i.slug, name: i.name, quantity: i.quantity })) }}
       logoutAction={logoutAction}
     >
+      {user.sessionExpiresAt ? <SessionExpiryGuard expiresAt={user.sessionExpiresAt.toISOString()} /> : null}
       {children}
     </AppShell>
   );

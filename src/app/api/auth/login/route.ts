@@ -3,8 +3,12 @@ import { ZodError } from "zod";
 import { DomainError } from "@/lib/errors";
 import { RateLimitExceededError } from "@/lib/rate-limit";
 import { signIn, SignInUnavailableError } from "@/lib/auth/login";
+import { rejectCrossOrigin } from "@/lib/auth/origin";
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const crossSite = rejectCrossOrigin(request);
+  if (crossSite) return crossSite;
+
   let body: unknown;
   try {
     body = await request.json();

@@ -30,6 +30,7 @@ const EXACT_PERMISSIONS: Readonly<Record<string, Permission>> = {
 const PUBLIC_AUTH_ROUTES = new Set([
   "/api/auth/forgot-password",
   "/api/auth/login",
+  "/api/auth/logout",
   "/api/auth/refresh",
   "/api/auth/reset-password",
 ]);

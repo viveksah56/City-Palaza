@@ -13,12 +13,20 @@ export type AccessTokenClaims = {
 
 export type AccessTokenSubject = Omit<AccessTokenClaims, "sessionId" | "expiresAt">;
 
-function key(): Uint8Array {
-  const secret = process.env.AUTH_SECRET;
+function validated(name: string, secret: string | undefined): Uint8Array {
   if (!secret || secret.length < 32 || /replace-with|your-secret|changeme|example/i.test(secret)) {
-    throw new Error("AUTH_SECRET must be set and at least 32 characters long.");
+    throw new Error(`${name} must be set and at least 32 characters long.`);
   }
   return new TextEncoder().encode(secret);
+}
+
+function key(): Uint8Array {
+  return validated("AUTH_SECRET", process.env.AUTH_SECRET);
+}
+
+/** Refresh tokens use their own secret when AUTH_REFRESH_SECRET is set, so one leaked key can't forge both kinds. */
+function refreshKey(): Uint8Array {
+  return process.env.AUTH_REFRESH_SECRET ? validated("AUTH_REFRESH_SECRET", process.env.AUTH_REFRESH_SECRET) : key();
 }
 
 export async function signAccessToken(subject: AccessTokenSubject, sessionId: string, expiresAt: Date): Promise<string> {
@@ -35,7 +43,7 @@ export async function signRefreshToken(sessionId: string, tokenId: string, expir
     .setJti(tokenId)
     .setIssuedAt()
     .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
-    .sign(key());
+    .sign(refreshKey());
 }
 
 export async function verifyAccessToken(token: string): Promise<AccessTokenClaims | null> {
@@ -50,7 +58,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenClaim
 
 export async function verifyRefreshToken(token: string): Promise<{ sessionId: string; tokenId: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, refreshKey(), { algorithms: ["HS256"] });
     if (payload.typ !== "refresh" || typeof payload.sid !== "string" || typeof payload.jti !== "string") return null;
     return { sessionId: payload.sid, tokenId: payload.jti };
   } catch {

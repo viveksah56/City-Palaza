@@ -27,14 +27,15 @@ import { updateSettings } from "./settings.service";
 
 // ---------- auth ----------
 export async function logoutAction() {
+  // Signing out must never fail: audit problems are logged, and destroySession always clears the cookies.
   try {
     const user = await getSessionUser();
     if (user) await writeAudit(prisma, { actorId: user.id, action: "LOGOUT", entityType: "User", entityId: user.id, description: `${user.email} signed out` });
-    await destroySession();
-  } catch {
-    return { ok: false as const };
+  } catch (error) {
+    console.error("[logout audit failure]", error);
   }
-  redirect("/login");
+  await destroySession();
+  redirect("/login?reason=signed-out");
 }
 
 // ---------- products ----------

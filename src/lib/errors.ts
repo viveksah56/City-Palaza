@@ -1,4 +1,6 @@
 import { ZodError } from "zod";
+import { redirect, unstable_rethrow } from "next/navigation";
+import { SESSION_EXPIRED_LOGOUT_URL } from "@/lib/constants";
 
 export type DomainErrorCode =
   | "UNAUTHENTICATED"
@@ -72,6 +74,9 @@ export async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, data: await fn() };
   } catch (e) {
+    unstable_rethrow(e); // let Next.js redirects / notFound pass through instead of being swallowed
+    // Session gone mid-action (expired, revoked, signed in elsewhere): log out and go to /login.
+    if (e instanceof DomainError && e.code === "UNAUTHENTICATED") redirect(SESSION_EXPIRED_LOGOUT_URL);
     return toActionError(e);
   }
 }

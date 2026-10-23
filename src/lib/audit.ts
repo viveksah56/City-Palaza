@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma, type Db } from "./db";
+import { clientIpFromHeaders } from "./client-ip";
 
 export type AuditAction =
   | "LOGIN" | "LOGOUT"
@@ -24,8 +25,7 @@ async function requestMeta(): Promise<{ ip: string | null; ua: string | null }> 
   try {
     const { headers } = await import("next/headers");
     const h = await headers();
-    const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim();
-    return { ip: ip ?? null, ua: h.get("user-agent")?.slice(0, 255) ?? null };
+    return { ip: clientIpFromHeaders(h), ua: h.get("user-agent")?.slice(0, 255) ?? null };
   } catch {
     return { ip: null, ua: null }; // outside a request (seed, tests)
   }

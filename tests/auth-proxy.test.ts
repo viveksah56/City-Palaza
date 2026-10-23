@@ -5,6 +5,7 @@ import { proxy } from "@/proxy";
 describe("authentication proxy boundaries", () => {
   it.each([
     "/api/auth/login",
+    "/api/auth/logout",
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
     "/api/auth/refresh",

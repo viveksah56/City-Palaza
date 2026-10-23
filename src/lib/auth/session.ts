@@ -12,15 +12,24 @@ export type SessionUser = {
   lastName: string;
   email: string;
   role: Role;
+  /** Hard end of the login (the refresh token can't outlive it). Present when loaded from the database. */
+  sessionExpiresAt?: Date;
 };
 
-const cookieOptions = (expires: Date) => ({
+export const authCookieOptions = (expires: Date) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
   path: "/",
   expires,
 });
+
+type CookieJar = Awaited<ReturnType<typeof cookies>>;
+
+export function clearAuthCookies(jar: CookieJar): void {
+  jar.delete(SESSION_COOKIE);
+  jar.delete(REFRESH_COOKIE);
+}
 
 export async function createSession(subject: AccessTokenSubject, meta: { ip?: string | null; userAgent?: string | null }) {
   const now = Date.now();
@@ -39,8 +48,8 @@ export async function createSession(subject: AccessTokenSubject, meta: { ip?: st
     signRefreshToken(session.id, refreshTokenId, expiresAt),
   ]);
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, accessToken, cookieOptions(accessExpiresAt));
-  jar.set(REFRESH_COOKIE, refreshToken, cookieOptions(expiresAt));
+  jar.set(SESSION_COOKIE, accessToken, authCookieOptions(accessExpiresAt));
+  jar.set(REFRESH_COOKIE, refreshToken, authCookieOptions(expiresAt));
 }
 
 /** Resolves the logged-in user for this request (deduplicated per request). */
@@ -55,19 +64,29 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   });
   if (!session || session.expiresAt < new Date() || session.user.status !== "ACTIVE") return null;
   const { status: _status, ...user } = session.user;
-  return user;
+  return { ...user, sessionExpiresAt: session.expiresAt };
 });
 
-export async function destroySession() {
+/**
+ * Revokes the server-side session (best effort) and ALWAYS clears both cookies, so a database hiccup
+ * can never leave the browser looking signed in. Returns whether the database row was revoked.
+ */
+export async function destroySession(): Promise<{ revoked: boolean }> {
   const jar = await cookies();
   const access = jar.get(SESSION_COOKIE)?.value;
   const refresh = jar.get(REFRESH_COOKIE)?.value;
-  const [accessToken, refreshToken] = await Promise.all([
-    access ? verifyAccessToken(access) : null,
-    refresh ? verifyRefreshToken(refresh) : null,
-  ]);
-  const sessionId = accessToken?.sessionId ?? refreshToken?.sessionId;
-  if (sessionId) await prisma.session.deleteMany({ where: { id: sessionId } });
-  jar.delete(SESSION_COOKIE);
-  jar.delete(REFRESH_COOKIE);
+  let revoked = true;
+  try {
+    const [accessToken, refreshToken] = await Promise.all([
+      access ? verifyAccessToken(access) : null,
+      refresh ? verifyRefreshToken(refresh) : null,
+    ]);
+    const sessionId = accessToken?.sessionId ?? refreshToken?.sessionId;
+    if (sessionId) await prisma.session.deleteMany({ where: { id: sessionId } });
+  } catch (error) {
+    revoked = false;
+    console.error("[session revoke failure]", error);
+  }
+  clearAuthCookies(jar);
+  return { revoked };
 }

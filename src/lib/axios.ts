@@ -36,7 +36,7 @@ function redirectToLogin(): void {
   const currentUrl = new URL(window.location.href);
   currentUrl.searchParams.delete("_rsc");
   const next = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
-  window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+  window.location.assign(`/login?reason=expired&next=${encodeURIComponent(next)}`);
 }
 
 async function refreshSession(): Promise<void> {

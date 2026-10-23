@@ -3,10 +3,13 @@ import { ZodError } from "zod";
 import { resetPasswordSchema } from "@/validations/employee";
 import { consumePasswordReset } from "@/lib/auth/password-reset";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { rejectCrossOrigin } from "@/lib/auth/origin";
 import { DomainError } from "@/lib/errors";
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const limited = await rateLimitResponse(request, "auth:reset-password", { limit: 8, windowSeconds: 300 });
+  const crossSite = rejectCrossOrigin(request);
+  if (crossSite) return crossSite;
+  const limited = await rateLimitResponse(request, "auth:reset-password", { ...{ limit: 8, windowSeconds: 300 }, scope: "ip" });
   if (limited) return limited;
 
   try {

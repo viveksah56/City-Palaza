@@ -30,7 +30,14 @@ npm run dev                       # http://localhost:3000
 
 **Bulk product import:** open **Products → Bulk upload**, download the CSV template, and upload up to 250 rows at a time. Categories and brands are added when missing; opening stock and IMEI/serial entries are created through the inventory ledger. Each batch validates before writing and rolls back completely if a row has an error. Existing SKUs are never overwritten.
 
-**Production:** configure the transaction-pool `DATABASE_URL`, session-pool `DIRECT_URL`, a production-only `AUTH_SECRET`, public `APP_URL`, and SMTP settings in the private `.env.prod` file or the hosting provider's environment settings. Do not configure `SEED_*` variables in production. `npm run build:prod` builds with `.env.prod`, `npm run start:prod` starts Next.js with `.env.prod`, and `npm run db:migrate:prod` applies reviewed Prisma migrations. `npm run db:setup:prod` also applies the database constraints. Destructive Prisma resets are blocked for Supabase URLs. For Vercel, set the same values in project environment settings instead of uploading a local env file.
+**Production:** configure the transaction-pool `DATABASE_URL`, session-pool `DIRECT_URL`, a production-only `AUTH_SECRET`, public `APP_URL`, and SMTP settings in the private `.env.prod` file or the hosting provider's environment settings. Do not configure `SEED_*` variables in production. `npm run build:prod` builds with `.env.prod`, `npm run start:prod` starts Next.js with `.env.prod`, and `npm run db:migrate:prod` applies reviewed Prisma migrations. `npm run db:setup:prod` also applies the database constraints. Destructive Prisma resets are blocked for Supabase URLs.
+
+**Auth hardening settings (all optional):**
+- `TRUSTED_PROXY_HOPS` (default `1`): number of reverse proxies in front of the app that append to `X-Forwarded-For`. The client IP used for rate limiting and audit logs is read from the right of that header, so a spoofed header can't dodge limits. Set `2` if you run e.g. Cloudflare in front of nginx.
+- `AUTH_REFRESH_SECRET` (min. 32 chars): signs refresh tokens with a separate key. Falls back to `AUTH_SECRET` when unset. Changing it signs everyone out.
+- `SESSION_MAX_AGE_HOURS` (default `24`): hard session lifetime. When it passes, the browser is signed out automatically and sent to `/login` with a notice.
+
+**Sessions and rate limits at a glance:** access token 15 min, refresh token rotated on every renewal, a replayed old refresh token revokes the session, one active session per user. Authenticated API routes are rate-limited per signed-in user, public auth routes per IP, and only *failed* sign-ins count against the shared IP budget. Expired sessions, spent reset tokens and old rate-limit rows are pruned automatically after sign-ins. Run `npm run db:migrate:prod` to apply the `session_refresh_reuse_detection` migration. For Vercel, set the same values in project environment settings instead of uploading a local env file.
 
 **Migration source:** `.env` contains `SOURCE_DIRECT_URL` for read-only exports from the old project. Do not use it for application runtime, migrations, or writes.
 

@@ -90,7 +90,7 @@ describe("shared Axios session recovery", () => {
 
     await expect(api.get("/products/search")).rejects.toMatchObject({ response: { status: 401 } });
 
-    expect(assign).toHaveBeenCalledWith("/login?next=%2Fsales%3Ffilter%3Dweek");
+    expect(assign).toHaveBeenCalledWith("/login?reason=expired&next=%2Fsales%3Ffilter%3Dweek");
   });
 
   it("does not redirect for temporary refresh-service failures", async () => {

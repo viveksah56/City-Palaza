@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { forgotPasswordSchema } from "@/validations/employee";
 import { createPasswordReset } from "@/lib/auth/password-reset";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { rejectCrossOrigin } from "@/lib/auth/origin";
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const limited = await rateLimitResponse(request, "auth:forgot-password", { limit: 5, windowSeconds: 300 });
+  const crossSite = rejectCrossOrigin(request);
+  if (crossSite) return crossSite;
+  const limited = await rateLimitResponse(request, "auth:forgot-password", { ...{ limit: 5, windowSeconds: 300 }, scope: "ip" });
   if (limited) return limited;
 
   let input: ReturnType<typeof forgotPasswordSchema.parse>;

@@ -2,7 +2,8 @@ import "server-only";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
-import { consumeRateLimit, RateLimitExceededError } from "@/lib/rate-limit";
+import { consumeRateLimit, refundRateLimit, resetRateLimit, RateLimitExceededError } from "@/lib/rate-limit";
+import { pruneExpiredAuthData } from "@/lib/auth/cleanup";
 import { createSession } from "@/lib/auth/session";
 import { getDummyHash, verifyPassword } from "@/lib/auth/password";
 import { requestMeta, writeAudit } from "@/lib/audit";
@@ -28,9 +29,11 @@ export async function signIn(raw: unknown, requestedRedirect?: unknown): Promise
     const meta = await requestMeta();
     ip = meta.ip;
     stage = "rate limit check";
+    const ipBucket = `auth:login:ip:${ip ?? "unknown"}`;
+    const accountBucket = `auth:login:account:${email}:${ip ?? "unknown"}`;
     const [ipLimit, accountLimit] = await Promise.all([
-      consumeRateLimit(`auth:login:ip:${ip ?? "unknown"}`, { limit: 60, windowSeconds: 900 }),
-      consumeRateLimit(`auth:login:account:${email}:${ip ?? "unknown"}`, { limit: 8, windowSeconds: 900 }),
+      consumeRateLimit(ipBucket, { limit: 60, windowSeconds: 900 }),
+      consumeRateLimit(accountBucket, { limit: 8, windowSeconds: 900 }),
     ]);
     const blocked = [ipLimit, accountLimit].filter((result) => !result.allowed);
     if (blocked.length) throw new RateLimitExceededError(Math.max(...blocked.map((result) => result.retryAfterSeconds)));
@@ -49,7 +52,12 @@ export async function signIn(raw: unknown, requestedRedirect?: unknown): Promise
     );
 
     stage = "post-login bookkeeping";
+    // Only failed attempts should count: a good login clears the account bucket and refunds the shared
+    // IP bucket, so a busy shop behind one router doesn't lock itself out. Also prune stale auth rows.
     const bookkeeping = await Promise.allSettled([
+      resetRateLimit(accountBucket),
+      refundRateLimit(ipBucket),
+      pruneExpiredAuthData(),
       prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
       writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` }),
     ]);

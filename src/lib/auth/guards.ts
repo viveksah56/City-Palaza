@@ -1,12 +1,18 @@
 import { redirect } from "next/navigation";
 import { DomainError } from "@/lib/errors";
+import { SESSION_EXPIRED_LOGOUT_URL } from "@/lib/constants";
 import { hasPermission, type Permission } from "@/lib/rbac/permission";
 import { getSessionUser, type SessionUser } from "./session";
 
-/** For pages / layouts: redirect when not allowed. */
+/**
+ * For pages / layouts: redirect when not allowed.
+ * A request only gets here without a user when its cookies no longer match a live session (expired,
+ * revoked, signed in elsewhere, account disabled), so we sign the browser out properly: the logout route
+ * clears the stale cookies (a Server Component can't) and sends the person to /login with a notice.
+ */
 export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
-  if (!user) redirect("/unauthorized");
+  if (!user) redirect(SESSION_EXPIRED_LOGOUT_URL);
   return user;
 }
 

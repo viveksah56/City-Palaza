@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BarChart3, Boxes, ScanLine } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/session";
 import { safeInternalRedirect } from "@/lib/auth/redirects";
+import { LOGIN_NOTICES, type LoginNoticeKey } from "@/lib/constants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "./login-form";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -14,7 +15,7 @@ const COPYRIGHT_YEAR = new Date().getFullYear();
 
 export const metadata: Metadata = { title: "Sign in" };
 
-export default function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; reason?: string }> }) {
   return (
     <Suspense fallback={<LoginSkeleton />}>
       <LoginContent searchParams={searchParams} />
@@ -22,8 +23,9 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ ne
   );
 }
 
-async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const requestedNext = (await searchParams).next;
+async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: string; reason?: string }> }) {
+  const { next: requestedNext, reason } = await searchParams;
+  const notice = reason && reason in LOGIN_NOTICES ? LOGIN_NOTICES[reason as LoginNoticeKey] : null;
   const redirectTo = safeInternalRedirect(requestedNext);
   if (await getSessionUser()) redirect(redirectTo);
   return (
@@ -75,6 +77,7 @@ async function LoginContent({ searchParams }: { searchParams: Promise<{ next?: s
               <CardDescription className="text-sm leading-6">Use the work email and password provided by your administrator.</CardDescription>
             </CardHeader>
             <CardContent className="px-7 sm:px-8">
+              {notice ? <p role="status" className="mb-5 rounded-lg border border-border bg-muted px-3.5 py-2.5 text-sm text-foreground">{notice}</p> : null}
               <LoginForm redirectTo={redirectTo} />
             </CardContent>
           </Card>
