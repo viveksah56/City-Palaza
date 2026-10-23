@@ -33,37 +33,44 @@ import { updateSettings } from "./settings.service";
 // ---------- auth ----------
 export async function loginAction(raw: unknown, requestedRedirect?: unknown): Promise<ActionResult<{ redirectTo: string }>> {
   return run(async () => {
-    let stage = "input validation";
+    let stage = "request validation";
     try {
       const { email, password } = loginSchema.parse(raw);
+      stage = "request metadata";
       const meta = await requestMeta();
+      stage = "rate limit check";
       if (await isLoginLimited(email, meta.ip)) throw new DomainError("UNAUTHENTICATED", "Too many sign-in attempts. Wait 15 minutes and try again.");
       stage = "user lookup";
       const user = await prisma.user.findUnique({ where: { email } });
+      stage = "password verification";
       const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
       if (!user || !ok) {
+        stage = "failed sign-in recording";
         await recordLoginFailure(email, meta.ip);
         throw new DomainError("UNAUTHENTICATED", "Email or password is incorrect.");
       }
       if (user.status !== "ACTIVE") throw new DomainError("FORBIDDEN", "This account is disabled. Ask an admin to reactivate it.");
       stage = "session creation";
       await createSession({ userId: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }, { ip: meta.ip, userAgent: meta.ua });
-      await clearLoginFailures(email, meta.ip);
       stage = "post-login bookkeeping";
       const bookkeeping = await Promise.allSettled([
+        clearLoginFailures(email, meta.ip),
         prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
         writeAudit(prisma, { actorId: user.id, action: "LOGIN", entityType: "User", entityId: user.id, description: `${user.email} signed in` }),
       ]);
       for (const result of bookkeeping) {
-        if (result.status === "rejected") console.error("[login bookkeeping error]", result.reason);
+        if (result.status === "rejected") console.error("[login post-session bookkeeping error]", result.reason);
       }
       return { redirectTo: safeInternalRedirect(requestedRedirect) };
     } catch (error) {
+      if (error instanceof z.ZodError) throw error;
       if (!(error instanceof DomainError)) {
         console.error(`[login failure: ${stage}]`, error);
         const message = stage === "session creation"
-          ? "Your credentials were accepted, but a session could not be created. Check the database migrations and authentication secret configuration."
-          : "The sign-in service is temporarily unavailable. Please try again shortly.";
+          ? "Your account was verified, but we couldn’t start a secure sign-in session. Please try again shortly. If this keeps happening, contact your administrator and ask them to check the production authentication settings and database migrations."
+          : stage === "rate limit check" || stage === "user lookup" || stage === "failed sign-in recording"
+            ? "We couldn’t check your account with the sign-in service. Please try again in a few minutes. If the problem continues, contact your administrator and ask them to check the production database connection and migrations."
+            : "We couldn’t complete sign-in because of a temporary service problem. Please try again shortly. If it continues, contact your administrator and share the time of this attempt.";
         throw new DomainError("CONFLICT", message);
       }
       throw error;
