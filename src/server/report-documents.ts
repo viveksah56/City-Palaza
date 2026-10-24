@@ -9,6 +9,34 @@ function safeCell(value: string | number): string | number {
   return /^[=+\-@]/.test(value) ? `'${value}` : value;
 }
 
+function csvCell(value: string | number): string {
+  const safe = safeCell(value);
+  if (typeof safe === "number") return String(safe);
+  const text = String(safe);
+  if (!/[",\r\n]/.test(text)) return text;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+export function createReportCsv(data: ReportExportData): Buffer {
+  const rows: (string | number)[][] = [
+    [data.title],
+    ["Reporting period", data.period],
+    ["Business", data.business.name],
+    ["Address", [data.business.address, data.business.city].filter(Boolean).join(", ")],
+    ["Phone", data.business.phone],
+    ["Email", data.business.email],
+    ["PAN", data.business.panNumber],
+    [],
+    ["Summary"],
+    ["Metric", "Value"],
+    ...data.summary,
+  ];
+  for (const section of data.sections) {
+    rows.push([], [section.title], section.columns, ...section.rows);
+  }
+  return Buffer.from(`\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}`, "utf8");
+}
+
 export async function createReportWorkbook(data: ReportExportData): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = data.business.name || APP_NAME;

@@ -1,12 +1,15 @@
-import { FileSpreadsheet, FileText } from "lucide-react";
+"use client";
+
+import { Download, FileSpreadsheet, FileText, Printer, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { DateRange } from "@/lib/dates";
 import { formatDateInput } from "@/lib/format";
 
 export function ReportExports({ range, scope, reportTab }: { range?: DateRange; scope: "sales" | "report"; reportTab?: string }) {
   const params = new URLSearchParams();
   params.set("scope", scope);
-  if (reportTab) params.set("tab", reportTab);
+  if (reportTab) params.set("report", reportTab);
   if (range) {
     params.set("range", range.preset);
     if (range.preset === "custom") {
@@ -14,19 +17,23 @@ export function ReportExports({ range, scope, reportTab }: { range?: DateRange; 
       params.set("to", formatDateInput(new Date(range.to.getTime() - 86_400_000)));
     }
   }
-  params.set("format", "pdf");
-  const query = params.size ? `?${params}` : "";
-  const pdfQuery = query;
-  params.set("format", "xlsx");
-  const excelQuery = `?${params}`;
+  const href = (format: "pdf" | "xlsx" | "csv") => {
+    const query = new URLSearchParams(params);
+    query.set("format", format);
+    return `/api/reports/export?${query.toString()}`;
+  };
+
   return (
-    <div className="flex items-center gap-2" role="group" aria-label="Export report">
-      <Button asChild variant="outline">
-        <a href={`/api/reports/export${pdfQuery}`} aria-label="Export PDF"><FileText aria-hidden="true" /> <span className="sr-only sm:not-sr-only">PDF</span></a>
-      </Button>
-      <Button asChild variant="outline">
-        <a href={`/api/reports/export${excelQuery}`} aria-label="Export Excel"><FileSpreadsheet aria-hidden="true" /> <span className="sr-only sm:not-sr-only">Excel</span></a>
-      </Button>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" aria-label="Export or print this report"><Download aria-hidden="true" /> Export</Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        <DropdownMenuItem asChild><a href={href("pdf")}><FileText aria-hidden="true" /> Download PDF</a></DropdownMenuItem>
+        <DropdownMenuItem asChild><a href={href("xlsx")}><FileSpreadsheet aria-hidden="true" /> Download Excel</a></DropdownMenuItem>
+        <DropdownMenuItem asChild><a href={href("csv")}><Table2 aria-hidden="true" /> Download CSV</a></DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => window.print()}><Printer aria-hidden="true" /> Print report</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -6,7 +6,7 @@ import { first } from "@/lib/url";
 import { resolveRange } from "@/lib/dates";
 import { getSettings } from "@/server/settings.service";
 import { getReportExportData, getSalesExportData, type ReportTab } from "@/server/report-export.service";
-import { createReportPdf, createReportWorkbook } from "@/server/report-documents";
+import { createReportCsv, createReportPdf, createReportWorkbook } from "@/server/report-documents";
 import { DomainError } from "@/lib/errors";
 import { rateLimitResponse } from "@/lib/rate-limit";
 
@@ -16,10 +16,10 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
-    if (format !== "pdf" && format !== "xlsx") return NextResponse.json({ error: "Choose PDF or Excel format." }, { status: 400 });
+    if (format !== "pdf" && format !== "xlsx" && format !== "csv") return NextResponse.json({ error: "Choose PDF, Excel, or CSV format." }, { status: 400 });
     const scope = url.searchParams.get("scope");
     if (scope !== "sales" && scope !== "report") return NextResponse.json({ error: "Choose a valid report type." }, { status: 400 });
-    const tabValue = url.searchParams.get("tab") ?? "sales";
+    const tabValue = url.searchParams.get("report") ?? url.searchParams.get("tab") ?? "sales";
     if (scope === "report" && !["sales", "profit", "inventory", "employees"].includes(tabValue)) return NextResponse.json({ error: "Choose a valid report tab." }, { status: 400 });
     const range = resolveRange(first(url.searchParams.get("range") ?? undefined), first(url.searchParams.get("from") ?? undefined), first(url.searchParams.get("to") ?? undefined), { fallback: "last7" });
     if (range.to.getTime() - range.from.getTime() > 366 * 86_400_000) return NextResponse.json({ error: "Choose a period of one year or less." }, { status: 400 });
@@ -29,9 +29,9 @@ export async function GET(request: Request) {
     const data = scope === "sales"
       ? await getSalesExportData(user, range, settings.currency, business)
       : await getReportExportData(user, range, settings.currency, tabValue as ReportTab, business);
-    const file = format === "pdf" ? await createReportPdf(data) : await createReportWorkbook(data);
-    const extension = format === "pdf" ? "pdf" : "xlsx";
-    const contentType = format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const file = format === "pdf" ? await createReportPdf(data) : format === "xlsx" ? await createReportWorkbook(data) : createReportCsv(data);
+    const extension = format;
+    const contentType = format === "pdf" ? "application/pdf" : format === "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv; charset=utf-8";
     const reportName = scope === "report" ? `${tabValue}-report` : "sales-report";
     const filename = `cityplaza-${reportName}-${new Date().toISOString().slice(0, 10)}.${extension}`;
     return new Response(new Uint8Array(file), {

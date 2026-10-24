@@ -1,13 +1,17 @@
 "use client";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
-import { formatCompactNumber, formatCurrency } from "@/lib/format";
+import { formatNPR, formatNPRCompact, formatNumberCompact } from "@/lib/format";
 
 export type ChartPoint = { label: string; value: number };
 const TIP = { background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 14, color: "var(--foreground)", boxShadow: "var(--shadow-pop)", fontSize: 13, padding: "8px 12px" } as const;
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"];
 
 function fmt(v: number, kind: "currency" | "number") {
-  return kind === "currency" ? formatCurrency(v, "NPR") : formatCompactNumber(v);
+  return kind === "currency" ? formatNPR(v) : formatNumberCompact(v);
+}
+
+function compact(v: number, kind: "currency" | "number") {
+  return kind === "currency" ? formatNPRCompact(v) : formatNumberCompact(v);
 }
 
 export function ReportChartContent({ type, data, kind = "currency", height = 260, label }: { type: "line" | "bar" | "hbar" | "pie"; data: ChartPoint[]; kind?: "currency" | "number"; height?: number; label: string }) {
@@ -28,22 +32,22 @@ export function ReportChartContent({ type, data, kind = "currency", height = 260
           <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" strokeOpacity={0.7} />
             <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} minTickGap={24} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} width={56} tickFormatter={formatCompactNumber} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} width={64} tickFormatter={(v: number) => compact(v, kind)} />
             <Tooltip cursor={{ fill: "var(--secondary)", opacity: 0.5 }} contentStyle={TIP} labelStyle={{ fontWeight: 600 }} formatter={(v: number) => fmt(v, kind)} />
-            <Line type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={3} strokeLinecap="round" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} name={label} />
+            <Line type="linear" dataKey="value" stroke="var(--chart-1)" strokeWidth={3} strokeLinecap="round" dot={false} activeDot={{ r: 5, strokeWidth: 0 }} name={label} />
           </LineChart>
         ) : type === "bar" ? (
           <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" strokeOpacity={0.7} />
             <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} interval={0} tickFormatter={(v: string) => (v.length > 10 ? `${v.slice(0, 9)}…` : v)} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} width={56} tickFormatter={formatCompactNumber} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} width={64} tickFormatter={(v: number) => compact(v, kind)} />
             <Tooltip cursor={{ fill: "var(--secondary)", opacity: 0.5 }} contentStyle={TIP} labelStyle={{ fontWeight: 600 }} formatter={(v: number) => fmt(v, kind)} />
             <Bar dataKey="value" fill="var(--chart-1)" radius={[8, 8, 0, 0]} maxBarSize={44} name={label} />
           </BarChart>
         ) : type === "hbar" ? (
           <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" strokeOpacity={0.7} />
-            <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
+            <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} tickFormatter={(v: number) => compact(v, kind)} />
             <YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} width={130} tickFormatter={(v: string) => (v.length > 20 ? `${v.slice(0, 19)}…` : v)} />
             <Tooltip cursor={{ fill: "var(--secondary)", opacity: 0.5 }} contentStyle={TIP} labelStyle={{ fontWeight: 600 }} formatter={(v: number) => fmt(v, kind)} />
             <Bar dataKey="value" fill="var(--chart-1)" radius={[0, 8, 8, 0]} maxBarSize={22} name={label} />

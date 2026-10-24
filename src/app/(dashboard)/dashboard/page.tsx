@@ -44,10 +44,10 @@ async function DashboardServerView({ range }: { range: ReturnType<typeof resolve
     <div className="grid min-w-0 items-start gap-5 min-[1440px]:grid-cols-[minmax(0,1fr)_19rem] min-[1440px]:gap-6">
       <div className="min-w-0 space-y-5 sm:space-y-6">
       <section aria-label="Key figures" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <ReportCard label="Today’s sales" value={<CurrencyDisplay value={d.kpis.todaySales} currency={c} />} icon={<Banknote className="size-5" />} />
+        <ReportCard label="Today’s sales" value={<CurrencyDisplay value={d.kpis.todaySales} currency={c} variant="compact" />} icon={<Banknote className="size-5" />} />
         <ReportCard label="Today’s orders" value={d.kpis.todayOrders} icon={<Receipt className="size-5" />} />
-        <ReportCard label="Today’s profit" value={<CurrencyDisplay value={d.kpis.todayProfit} currency={c} />} icon={<TrendingUp className="size-5" />} />
-        <ReportCard label="Inventory value at cost" value={<CurrencyDisplay value={d.kpis.inventoryValue} currency={c} />} icon={<Wallet className="size-5" />} />
+        <ReportCard label="Today’s profit" value={<CurrencyDisplay value={d.kpis.todayProfit} currency={c} variant="compact" />} icon={<TrendingUp className="size-5" />} />
+        <ReportCard label="Inventory value at cost" value={<CurrencyDisplay value={d.kpis.inventoryValue} currency={c} variant="compact" />} icon={<Wallet className="size-5" />} />
       </section>
 
       <Card>
@@ -63,7 +63,7 @@ async function DashboardServerView({ range }: { range: ReturnType<typeof resolve
       <Card>
         <CardHeader>
           <CardTitle>Sales trend</CardTitle>
-          <CardDescription>{range.label}. {d.rangeSummary.count} sales. Total <CurrencyDisplay value={d.rangeSummary.total} currency={c} />. Average <CurrencyDisplay value={d.rangeSummary.averageSale} currency={c} />.</CardDescription>
+          <CardDescription>{range.label}. {d.rangeSummary.count} sales. Total <CurrencyDisplay value={d.rangeSummary.total} currency={c} variant="compact" />. Average <CurrencyDisplay value={d.rangeSummary.averageSale} currency={c} variant="compact" />.</CardDescription>
         </CardHeader>
         <CardContent><ReportChart type="line" data={d.series} label="Sales" /></CardContent>
       </Card>
@@ -118,7 +118,7 @@ async function EmployeeDashboard({ userId, name }: { userId: string; name: strin
       <div className="grid min-w-0 items-start gap-5 min-[1440px]:grid-cols-[minmax(0,1fr)_19rem] min-[1440px]:gap-6">
       <div className="min-w-0 space-y-5">
         <section aria-label="My performance today" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <ReportCard label="My sales today" value={<CurrencyDisplay value={d.todaySales} currency={s.currency} />} icon={<Banknote className="size-5" />} />
+        <ReportCard label="My sales today" value={<CurrencyDisplay value={d.todaySales} currency={s.currency} variant="compact" />} icon={<Banknote className="size-5" />} />
         <ReportCard label="My orders today" value={d.todayOrders} icon={<Receipt className="size-5" />} />
         <ReportCard label="Products available" value={d.availableProducts} icon={<Boxes className="size-5" />} />
         <ReportCard label="Low-stock products" value={d.lowStock.length} tone={d.lowStock.length ? "warning" : "default"} icon={<AlertTriangle className="size-5" />} />

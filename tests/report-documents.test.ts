@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { createReportPdf, createReportWorkbook } from "@/server/report-documents";
+import { createReportCsv, createReportPdf, createReportWorkbook } from "@/server/report-documents";
 import type { ReportExportData } from "@/server/report-export.service";
 
 const data: ReportExportData = {
@@ -23,6 +23,14 @@ const data: ReportExportData = {
 };
 
 describe("report documents", () => {
+  it("exports a UTF-8 BOM CSV with every product row and exact numeric values", () => {
+    const csv = createReportCsv(data).toString("utf8");
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    expect(csv).toContain("USB-C Cable");
+    expect(csv).toContain("CP-2026-001");
+    expect(csv).toContain(",3,,1200,3600,");
+  });
+
   it("exports every sold product detail and totals to Excel", async () => {
     const bytes = await createReportWorkbook(data);
     const workbook = new ExcelJS.Workbook();

@@ -243,5 +243,11 @@
 @media print {
   @page { size: A4 portrait; margin: 12mm; }
   body { background: white !important; color: black !important; }
+  .report-page { color: black !important; }
+  .report-page [data-slot="card"], .report-page .rounded-xl { break-inside: avoid; background: white !important; color: black !important; box-shadow: none !important; }
+  .report-page table { width: 100%; border-collapse: collapse; }
+  .report-page thead { display: table-header-group; }
+  .report-page tr { break-inside: avoid; }
+  .report-page a { color: inherit !important; text-decoration: none !important; }
   .receipt-document { width: 100% !important; max-width: none !important; border: 0 !important; background: white !important; color: oklch(0.2 0.02 260) !important; box-shadow: none !important; }
 }

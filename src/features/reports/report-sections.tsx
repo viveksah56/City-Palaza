@@ -20,18 +20,34 @@ export async function SalesReport({ range }: { range: DateRange }) {
   ]);
   const c = cur.currency;
   const money = (v: string) => <CurrencyDisplay value={v} currency={c} />;
+  const summaryMoney = (v: string) => <CurrencyDisplay value={v} currency={c} variant="compact" />;
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <ReportCard label="Gross sales" value={money(s.grossSales)} hint="Before discounts" />
-        <ReportCard label="Discounts" value={money(s.discounts)} />
-        <ReportCard label="Taxes" value={money(s.taxes)} />
-        <ReportCard label="Net sales" value={money(s.netSales)} hint="Gross − discounts" />
-        <ReportCard label="Collected" value={money(s.collected)} hint="Payments received in period" accent="green" />
-        <ReportCard label="Outstanding" value={money(s.outstanding)} hint="Balance due on completed sales" accent="orange" />
-        <ReportCard label="Number of sales" value={s.count} />
-        <ReportCard label="Average sale" value={money(s.averageSale)} hint="Net per completed sale, excluding tax" />
-      </div>
+      <section aria-label="Sales summary" className="space-y-5">
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-muted-foreground">At a glance</h2>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+            <ReportCard label="Net sales" value={summaryMoney(s.netSales)} hint="Gross − discounts" />
+            <ReportCard label="Number of sales" value={s.count} />
+            <ReportCard label="Average sale" value={summaryMoney(s.averageSale)} hint="Net per completed sale, excluding tax" />
+            <ReportCard label="Collected" value={summaryMoney(s.collected)} hint="Payments received in period" accent="green" />
+          </div>
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Sales breakdown</h2>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+            <ReportCard label="Gross sales" value={summaryMoney(s.grossSales)} hint="Before discounts" />
+            <ReportCard label="Discounts" value={summaryMoney(s.discounts)} />
+            <ReportCard label="Taxes" value={summaryMoney(s.taxes)} />
+          </div>
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Receivables</h2>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+            <ReportCard label="Outstanding" value={summaryMoney(s.outstanding)} hint="Balance due on completed sales" accent="orange" />
+          </div>
+        </div>
+      </section>
       <Card><CardHeader><CardTitle>Sales over time</CardTitle></CardHeader><CardContent><ReportChart type="line" data={series} label="Sales" /></CardContent></Card>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card><CardHeader><CardTitle>By category</CardTitle></CardHeader><CardContent><ReportChart type="bar" data={byCat.map((x) => ({ label: x.name, value: D(x.revenue).toNumber() }))} label="Revenue" /></CardContent></Card>
@@ -57,12 +73,13 @@ export async function ProfitReport({ range }: { range: DateRange }) {
   const [p, cur, series, byProduct] = await Promise.all([r.getProfitSummary(range), getSettings(), r.getProfitOverTime(range), r.getProfitByProduct(range)]);
   const c = cur.currency;
   const money = (v: string) => <CurrencyDisplay value={v} currency={c} />;
+  const summaryMoney = (v: string) => <CurrencyDisplay value={v} currency={c} variant="compact" />;
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <ReportCard label="Revenue (after discounts)" value={money(p.revenue)} />
-        <ReportCard label="Cost of goods sold" value={money(p.cost)} hint="Purchase prices at time of sale" />
-        <ReportCard label="Gross profit" value={money(p.profit)} />
+        <ReportCard label="Revenue (after discounts)" value={summaryMoney(p.revenue)} />
+        <ReportCard label="Cost of goods sold" value={summaryMoney(p.cost)} hint="Purchase prices at time of sale" />
+        <ReportCard label="Gross profit" value={summaryMoney(p.profit)} />
         <ReportCard label="Margin" value={`${p.marginPercent}%`} />
       </div>
       <Card><CardHeader><CardTitle>Gross profit over time</CardTitle></CardHeader><CardContent><ReportChart type="line" data={series} label="Profit" /></CardContent></Card>
@@ -80,17 +97,17 @@ export async function ProfitReport({ range }: { range: DateRange }) {
 export async function InventoryReport() {
   const [s, cur, low, out] = await Promise.all([r.getInventorySummary(), getSettings(), r.getLowStockProducts(), r.getOutOfStockProducts()]);
   const c = cur.currency;
-  const money = (v: string) => <CurrencyDisplay value={v} currency={c} />;
+  const summaryMoney = (v: string) => <CurrencyDisplay value={v} currency={c} variant="compact" />;
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <ReportCard label="Active products" value={s.products} />
-        <ReportCard label="Units in stock" value={s.units} />
-        <ReportCard label="Inventory cost value" value={money(s.costValue)} />
-        <ReportCard label="Inventory selling value" value={money(s.sellingValue)} />
-        <ReportCard label="Potential gross profit" value={money(s.potentialProfit)} />
-        <ReportCard label="Low stock" value={s.lowStock} tone={s.lowStock ? "warning" : "default"} />
-        <ReportCard label="Out of stock" value={s.outOfStock} tone={s.outOfStock ? "danger" : "default"} />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-3"><ReportCard label="Active products" value={s.products} /></div>
+        <div className="min-w-0 xl:col-span-3"><ReportCard label="Units in stock" value={s.units} /></div>
+        <div className="min-w-0 xl:col-span-3"><ReportCard label="Inventory cost value" value={summaryMoney(s.costValue)} /></div>
+        <div className="min-w-0 xl:col-span-3"><ReportCard label="Inventory selling value" value={summaryMoney(s.sellingValue)} /></div>
+        <div className="min-w-0 xl:col-span-4"><ReportCard label="Potential gross profit" value={summaryMoney(s.potentialProfit)} /></div>
+        <div className="min-w-0 xl:col-span-4"><ReportCard label="Low stock" value={s.lowStock} tone={s.lowStock ? "warning" : "default"} /></div>
+        <div className="min-w-0 xl:col-span-4"><ReportCard label="Out of stock" value={s.outOfStock} tone={s.outOfStock ? "danger" : "default"} /></div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="gap-0 py-0"><CardHeader className="p-4"><CardTitle>Low stock</CardTitle></CardHeader>
