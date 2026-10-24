@@ -5,62 +5,71 @@ import { Input } from "@/components/ui/input";
 import { useCart, type CartItem } from "@/stores/cart-store";
 import { formatCurrency } from "@/lib/format";
 import { money } from "@/lib/money";
+import type { CalcLine } from "@/lib/sales-calc";
 import { IconButton } from "@/components/shared/icon-button";
 import { api } from "@/lib/axios";
 
-export function SaleCart({ currency, isAdmin }: { currency: string; isAdmin: boolean }) {
+export function SaleCart({ currency, isAdmin, calcLines }: { currency: string; isAdmin: boolean; calcLines: CalcLine[] }) {
   const { items, setQuantity, remove, setDiscount } = useCart();
+  const calculated = React.useMemo(() => new Map(calcLines.map((line) => [line.productId, line])), [calcLines]);
   if (items.length === 0) return <p className="rounded-2xl bg-secondary/60 p-8 text-center text-sm text-muted-foreground">The cart is empty. Search for a product and tap it to add it.</p>;
   return (
     <ul aria-label="Products added to this sale" className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-secondary/40">
       {items.map((i) => {
+        const line = calculated.get(i.productId);
         const discountPercent = i.discount?.type === "PERCENT" ? Math.min(100, Math.max(0, Number(i.discount.value))) : 0;
-        const afterDiscountUnit = money(i.unitPrice).times(100 - discountPercent).div(100);
-        const afterDiscountTotal = afterDiscountUnit.times(i.quantity);
-        const lineDiscount = money(i.unitPrice).times(i.quantity).minus(afterDiscountTotal);
+        const afterItemDiscountUnit = money(i.unitPrice).times(100 - discountPercent).div(100);
+        const afterAllDiscountsUnit = line ? money(line.subtotal.minus(line.discount)).div(i.quantity) : afterItemDiscountUnit;
         return (
-        <li key={i.productId} className="grid gap-3 p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{i.name}</p>
-              <p className="text-xs text-muted-foreground num">Unit price {formatCurrency(i.unitPrice, currency)}</p>
-              {!isAdmin && <p className="text-xs text-muted-foreground">Maximum employee discount: {i.maxDiscountPercent}%</p>}
-            </div>
-            <IconButton label={`Remove ${i.name}`} variant="ghost" onClick={() => remove(i.productId)}><Trash2 className="text-destructive" /></IconButton>
-          </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_5rem] items-center gap-x-3 gap-y-1">
-            <label htmlFor={`discount-${i.productId}`} className="text-xs text-muted-foreground">Discount</label>
-            <span className="text-xs text-muted-foreground">After discount</span>
-            <div className="relative w-24">
-              <Input id={`discount-${i.productId}`} aria-label={`Manual discount percentage for ${i.name}`} type="number" min="0" max={!isAdmin ? i.maxDiscountPercent : 100} step="0.01" inputMode="decimal" value={i.discount?.value ?? ""} onChange={(event) => setDiscount(i.productId, event.target.value === "" ? undefined : { type: "PERCENT", value: event.target.value })} placeholder="0" className="h-9 pr-7 text-sm" />
-              <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted-foreground">%</span>
-            </div>
-            <span className="num text-right text-xs font-medium">{formatCurrency(afterDiscountUnit, currency)} ea</span>
-          </div>
-          {i.trackingType === "QUANTITY" ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <IconButton label="Decrease quantity" variant="secondary" className="size-9" onClick={() => setQuantity(i.productId, i.quantity - 1)} disabled={i.quantity <= 1}><Minus /></IconButton>
-                <Input aria-label={`Quantity for ${i.name}`} type="number" min={1} max={i.available} value={i.quantity} onChange={(e) => setQuantity(i.productId, Number(e.target.value))} className="h-9 w-16 rounded-full bg-card px-1 text-center" />
-                <IconButton label="Increase quantity" variant="secondary" className="size-9" onClick={() => setQuantity(i.productId, i.quantity + 1)} disabled={i.quantity >= i.available}><Plus /></IconButton>
+          <li key={i.productId} className="grid gap-3 p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{i.name}</p>
+                <p className="text-xs text-muted-foreground num">Unit price: {formatCurrency(i.unitPrice, currency)} each</p>
+                {!isAdmin && <p className="text-xs text-muted-foreground">Item discount limit: {i.maxDiscountPercent}%</p>}
               </div>
-              <div className="text-right">
-                {lineDiscount.gt(0) && <p className="num text-xs text-muted-foreground line-through">{formatCurrency(money(i.unitPrice).times(i.quantity), currency)}</p>}
-                <p className="num text-sm font-medium">{formatCurrency(afterDiscountTotal, currency)}</p>
-                {lineDiscount.gt(0) && <p className="num text-[11px] text-muted-foreground">−{formatCurrency(lineDiscount, currency)} discount</p>}
-              </div>
+              <IconButton label={`Remove ${i.name}`} variant="ghost" onClick={() => remove(i.productId)}><Trash2 className="text-destructive" /></IconButton>
             </div>
-          ) : (
-            <SerialPicker item={i} currency={currency} />
-          )}
-        </li>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+              <label htmlFor={`discount-${i.productId}`} className="text-xs text-muted-foreground">Item discount (%)</label>
+              <span className="text-right text-xs text-muted-foreground">After all discounts / unit, before VAT</span>
+              <div className="relative w-24">
+                <Input id={`discount-${i.productId}`} aria-label={`Item discount percentage for ${i.name}`} type="number" min="0" max={!isAdmin ? i.maxDiscountPercent : 100} step="0.01" inputMode="decimal" value={i.discount?.value ?? ""} onChange={(event) => setDiscount(i.productId, event.target.value === "" ? undefined : { type: "PERCENT", value: event.target.value })} placeholder="0" className="h-9 pr-7 text-sm" />
+                <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted-foreground">%</span>
+              </div>
+              <span className="num text-right text-xs font-medium">{formatCurrency(afterAllDiscountsUnit, currency)}</span>
+            </div>
+            {line && (
+              <dl className="grid gap-1 border-t border-border/60 pt-2 text-xs">
+                <div className="flex justify-between gap-3 text-muted-foreground"><dt>Item discount</dt><dd className="num">−{formatCurrency(line.itemManualDiscount, currency)}</dd></div>
+                <div className="flex justify-between gap-3 text-muted-foreground"><dt>Sale discount share</dt><dd className="num">−{formatCurrency(line.saleDiscount, currency)}</dd></div>
+                <div className="flex justify-between gap-3 text-muted-foreground"><dt>Taxable after discounts</dt><dd className="num">{formatCurrency(line.subtotal.minus(line.discount), currency)}</dd></div>
+                <div className="flex justify-between gap-3 text-muted-foreground"><dt>VAT</dt><dd className="num">{formatCurrency(line.tax, currency)}</dd></div>
+              </dl>
+            )}
+            {i.trackingType === "QUANTITY" ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <IconButton label="Decrease quantity" variant="secondary" className="size-9" onClick={() => setQuantity(i.productId, i.quantity - 1)} disabled={i.quantity <= 1}><Minus /></IconButton>
+                  <Input aria-label={`Quantity for ${i.name}`} type="number" min={1} max={i.available} value={i.quantity} onChange={(e) => setQuantity(i.productId, Number(e.target.value))} className="h-9 w-16 rounded-lg bg-card px-1 text-center" />
+                  <IconButton label="Increase quantity" variant="secondary" className="size-9" onClick={() => setQuantity(i.productId, i.quantity + 1)} disabled={i.quantity >= i.available}><Plus /></IconButton>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] text-muted-foreground">Line total incl. VAT</p>
+                  <p className="num text-sm font-semibold">{formatCurrency(line?.total ?? money(afterAllDiscountsUnit).times(i.quantity), currency)}</p>
+                </div>
+              </div>
+            ) : (
+              <SerialPicker item={i} currency={currency} lineTotal={line?.total.toString()} />
+            )}
+          </li>
         );
       })}
     </ul>
   );
 }
 
-function SerialPicker({ item, currency }: { item: CartItem; currency: string }) {
+function SerialPicker({ item, currency, lineTotal }: { item: CartItem; currency: string; lineTotal?: string }) {
   const setSerials = useCart((s) => s.setSerials);
   const [list, setList] = React.useState<{ id: string; serial: string }[] | null>(null);
   const [error, setError] = React.useState(false);
@@ -85,7 +94,7 @@ function SerialPicker({ item, currency }: { item: CartItem; currency: string }) 
           ))}
         </div>
       )}
-      <p className="num text-right text-sm font-medium">{item.serials.length} × = {formatCurrency(money(item.unitPrice).times(item.serials.length).times(100 - (item.discount?.type === "PERCENT" ? Number(item.discount.value) : 0)).div(100), currency)}</p>
+      <p className="num text-right text-sm font-semibold">Line total incl. VAT: {formatCurrency(lineTotal ?? money(item.unitPrice).times(item.serials.length).times(100 - (item.discount?.type === "PERCENT" ? Number(item.discount.value) : 0)).div(100), currency)}</p>
     </fieldset>
   );
 }

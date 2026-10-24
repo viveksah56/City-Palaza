@@ -1,8 +1,8 @@
 export const APP_NAME = "CityPlaza";
 export const DEFAULT_BUSINESS_DETAILS = {
   name: APP_NAME,
-  address: "",
-  city: "Kathmandu",
+  address: "Mirchiaya",
+  city: "Sirahah",
   phone: "",
   email: "",
   panNumber: "612865374",

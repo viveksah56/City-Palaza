@@ -293,18 +293,20 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     await sales.createSale(f.admin, { ...ok, discount: { type: "PERCENT", value: 30 } });
   });
 
-  it("stores the new sale discount split and checks the optional effective discount ceiling", async () => {
+  it("stores product and sale-wide discounts separately and checks the optional effective discount ceiling", async () => {
     const f = await fixtures();
-    const p = await f.mk("SPLIT", { maxDiscountPercent: "10.00" });
+    const p = await f.mk("SPLIT", { maxDiscountPercent: "25.00" });
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 10, reason: "test" });
     await prisma.setting.create({ data: { key: "employeeMaxTotalDiscountPercent", value: 15 } });
-    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1, discount: { type: "FIXED", value: 20 } }], paymentMethod: "CASH" });
+    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1, discount: { type: "FIXED", value: 20 } }], discount: { type: "FIXED", value: 10 }, paymentMethod: "CASH" });
     const saved = await prisma.sale.findUniqueOrThrow({ where: { id: sale.id }, include: { items: true } });
     expect(saved.promoDiscount?.toString()).toBe("0");
-    expect(saved.manualDiscount?.toString()).toBe("20");
+    expect(saved.manualDiscount?.toString()).toBe("30");
     expect(saved.items[0]!.promoDiscount?.toString()).toBe("0");
-    expect(saved.items[0]!.saleDiscount?.toString()).toBe("20");
-    await prisma.setting.update({ where: { key: "employeeMaxTotalDiscountPercent" }, data: { value: 12 } });
+    expect(saved.items[0]!.itemDiscount?.toString()).toBe("20");
+    expect(saved.items[0]!.saleDiscount?.toString()).toBe("10");
+    expect(saved.items[0]!.discount.toString()).toBe("30");
+    await prisma.setting.update({ where: { key: "employeeMaxTotalDiscountPercent" }, data: { value: 4 } });
     await expect(sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1, discount: { type: "PERCENT", value: 5 } }], paymentMethod: "CASH" })).rejects.toThrow(/total discount/i);
     await prisma.setting.delete({ where: { key: "employeeMaxTotalDiscountPercent" } });
     await expect(sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1, discount: { type: "PERCENT", value: 5 } }], paymentMethod: "CASH" })).resolves.toBeDefined();

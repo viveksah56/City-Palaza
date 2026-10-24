@@ -10,8 +10,10 @@ export function SaleSummary({ calc, currency, taxRate }: { calc: SaleCalculation
   return (
     <dl className="grid gap-1.5" aria-live="polite">
       {row("Subtotal", f(calc?.subtotal))}
-      {row("Discount", `-${f(calc?.discount)}`)}
-      {row("Effective discount", `${calc?.effectiveDiscountPercent.toDecimalPlaces(2).toFixed(2) ?? "0.00"}%`)}
+      {row("Product discounts", `-${f(calc?.manualDiscount.minus(calc.saleDiscount))}`)}
+      {row("Sale-wide discount", `-${f(calc?.saleDiscount)}`)}
+      {row("Total discount", `-${f(calc?.discount)}`)}
+      {row("Taxable amount", f(calc?.subtotal.minus(calc.discount)))}
       {row(`VAT (${taxRate}%)`, f(calc?.tax))}
       {row("Total", f(calc?.total), true)}
     </dl>

@@ -94,9 +94,9 @@ export async function createReportPdf(data: ReportExportData): Promise<Buffer> {
       for (let page = pages.start; page < pages.start + pages.count; page += 1) {
         doc.switchToPage(page);
         doc.save();
-        doc.strokeColor("#d8e1ec").moveTo(40, doc.page.height - 27).lineTo(doc.page.width - 40, doc.page.height - 27).stroke();
-        doc.font("Helvetica").fontSize(8).fillColor("#64748b").text(`${data.business.name || APP_NAME} · Confidential business report`, 40, doc.page.height - 21, { width: 400 });
-        doc.text(`Page ${page + 1} of ${pages.count}`, doc.page.width - 180, doc.page.height - 21, { width: 140, align: "right" });
+        doc.strokeColor("#d8e1ec").moveTo(40, doc.page.height - 66).lineTo(doc.page.width - 40, doc.page.height - 66).stroke();
+        doc.font("Helvetica").fontSize(8).fillColor("#64748b").text(`${data.business.name || APP_NAME} · Confidential business report`, 40, doc.page.height - 59, { width: 400, lineBreak: false });
+        doc.text(`Page ${page + 1} of ${pages.count}`, doc.page.width - 180, doc.page.height - 59, { width: 140, align: "right", lineBreak: false });
         doc.restore();
       }
     };
@@ -121,11 +121,11 @@ export async function createReportPdf(data: ReportExportData): Promise<Buffer> {
         }];
       }
       if (section.title === "Sold products") {
-        const indexes = [0, 1, 6, 7, 9, 11, 14, 16, 17];
+        const indexes = [0, 1, 6, 7, 9, 11, 14, 15, 17, 18];
         return [{
           ...section,
           title: "Sold products · detailed",
-          columns: indexes.map((index) => section.columns[index] ?? ""),
+          columns: ["Sale", "Date", "Product", "SKU", "Qty", "Unit price", "Item disc.", "Sale disc.", "VAT", "Line total"],
           rows: section.rows.map((row) => indexes.map((index) => row[index] ?? "")),
         }];
       }
@@ -158,24 +158,25 @@ export async function createReportPdf(data: ReportExportData): Promise<Buffer> {
     const cardGap = 10;
     const cardWidth = (doc.page.width - margin * 2 - cardGap * 3) / 4;
     const cardHeight = 48;
+    const summaryTop = doc.y;
     for (let index = 0; index < data.summary.length; index += 1) {
       const [label, value] = data.summary[index] ?? ["", ""];
       const column = index % 4;
       const row = Math.floor(index / 4);
       const x = margin + column * (cardWidth + cardGap);
-      const y = doc.y + row * (cardHeight + cardGap);
+      const y = summaryTop + row * (cardHeight + cardGap);
       doc.roundedRect(x, y, cardWidth, cardHeight, 6).fillAndStroke("#f6f9fc", "#dce5ef");
       doc.font("Helvetica").fontSize(8).fillColor("#64748b").text(label, x + 10, y + 8, { width: cardWidth - 20, ellipsis: true });
       doc.font("Helvetica-Bold").fontSize(12).fillColor("#14263d").text(String(value), x + 10, y + 23, { width: cardWidth - 20, ellipsis: true });
     }
 
-    doc.y += Math.ceil(data.summary.length / 4) * (cardHeight + cardGap) + 3;
+    doc.y = summaryTop + Math.ceil(data.summary.length / 4) * (cardHeight + cardGap) + 3;
     for (const section of sectionRows) {
       ensureSpace(58);
       doc.font("Helvetica-Bold").fontSize(13).fillColor("#14263d").text(section.title, margin, doc.y);
       doc.y += 21;
       const tableWidth = doc.page.width - margin * 2;
-      const weights = section.title.startsWith("Sold products") ? [0.09, 0.12, 0.21, 0.1, 0.06, 0.11, 0.11, 0.1, 0.1] : section.columns.map(() => 1);
+      const weights = section.title.startsWith("Sold products") ? [0.09, 0.12, 0.19, 0.1, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09] : section.columns.map(() => 1);
       const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
       const widths = weights.map((weight) => tableWidth * weight / weightTotal);
       let y = drawTableHeader(section.columns, widths, doc.y);

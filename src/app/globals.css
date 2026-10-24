@@ -232,5 +232,7 @@
 .rise { animation: rise 0.45s var(--ease-apple) both; }
 
 @media print {
-  body { background: #fff; color: #000; }
+  @page { size: A4 portrait; margin: 12mm; }
+  body { background: #fff !important; color: #000 !important; }
+  .receipt-document { width: 100% !important; max-width: none !important; border: 0 !important; background: #fff !important; color: #0f172a !important; box-shadow: none !important; }
 }

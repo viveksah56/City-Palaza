@@ -131,7 +131,7 @@ export function SalesTerminal({ currency, taxRate, discountLimit, totalDiscountL
         <Card className="gap-4">
           <CardHeader><CardTitle>Current sale <span className="text-sm font-normal text-muted-foreground">({cart.items.length} product{cart.items.length === 1 ? "" : "s"})</span></CardTitle></CardHeader>
           <CardContent className="grid gap-4">
-            <SaleCart currency={currency} isAdmin={isAdmin} />
+            <SaleCart currency={currency} isAdmin={isAdmin} calcLines={calc?.lines ?? []} />
 
             <div className="grid gap-1.5">
               <p className="text-sm font-medium">Customer <span className="font-normal text-muted-foreground">(optional)</span></p>
