@@ -16,7 +16,7 @@ export function EmployeeCreateDialog() {
           <DialogTitle>Add account</DialogTitle>
           <DialogDescription>Create an employee or admin account with a temporary password.</DialogDescription>
         </DialogHeader>
-        <EmployeeForm onCancel={() => setOpen(false)} onSuccess={() => setOpen(false)} />
+        <EmployeeForm inDialog onCancel={() => setOpen(false)} onSuccess={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );
