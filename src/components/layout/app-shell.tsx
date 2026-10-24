@@ -59,7 +59,7 @@ function Brand({ name, onDark = false }: { name: string; onDark?: boolean }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5 rounded-lg outline-none">
       <Image src="/citypalaza-icon.png" alt="" width={36} height={36} className={cn("size-9 shrink-0 rounded-lg object-cover", onDark && "ring-1 ring-sidebar-border")} />
-      <span className={cn("truncate font-heading text-[18px] font-semibold tracking-[-0.025em] group-data-[collapsed=true]/sidebar:hidden", onDark ? "text-sidebar-foreground" : "text-foreground")}>{name}</span>
+      <span className={cn("truncate font-heading text-[18px] font-semibold tracking-[-0.025em] group-data-[collapsed=true]/sidebar:hidden max-sm:hidden", onDark ? "text-sidebar-foreground" : "text-foreground")}>{name}</span>
     </Link>
   );
 }
@@ -72,6 +72,11 @@ function AppShellContent({ nav, user, shopName, notifications, logoutAction, chi
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
   const tabItems = nav.length > 5 ? nav.slice(0, 4) : nav;
   const hasMore = nav.length > 5;
+  const navGroups = [
+    { title: "Workspace", items: nav.filter((item) => !["/reports", "/audit-logs", "/employees", "/settings"].includes(item.href)) },
+    { title: "Insights", items: nav.filter((item) => ["/reports", "/audit-logs"].includes(item.href)) },
+    { title: "Admin", items: nav.filter((item) => ["/employees", "/settings"].includes(item.href)) },
+  ].filter((group) => group.items.length > 0);
 
   return (
     <div className="flex min-h-dvh print:block">
@@ -79,25 +84,30 @@ function AppShellContent({ nav, user, shopName, notifications, logoutAction, chi
       <Sidebar className="print:hidden">
         <SidebarHeader className="px-4 py-5"><Brand name={shopName} onDark /></SidebarHeader>
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          {navGroups.map((group) => <SidebarGroup key={group.title}>
+            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
             <SidebarMenu>
-              {nav.map((item) => {
+              {group.items.map((item) => {
                 const Icon = ICONS[item.icon] ?? LayoutDashboard;
                 const active = isActive(item.href);
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={active} title={item.title}>
-                      <Link href={item.href}>
-                        <Icon strokeWidth={active ? 2.1 : 1.75} aria-hidden />
-                        <span className="truncate group-data-[collapsed=true]/sidebar:hidden">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuButton asChild isActive={active} title={item.title}>
+                          <Link href={item.href}>
+                            <Icon strokeWidth={active ? 2.1 : 1.75} aria-hidden />
+                            <span className="truncate group-data-[collapsed=true]/sidebar:hidden">{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{item.title}</TooltipContent>
+                    </Tooltip>
                   </SidebarMenuItem>
                 );
               })}
             </SidebarMenu>
-          </SidebarGroup>
+          </SidebarGroup>)}
         </SidebarContent>
         <SidebarFooter>
           <div className="flex min-w-0 items-center gap-3 rounded-lg border border-sidebar-border bg-white/5 p-2.5 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:gap-0 group-data-[collapsed=true]/sidebar:border-transparent group-data-[collapsed=true]/sidebar:bg-transparent group-data-[collapsed=true]/sidebar:p-0">
@@ -147,7 +157,7 @@ function AppShellContent({ nav, user, shopName, notifications, logoutAction, chi
           </div>
         </header>
 
-        <main id="main" className="mx-auto w-full max-w-[1480px] flex-1 px-4 pt-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-7 lg:px-8 lg:pt-8 lg:pb-14 print:p-0">{children}</main>
+        <main id="main" className="mx-auto min-w-0 w-full max-w-screen-2xl flex-1 px-3 pt-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:pt-7 lg:px-8 lg:pt-8 lg:pb-14 print:p-0">{children}</main>
       </div>
 
       <nav aria-label="Primary" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card lg:hidden print:hidden">

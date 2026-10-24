@@ -45,6 +45,7 @@ export async function createProductAction(raw: unknown) {
     const res = await products.createProduct(actor, raw);
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidateTag(TAXONOMY_CACHE_TAG[TAXONOMY_KIND.CATEGORY], "max");
+    revalidateTag(TAXONOMY_CACHE_TAG[TAXONOMY_KIND.BRAND], "max");
     revalidatePath("/products");
     revalidatePath("/inventory");
     return res;
@@ -56,9 +57,22 @@ export async function updateProductAction(id: string, raw: unknown) {
     const slug = await products.updateProduct(actor, id, raw);
     updateTag(LOW_STOCK_NOTIFICATIONS_CACHE_TAG);
     revalidateTag(TAXONOMY_CACHE_TAG[TAXONOMY_KIND.CATEGORY], "max");
+    revalidateTag(TAXONOMY_CACHE_TAG[TAXONOMY_KIND.BRAND], "max");
     revalidatePath("/products");
     revalidatePath(`/products/${slug}`);
     return undefined;
+  });
+}
+export async function checkProductBarcodeAction(rawBarcode: string, productId?: string) {
+  return run(async () => {
+    const barcode = z.string().trim().max(64).parse(rawBarcode);
+    await assertPermission(productId ? PERMISSION.PRODUCT_UPDATE : PERMISSION.PRODUCT_CREATE);
+    if (!barcode) return true;
+    const existing = await prisma.product.findFirst({
+      where: { barcode, ...(productId ? { id: { not: productId } } : {}) },
+      select: { id: true },
+    });
+    return !existing;
   });
 }
 export async function deleteProductAction(id: string) {

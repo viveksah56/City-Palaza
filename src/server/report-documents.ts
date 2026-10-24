@@ -1,7 +1,8 @@
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
 import type { ReportExportData } from "@/server/report-export.service";
-import { APP_NAME, APP_TIMEZONE } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
+import { formatDateTime } from "@/lib/format";
 
 function safeCell(value: string | number): string | number {
   if (typeof value !== "string") return value;
@@ -20,7 +21,7 @@ export async function createReportWorkbook(data: ReportExportData): Promise<Buff
   summary.mergeCells("A1:B1");
   summary.addRow([data.title]);
   summary.addRow(["Reporting period", data.period]);
-  summary.addRow(["Generated", new Date().toLocaleString("en-GB", { timeZone: APP_TIMEZONE })]);
+  summary.addRow(["Generated", formatDateTime(new Date())]);
   summary.addRow(["Business", data.business.name || APP_NAME]);
   summary.addRow(["Address", [data.business.address, data.business.city].filter(Boolean).join(", ")]);
   summary.addRow(["Phone", data.business.phone]);
@@ -151,7 +152,7 @@ export async function createReportPdf(data: ReportExportData): Promise<Buffer> {
     doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(data.period, margin, 83);
     const businessDetails = [data.business.address, data.business.city, data.business.phone, data.business.email, data.business.panNumber ? `PAN ${data.business.panNumber}` : ""].filter(Boolean).join("  ·  ");
     if (businessDetails) doc.font("Helvetica").fontSize(8).fillColor("#64748b").text(businessDetails, margin, 99, { width: doc.page.width - margin * 2, ellipsis: true });
-    doc.font("Helvetica").fontSize(8).fillColor("#64748b").text(`Generated ${new Date().toLocaleString("en-GB", { timeZone: APP_TIMEZONE })} · Currency: ${data.currency}`, margin, businessDetails ? 111 : 99);
+    doc.font("Helvetica").fontSize(8).fillColor("#64748b").text(`Generated ${formatDateTime(new Date())} · Currency: ${data.currency}`, margin, businessDetails ? 111 : 99);
     doc.y = businessDetails ? 132 : 123;
     doc.font("Helvetica-Bold").fontSize(13).fillColor("#14263d").text("Executive summary", margin, doc.y);
     doc.y += 13;

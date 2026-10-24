@@ -25,6 +25,14 @@ function useSidebar() {
 function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [openMobile, setOpenMobile] = React.useState(false);
+  const [hydrated, setHydrated] = React.useState(false);
+  React.useEffect(() => {
+    setCollapsed(document.cookie.split(";").some((part) => part.trim() === "cp_sidebar_collapsed=1"));
+    setHydrated(true);
+  }, []);
+  React.useEffect(() => {
+    if (hydrated) document.cookie = `cp_sidebar_collapsed=${collapsed ? "1" : "0"}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  }, [collapsed, hydrated]);
   const value = React.useMemo(() => ({ collapsed, setCollapsed, openMobile, setOpenMobile }), [collapsed, openMobile]);
   return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;
 }

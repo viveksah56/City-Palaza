@@ -4,7 +4,8 @@ import type { DateRange } from "@/lib/dates";
 import type { SessionUser } from "@/lib/auth/session";
 import * as reports from "@/server/reports.service";
 import { PERMISSION, assertRolePermission, hasPermission } from "@/lib/rbac/permission";
-import { APP_NAME, APP_TIMEZONE } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 export type ExportSection = {
   title: string;
@@ -59,7 +60,7 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
   const scope = employeeId ? "My sales" : "Store sales";
   const soldProductRows: (string | number)[][] = rows.flatMap((sale) => sale.items.map((item) => [
     sale.saleNumber,
-    sale.createdAt.toLocaleString("en-GB", { timeZone: APP_TIMEZONE }),
+    formatDateTime(sale.createdAt),
     `${sale.employee.firstName} ${sale.employee.lastName}`.trim(),
     sale.customer?.name ?? "Walk-in",
     sale.customer?.phone ?? "",
@@ -99,7 +100,7 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
   ]);
   return {
     title: `${business.name || APP_NAME} ${scope.toLowerCase()} report`,
-    period: `${range.label} · ${range.from.toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })}`,
+    period: `${range.label} · ${formatDate(range.from)} – ${formatDate(new Date(range.to.getTime() - 1))}`,
     currency,
     business,
     summary: [
@@ -123,7 +124,7 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
         columns: ["Sale", "Date and time", "Employee", "Customer", "Phone", "Payment status", "Payment method", `Subtotal (${currency})`, `Discount (${currency})`, "VAT rate", `VAT (${currency})`, `Total (${currency})`, `Paid (${currency})`, `Balance (${currency})`, "Notes"],
         rows: rows.map((row) => [
           row.saleNumber,
-          row.createdAt.toLocaleString("en-GB", { timeZone: APP_TIMEZONE }),
+          formatDateTime(row.createdAt),
           `${row.employee.firstName} ${row.employee.lastName}`.trim(),
           row.customer?.name ?? "Walk-in",
           row.customer?.phone ?? "",
@@ -149,7 +150,7 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
         columns: ["Sale", "Received at", "Received by", "Method", `Amount (${currency})`, "Note"],
         rows: rows.flatMap((sale) => sale.payments.map((payment) => [
           sale.saleNumber,
-          payment.receivedAt.toLocaleString("en-GB", { timeZone: APP_TIMEZONE }),
+          formatDateTime(payment.receivedAt),
           `${payment.receivedBy.firstName} ${payment.receivedBy.lastName}`.trim(),
           payment.method,
           Number(payment.amount.toString()),
@@ -175,7 +176,7 @@ export async function getReportExportData(user: SessionUser, range: DateRange, c
     const [summary, trend, products] = await Promise.all([reports.getProfitSummary(range), reports.getProfitOverTime(range), reports.getProfitByProduct(range)]);
     return {
       title: `${business.name || APP_NAME} profit report`,
-      period: `${range.label} · ${range.from.toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })}`,
+      period: `${range.label} · ${formatDate(range.from)} – ${formatDate(new Date(range.to.getTime() - 1))}`,
       currency,
       business,
       summary: [["Revenue", money(summary.revenue, currency)], ["Cost of goods sold", money(summary.cost, currency)], ["Gross profit", money(summary.profit, currency)], ["Margin", `${summary.marginPercent}%`]],
@@ -189,7 +190,7 @@ export async function getReportExportData(user: SessionUser, range: DateRange, c
     const [summary, low, out] = await Promise.all([reports.getInventorySummary(), reports.getLowStockProducts(), reports.getOutOfStockProducts()]);
     return {
       title: `${business.name || APP_NAME} inventory report`,
-      period: `Current inventory · generated ${new Date().toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })}`,
+      period: `Current inventory · generated ${formatDate(new Date())}`,
       currency,
       business,
       summary: [["Active products", summary.products], ["Units in stock", summary.units], ["Inventory cost value", money(summary.costValue, currency)], ["Inventory selling value", money(summary.sellingValue, currency)], ["Potential gross profit", money(summary.potentialProfit, currency)], ["Low stock", summary.lowStock], ["Out of stock", summary.outOfStock]],
@@ -202,7 +203,7 @@ export async function getReportExportData(user: SessionUser, range: DateRange, c
   const employees = await reports.getEmployeePerformance(range);
   return {
     title: `${business.name || APP_NAME} employee performance report`,
-    period: `${range.label} · ${range.from.toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })} – ${new Date(range.to.getTime() - 1).toLocaleDateString("en-GB", { timeZone: APP_TIMEZONE })}`,
+    period: `${range.label} · ${formatDate(range.from)} – ${formatDate(new Date(range.to.getTime() - 1))}`,
     currency,
     business,
     summary: [["Employees with sales", employees.length], ["Sales", employees.reduce((total, row) => total + row.sales, 0)], ["Revenue", money(employees.reduce((total, row) => total.plus(row.revenue), D(0)).toFixed(2), currency)]],

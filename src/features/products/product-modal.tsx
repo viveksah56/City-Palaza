@@ -1,55 +1,28 @@
 "use client";
 
-import * as React from "react";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ProductForm } from "./product-form";
-import type { ProductFormValues } from "@/validations/product";
+import { ProductFormDialog } from "./product-form-dialog";
+import type { ProductFormProduct } from "./product-form-schema";
 
 type Option = { id: string; name: string };
 
-export function ProductModal({
-  categories,
-  brands,
-  product,
-  trigger,
-  autoOpen = false,
-}: {
+export function ProductModal({ categories, brands, product, triggerLabel, triggerIconOnly = false, autoOpen = false, canSeeCost = true }: {
   categories: Option[];
   brands: Option[];
-  product?: { id: string; defaults: Partial<ProductFormValues> };
-  trigger?: React.ReactNode;
+  product?: { id: string; defaults: ProductFormProduct };
+  triggerLabel?: string;
+  triggerIconOnly?: boolean;
   autoOpen?: boolean;
+  canSeeCost?: boolean;
 }) {
-  const [open, setOpen] = React.useState(autoOpen);
-  const mode = product ? "edit" : "create";
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? <Button type="button"><Plus aria-hidden /> Add product</Button>}
-      </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader className="pr-8">
-          <DialogTitle>{mode === "create" ? "Add product" : "Edit product"}</DialogTitle>
-          <DialogDescription>
-            {mode === "create" ? "Create a product variant and optionally enter its opening stock." : "Update product details and pricing. Manage stock from Inventory."}
-          </DialogDescription>
-        </DialogHeader>
-        {open && (
-          <ProductForm
-            key={product?.id ?? "new-product"}
-            mode={mode}
-            productId={product?.id}
-            categories={categories}
-            brands={brands}
-            defaults={product?.defaults}
-            onCancel={() => setOpen(false)}
-            onSaved={() => setOpen(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
-  );
+  return <ProductFormDialog
+    mode={product ? "edit" : "add"}
+    productId={product?.id}
+    defaultValues={product?.defaults}
+    categories={categories}
+    brands={brands}
+    triggerLabel={triggerLabel ?? (product ? `Edit ${product.defaults.name ?? "product"}` : "Add product")}
+    triggerIconOnly={triggerIconOnly}
+    autoOpen={autoOpen}
+    canSeeCost={canSeeCost}
+  />;
 }

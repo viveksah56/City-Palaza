@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { moneyField, optionalText } from "./common";
-import { PRODUCT_CATEGORY_SELECTION } from "@/lib/constants/categories";
+import { PRODUCT_BRAND_SELECTION, PRODUCT_CATEGORY_SELECTION } from "@/lib/constants/categories";
 
 export const productSchema = z
   .object({
@@ -12,6 +12,7 @@ export const productSchema = z
     categoryId: z.string().min(1, "Choose a category"),
     customCategory: z.string().trim().max(60, "Category name must be 60 characters or less").optional().default(""),
     brandId: z.string().optional(),
+    customBrand: z.string().trim().max(60, "Brand name must be 60 characters or less").optional().default(""),
     purchasePrice: moneyField("Purchase price"),
     sellingPrice: moneyField("Selling price"),
     maxDiscountPercent: z.number({ invalid_type_error: "Enter 0 if none" }).min(0).max(100).default(5),
@@ -23,6 +24,10 @@ export const productSchema = z
   .refine((v) => v.categoryId !== PRODUCT_CATEGORY_SELECTION.CUSTOM || v.customCategory.trim().length >= 2, {
     message: "Enter a category name with at least 2 characters",
     path: ["customCategory"],
+  })
+  .refine((v) => v.brandId !== PRODUCT_BRAND_SELECTION.CUSTOM || v.customBrand.trim().length >= 2, {
+    message: "Enter a brand name with at least 2 characters",
+    path: ["customBrand"],
   })
   .refine((v) => v.trackingType === "QUANTITY" || v.openingQuantity === 0, {
     message: "Enter opening stock using IMEI or serial numbers for this tracking type",

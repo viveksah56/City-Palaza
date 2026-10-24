@@ -6,8 +6,6 @@ import { TRACKING_LABELS } from "@/lib/constants";
 import type { ProductRow } from "@/server/products.service";
 import { SkuCode } from "@/components/shared/sku-code";
 import { ProductAdminActions } from "./product-admin-actions";
-import { IconButton } from "@/components/shared/icon-button";
-import { Pencil } from "lucide-react";
 import { PERMISSION, hasPermission } from "@/lib/rbac/permission";
 import type { Role } from "@/lib/constants/roles";
 import { ProductModal } from "./product-modal";
@@ -50,6 +48,9 @@ export function ProductTable({
           <ProductModal
             categories={categories}
             brands={brands}
+            canSeeCost={canSeeCost}
+            triggerLabel={`Edit ${p.name}`}
+            triggerIconOnly
             product={{
               id: p.id,
               defaults: {
@@ -66,7 +67,6 @@ export function ProductTable({
                 trackingType: p.trackingType,
               } satisfies Partial<ProductFormValues>,
             }}
-            trigger={<IconButton label={`Edit ${p.name}`} variant="outline"><Pencil /></IconButton>}
           />
         )}
         {hasPermission(role, PERMISSION.PRODUCT_DELETE) && <ProductAdminActions id={p.id} canDelete compact />}

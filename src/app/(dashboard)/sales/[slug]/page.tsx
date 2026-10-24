@@ -42,7 +42,9 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
           </p>
         )}
       </div>
-      <Receipt sale={sale} settings={settings} />
+      <div className="rounded-2xl border border-border/70 bg-muted/40 p-2 shadow-sm sm:p-5 lg:p-7">
+        <Receipt sale={sale} settings={settings} />
+      </div>
     </>
   );
 }

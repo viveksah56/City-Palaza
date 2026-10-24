@@ -17,7 +17,21 @@ export function formatCurrency(value: MoneyInput | null | undefined, currency = 
 }
 
 export function formatNumber(n: number): string {
-  return new Intl.NumberFormat("en-IN").format(n);
+  return new Intl.NumberFormat("en-NP").format(n);
+}
+
+export function formatCompactNumber(n: number): string {
+  return new Intl.NumberFormat("en-NP", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+}
+
+export function formatNPR(value: MoneyInput | null | undefined): string {
+  return formatCurrency(value, "NPR");
+}
+
+export function formatNPRCompact(value: MoneyInput | null | undefined): string {
+  const amount = D(value ?? 0);
+  const compact = new Intl.NumberFormat("en-NP", { notation: "compact", maximumFractionDigits: 1 }).format(amount.abs().toNumber());
+  return `${amount.isNegative() ? "-" : ""}Rs ${compact}`;
 }
 
 export function formatDateTime(date: Date | string): string {
@@ -26,6 +40,10 @@ export function formatDateTime(date: Date | string): string {
 
 export function formatDate(date: Date | string): string {
   return format(new TZDate(new Date(date), APP_TIMEZONE), "dd MMM yyyy");
+}
+
+export function formatDateInput(date: Date | string): string {
+  return format(new TZDate(new Date(date), APP_TIMEZONE), "yyyy-MM-dd");
 }
 
 export function fullName(u: { firstName: string; lastName: string }): string {

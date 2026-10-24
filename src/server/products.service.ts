@@ -12,7 +12,7 @@ import { first, type SearchParams } from "@/lib/url";
 import { LOW_STOCK_THRESHOLD, stockStatus, type StockStatus } from "@/lib/stock";
 import { productSchema, type ProductFormValues } from "@/validations/product";
 import { addStockTx, type Actor } from "./inventory.service";
-import { PRODUCT_CATEGORY_SELECTION, TAXONOMY_CACHE_TAG, TAXONOMY_KIND } from "@/lib/constants/categories";
+import { PRODUCT_BRAND_SELECTION, PRODUCT_CATEGORY_SELECTION, TAXONOMY_CACHE_TAG, TAXONOMY_KIND } from "@/lib/constants/categories";
 import { slugify } from "@/lib/format";
 import { uniqueSlug } from "@/lib/slug";
 
@@ -161,7 +161,7 @@ function toData(v: ProductFormValues, fallbackSku?: string) {
     variantLabel: v.variantLabel?.trim() || null,
     description: emptyToNull(v.description),
     categoryId: v.categoryId,
-    brandId: v.brandId || null,
+    brandId: v.brandId === PRODUCT_BRAND_SELECTION.CUSTOM ? null : v.brandId || null,
     purchasePrice: toDb(v.purchasePrice),
     sellingPrice: toDb(v.sellingPrice),
     maxDiscountPercent: money(Number.isFinite(v.maxDiscountPercent) ? v.maxDiscountPercent : 5).toFixed(2),
@@ -210,6 +210,34 @@ async function resolveProductCategory(tx: Prisma.TransactionClient, actor: Actor
   return category.id;
 }
 
+async function resolveProductBrand(tx: Prisma.TransactionClient, actor: Actor, values: ProductFormValues) {
+  if (values.brandId !== PRODUCT_BRAND_SELECTION.CUSTOM) return values.brandId || null;
+
+  assertRolePermission(actor.role, PERMISSION.BRAND_CREATE);
+  const name = values.customBrand.trim();
+  const slug = slugify(name);
+  if (!slug) throw new DomainError("VALIDATION", "Brand name must contain letters or numbers.");
+
+  const existing = await tx.brand.findFirst({
+    where: { name: { equals: name, mode: "insensitive" } },
+    select: { id: true, name: true, isActive: true },
+  });
+  if (existing) {
+    if (!existing.isActive) {
+      await tx.brand.update({ where: { id: existing.id }, data: { isActive: true } });
+      await writeAudit(tx, { actorId: actor.id, action: PERMISSION.BRAND_UPDATE, entityType: "Brand", entityId: existing.id, description: `Reactivated brand “${existing.name}” while saving a product` });
+    }
+    return existing.id;
+  }
+
+  const slugOwner = await tx.brand.findUnique({ where: { slug }, select: { id: true } });
+  if (slugOwner) throw new DomainError("CONFLICT", "A brand with a similar name already exists. Choose it from the brand list.");
+
+  const brand = await tx.brand.create({ data: { name, slug, isActive: true } });
+  await writeAudit(tx, { actorId: actor.id, action: PERMISSION.BRAND_CREATE, entityType: "Brand", entityId: brand.id, description: `Created brand “${brand.name}” while saving a product` });
+  return brand.id;
+}
+
 export async function createProduct(actor: Actor, raw: unknown) {
   assertRolePermission(actor.role, PERMISSION.PRODUCT_CREATE);
   const v = productSchema.parse(raw);
@@ -217,8 +245,9 @@ export async function createProduct(actor: Actor, raw: unknown) {
 
   return prisma.$transaction(async (tx) => {
     const categoryId = await resolveProductCategory(tx, actor, v);
+    const brandId = await resolveProductBrand(tx, actor, v);
     const slug = await uniqueSlug(v.name, async (value) => !!(await tx.product.findUnique({ where: { slug: value }, select: { id: true } })));
-    const product = await tx.product.create({ data: { ...data, slug, categoryId } });
+    const product = await tx.product.create({ data: { ...data, slug, categoryId, brandId } });
     const openingSerials = v.openingSerialsText.trim().split(/[\s,;]+/).filter(Boolean);
     if (v.trackingType === "QUANTITY" && v.openingQuantity > 0) {
       await addStockTx(tx, actor, { productId: product.id, type: "INITIAL_STOCK", quantity: v.openingQuantity, reason: "Opening stock" });
@@ -246,6 +275,7 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
     const { status: _status, ...data } = toData(v, before.sku);
     const categoryId = await resolveProductCategory(tx, actor, v);
     data.categoryId = categoryId;
+    data.brandId = await resolveProductBrand(tx, actor, v);
     if (before.trackingType !== data.trackingType && (before.quantity > 0 || before._count.serials > 0)) {
       throw new DomainError("CONFLICT", "Tracking type can't be changed once the product has stock or registered devices.");
     }

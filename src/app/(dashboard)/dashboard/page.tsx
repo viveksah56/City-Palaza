@@ -41,7 +41,7 @@ async function DashboardServerView({ range }: { range: ReturnType<typeof resolve
   const [d, s] = await Promise.all([getAdminDashboard(range), getSettings()]);
   const c = s.currency;
   return (
-    <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_19rem] 2xl:gap-6">
+    <div className="grid min-w-0 items-start gap-5 min-[1440px]:grid-cols-[minmax(0,1fr)_19rem] min-[1440px]:gap-6">
       <div className="min-w-0 space-y-5 sm:space-y-6">
       <section aria-label="Key figures" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <ReportCard label="Today’s sales" value={<CurrencyDisplay value={d.kpis.todaySales} currency={c} />} icon={<Banknote className="size-5" />} />
@@ -75,7 +75,7 @@ async function DashboardServerView({ range }: { range: ReturnType<typeof resolve
       <Card><CardHeader><CardTitle>Payment methods</CardTitle><CardDescription>Collected payments over the selected period.</CardDescription></CardHeader><CardContent><ReportChart type="pie" data={d.payments} label="Payments" height={280} /></CardContent></Card>
       </div>
 
-      <aside aria-label="Store activity" className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-1">
+      <aside aria-label="Store activity" className="grid min-w-0 gap-4 sm:grid-cols-2 min-[1440px]:grid-cols-1">
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <div><CardTitle>Recent sales</CardTitle><CardDescription className="mt-1">Latest completed orders</CardDescription></div>
@@ -115,7 +115,7 @@ async function EmployeeDashboard({ userId, name }: { userId: string; name: strin
   return (
     <>
       <PageHeader title={`Hello, ${name}`} description="Your day at the counter." actions={<Button asChild><Link href="/sales/new"><ShoppingBag /> New sale</Link></Button>} />
-      <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_19rem] 2xl:gap-6">
+      <div className="grid min-w-0 items-start gap-5 min-[1440px]:grid-cols-[minmax(0,1fr)_19rem] min-[1440px]:gap-6">
       <div className="min-w-0 space-y-5">
         <section aria-label="My performance today" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <ReportCard label="My sales today" value={<CurrencyDisplay value={d.todaySales} currency={s.currency} />} icon={<Banknote className="size-5" />} />

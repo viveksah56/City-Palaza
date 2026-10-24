@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import "./globals.css";
 
-export const viewport: Viewport = { themeColor: [{ media: "(prefers-color-scheme: light)", color: "#ffffff" }, { media: "(prefers-color-scheme: dark)", color: "#09090b" }], viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: [{ media: "(prefers-color-scheme: light)", color: "rgb(255 255 255)" }, { media: "(prefers-color-scheme: dark)", color: "rgb(20 20 23)" }], viewportFit: "cover" };
 
 
 export const metadata: Metadata = {
@@ -14,12 +15,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('citypalaza-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}}catch{}` }} />
-      </head>
       <body className="min-h-dvh antialiased">
-        {children}
-        <Toaster />
+        <ThemeProvider attribute="data-theme" defaultTheme="system" enableSystem storageKey="citypalaza-theme" disableTransitionOnChange>
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

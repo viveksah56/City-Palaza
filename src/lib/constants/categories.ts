@@ -13,3 +13,7 @@ export const TAXONOMY_CACHE_TAG = {
 export const PRODUCT_CATEGORY_SELECTION = {
   CUSTOM: "__custom_category__",
 } as const;
+
+export const PRODUCT_BRAND_SELECTION = {
+  CUSTOM: "__custom_brand__",
+} as const;

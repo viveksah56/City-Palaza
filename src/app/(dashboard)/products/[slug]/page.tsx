@@ -14,7 +14,6 @@ import { getBrands, getCategories, getProductBySlug } from "@/server/products.se
 import { listSerialsByProductSlug } from "@/server/inventory.service";
 import { getSettings } from "@/server/settings.service";
 import { TRACKING_LABELS } from "@/lib/constants";
-import { Pencil } from "lucide-react";
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const user = await requirePermission(PERMISSION.PRODUCT_VIEW);
@@ -54,6 +53,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             <ProductModal
               categories={categories}
               brands={brands}
+              canSeeCost={canSeeCost}
+              triggerLabel="Edit product"
               product={{
                 id: product.id,
                 defaults: {
@@ -68,9 +69,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                   sellingPrice: Number(product.sellingPrice),
                   maxDiscountPercent: Number(product.maxDiscountPercent),
                   trackingType: product.trackingType,
+                  createdAt: product.createdAt,
+                  updatedAt: product.updatedAt,
                 },
               }}
-              trigger={<Button variant="outline"><Pencil /> Edit product</Button>}
             />
             <ProductAdminActions id={product.id} canDelete={hasPermission(user.role, PERMISSION.PRODUCT_DELETE)} />
           </>

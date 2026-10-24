@@ -1,7 +1,7 @@
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DateRange } from "@/lib/dates";
-import { APP_TIMEZONE } from "@/lib/constants";
+import { formatDateInput } from "@/lib/format";
 
 export function ReportExports({ range, scope, reportTab }: { range?: DateRange; scope: "sales" | "report"; reportTab?: string }) {
   const params = new URLSearchParams();
@@ -10,8 +10,8 @@ export function ReportExports({ range, scope, reportTab }: { range?: DateRange; 
   if (range) {
     params.set("range", range.preset);
     if (range.preset === "custom") {
-      params.set("from", range.from.toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE }));
-      params.set("to", new Date(range.to.getTime() - 86_400_000).toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE }));
+      params.set("from", formatDateInput(range.from));
+      params.set("to", formatDateInput(new Date(range.to.getTime() - 86_400_000)));
     }
   }
   params.set("format", "pdf");

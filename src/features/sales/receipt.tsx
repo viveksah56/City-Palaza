@@ -14,7 +14,7 @@ export function Receipt({ sale, settings }: { sale: Sale; settings: Settings }) 
   const saleWideDiscountTotal = sale.items.reduce((total, item) => total.plus(item.saleDiscount ?? 0), sale.discount.minus(sale.discount));
 
   return (
-    <article aria-label={`Tax invoice ${sale.saleNumber}`} className="receipt-document mx-auto w-full max-w-5xl border border-border/70 bg-white p-5 text-slate-900 shadow-card sm:p-8 print:max-w-none print:border-0 print:p-0 print:shadow-none">
+    <article aria-label={`Tax invoice ${sale.saleNumber}`} className="receipt-document mx-auto w-full max-w-4xl border border-border/70 bg-white p-5 text-slate-900 shadow-xl sm:p-8 print:max-w-none print:border-0 print:p-0 print:shadow-none">
       <header className="grid gap-5 border-b-2 border-slate-800 pb-5 sm:grid-cols-[1fr_auto] sm:items-start">
         <div className="flex items-start gap-4">
           <Image src="/citypalaza-icon.png" alt="" width={56} height={56} className="size-14 rounded-lg object-cover" />
