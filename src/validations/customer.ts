@@ -7,5 +7,6 @@ export const customerSchema = z.object({
   phone: phoneField,
   email: z.string().trim().email("Enter a valid email").max(120).optional().or(z.literal("")),
   address: z.string().trim().max(250).optional(),
+  notes: z.string().trim().max(500).optional(),
 });
 export type CustomerValues = z.infer<typeof customerSchema>;

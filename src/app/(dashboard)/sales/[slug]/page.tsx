@@ -6,11 +6,13 @@ import { fullName, formatDateTime } from "@/lib/format";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/badges";
 import { Button } from "@/components/ui/button";
-import { Receipt } from "@/features/sales/receipt";
-import { DownloadReceipt, PrintButton, VoidSaleDialog } from "@/features/sales/sale-actions";
+import { Receipt } from "@/features/billing/receipt";
+import { ThermalReceipt } from "@/features/billing/receipt-thermal";
+import { ReceiptViewer } from "@/features/billing/receipt-viewer";
+import { VoidSaleDialog } from "@/features/billing/sale-actions";
 import { getSaleForUserBySlug } from "@/server/sales.service";
 import { getSettings } from "@/server/settings.service";
-import { SettlePaymentDialog } from "@/features/sales/settle-payment-dialog";
+import { SettlePaymentDialog } from "@/features/billing/settle-payment-dialog";
 import { money } from "@/lib/money";
 
 export default async function SaleDetailPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ new?: string }> }) {
@@ -28,8 +30,6 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
           actions={
             <>
               <StatusBadge status={sale.status} />
-              <PrintButton />
-              <DownloadReceipt slug={sale.slug} />
               {sale.status === "COMPLETED" && money(sale.total).minus(sale.amountPaid).gt(0) && hasPermission(user.role, PERMISSION.SALE_SETTLE) && <SettlePaymentDialog saleId={sale.id} saleNumber={sale.saleNumber} balance={money(sale.total).minus(sale.amountPaid).toFixed(2)} />}
               {hasPermission(user.role, PERMISSION.SALE_VOID) && sale.status === "COMPLETED" && <VoidSaleDialog saleId={sale.id} saleNumber={sale.saleNumber} />}
               {hasPermission(user.role, PERMISSION.SALE_CREATE) && <Button asChild><Link href="/sales/new">New sale</Link></Button>}
@@ -42,9 +42,7 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
           </p>
         )}
       </div>
-      <div className="rounded-2xl border border-border/70 bg-muted/40 p-2 shadow-sm sm:p-5 lg:p-7">
-        <Receipt sale={sale} settings={settings} />
-      </div>
+      <ReceiptViewer slug={sale.slug} a4={<Receipt sale={sale} settings={settings} />} thermal={<ThermalReceipt sale={sale} settings={settings} />} />
     </>
   );
 }

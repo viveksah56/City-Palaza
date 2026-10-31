@@ -29,16 +29,15 @@ export async function SalesReport({ range }: { range: DateRange }) {
           <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <ReportCard label="Net sales" value={summaryMoney(s.netSales)} hint="Gross − discounts" />
             <ReportCard label="Number of sales" value={s.count} />
-            <ReportCard label="Average sale" value={summaryMoney(s.averageSale)} hint="Net per completed sale, excluding tax" />
+            <ReportCard label="Average sale" value={summaryMoney(s.averageSale)} hint="Net per completed sale" />
             <ReportCard label="Collected" value={summaryMoney(s.collected)} hint="Payments received in period" accent="green" />
           </div>
         </div>
         <div>
           <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Sales breakdown</h2>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-2">
             <ReportCard label="Gross sales" value={summaryMoney(s.grossSales)} hint="Before discounts" />
             <ReportCard label="Discounts" value={summaryMoney(s.discounts)} />
-            <ReportCard label="Taxes" value={summaryMoney(s.taxes)} />
           </div>
         </div>
         <div>

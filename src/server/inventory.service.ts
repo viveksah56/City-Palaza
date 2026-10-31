@@ -2,7 +2,7 @@ import { Prisma, type InventoryTransactionType, type TrackingType } from "@/gene
 import { prisma, type Tx } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { writeAudit } from "@/lib/audit";
-import { normalizeSerials } from "@/lib/imei";
+import { normalizeSerials, normalizeDevices } from "@/lib/imei";
 import { parsePage, parseSort, paged, type PageQuery, type SortOrder } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
 import { LOW_STOCK_THRESHOLD, stockStatus } from "@/lib/stock";
@@ -91,12 +91,16 @@ export async function addStockTx(tx: Tx, actor: Actor, input: AddStockInput) {
     quantity = input.quantity ?? 0;
     if (!Number.isInteger(quantity) || quantity < 1) throw new DomainError("VALIDATION", "Enter a quantity of at least 1.");
   } else {
-    const serials = normalizeSerials(input.serials ?? [], product.trackingType);
-    if (serials.length === 0) throw new DomainError("VALIDATION", `Enter at least one ${product.trackingType === "IMEI" ? "IMEI" : "serial number"}.`);
-    const existing = await tx.productSerial.findMany({ where: { serial: { in: serials } }, select: { serial: true } });
-    if (existing.length) throw new DomainError("DUPLICATE", `Already registered: ${existing.map((e) => e.serial).join(", ")}`);
-    await tx.productSerial.createMany({ data: serials.map((serial) => ({ productId: product.id, serial })) });
-    quantity = serials.length;
+    const devices = normalizeDevices(input.serials ?? [], product.trackingType);
+    if (devices.length === 0) throw new DomainError("VALIDATION", `Enter at least one ${product.trackingType === "IMEI" ? "IMEI" : "serial number"}.`);
+    const all = devices.flatMap((d) => (d.imei2 ? [d.serial, d.imei2] : [d.serial]));
+    const existing = await tx.productSerial.findMany({ where: { OR: [{ serial: { in: all } }, { imei2: { in: all } }] }, select: { serial: true, imei2: true } });
+    if (existing.length) {
+      const taken = existing.flatMap((e) => [e.serial, e.imei2]).filter((v): v is string => !!v && all.includes(v));
+      throw new DomainError("DUPLICATE", `Already registered: ${[...new Set(taken)].join(", ")}`);
+    }
+    await tx.productSerial.createMany({ data: devices.map((d) => ({ productId: product.id, serial: d.serial, imei2: d.imei2 })) });
+    quantity = devices.length;
   }
 
   const reason = input.reason?.trim() || (input.reference ? null : input.type === "INITIAL_STOCK" ? "Opening stock" : "Stock received");
@@ -161,7 +165,7 @@ export async function adjustStock(actor: Actor, input: AdjustStockInput) {
       if (input.type === "ADJUSTMENT") {
         throw new DomainError("VALIDATION", "Serialized products can't be adjusted by count. Add devices via “Add stock” or mark them damaged/lost.");
       }
-      const serials = normalizeSerials(input.serials ?? [], product.trackingType);
+      const serials = normalizeDevices(input.serials ?? [], product.trackingType).map((d) => d.serial);
       if (!serials.length) throw new DomainError("VALIDATION", "Enter the IMEI / serial numbers being written off.");
       const r = await tx.productSerial.updateMany({
         where: { productId: product.id, serial: { in: serials }, status: "IN_STOCK" },
@@ -291,7 +295,7 @@ export async function listSerials(productId: string, status?: "IN_STOCK") {
     where: { productId, ...(status && { status }) },
     orderBy: [{ status: "asc" }, { serial: "asc" }],
     take: 500,
-    select: { id: true, serial: true, status: true, notes: true },
+    select: { id: true, serial: true, imei2: true, status: true, notes: true },
   });
 }
 
@@ -300,6 +304,6 @@ export async function listSerialsByProductSlug(productSlug: string, status?: "IN
     where: { product: { slug: productSlug }, ...(status && { status }) },
     orderBy: [{ status: "asc" }, { serial: "asc" }],
     take: 500,
-    select: { id: true, serial: true, status: true, notes: true },
+    select: { id: true, serial: true, imei2: true, status: true, notes: true },
   });
 }

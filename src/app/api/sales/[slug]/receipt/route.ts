@@ -5,6 +5,7 @@ import { getSaleForUserBySlug } from "@/server/sales.service";
 import { readSettings } from "@/server/settings.service";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { createReceiptPdf } from "@/server/receipt-document";
+import { parseReceiptFormat } from "@/lib/receipt-helpers";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const limited = await rateLimitResponse(_request, "sales:receipt", { limit: 30, windowSeconds: 300 });
@@ -16,8 +17,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const sale = await getSaleForUserBySlug(user, slug);
   if (!sale) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const settings = await readSettings();
-  const pdf = await createReceiptPdf(sale, settings);
-  const filename = `receipt-${sale.saleNumber.replace(/[^a-zA-Z0-9_-]/g, "-")}.pdf`;
+  const format = parseReceiptFormat(new URL(_request.url).searchParams.get("format"));
+  const pdf = await createReceiptPdf(sale, settings, format);
+  const filename = `${format === "thermal" ? "receipt-80mm" : "invoice"}-${sale.saleNumber.replace(/[^a-zA-Z0-9_-]/g, "-")}.pdf`;
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

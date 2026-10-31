@@ -208,53 +208,43 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     expect(originalReceiptData?.items.flatMap((item) => item.serialSnapshot)).toContain(imei);
   });
 
-  it("concurrent voids restore stock once and mark an unpaid sale refunded", async () => {
+  it("concurrent voids restore stock once", async () => {
     const f = await fixtures();
     const p = await f.mk("VOIDRACE");
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 2, reason: "test" });
-    const customer = await prisma.customer.create({ data: { slug: "void-credit-customer", name: "Void Credit Customer" } });
-    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], customerId: customer.id, paymentMethod: "CASH", paymentStatus: "PENDING" });
+    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
     const results = await Promise.allSettled([
       sales.voidSale(f.admin, { saleId: sale.id, reason: "duplicate sale" }),
       sales.voidSale(f.admin, { saleId: sale.id, reason: "duplicate sale" }),
     ]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect((await prisma.product.findUniqueOrThrow({ where: { id: p.id } })).quantity).toBe(2);
-    const row = await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } });
-    expect(row.paymentStatus).toBe("REFUNDED");
-    expect(row.amountPaid.toString()).toBe("0");
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).status).toBe("VOIDED");
     expect(await prisma.auditLog.count({ where: { action: "SALE_VOID" } })).toBe(1);
   });
 
-  it("validates payment states and requires a customer for credit sales", async () => {
+  it("always settles in full, records cash tendered and change, and never needs a customer", async () => {
     const f = await fixtures();
     const p = await f.mk("PAYMENTS");
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 10, reason: "test" });
-    const base = { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" as const };
-    const customer = await prisma.customer.create({ data: { slug: "payment-customer", name: "Payment Customer" } });
-    await expect(sales.createSale(f.emp, { ...base, paymentStatus: "PENDING" })).rejects.toThrow(/customer is required/i);
-    const pending = await sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PENDING" });
-    expect((await prisma.sale.findUniqueOrThrow({ where: { id: pending.id } })).amountPaid.toString()).toBe("0");
-    expect(await prisma.salePayment.count({ where: { saleId: pending.id } })).toBe(0);
-    const partial = await sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PARTIAL", amountPaid: 400 });
-    expect((await prisma.sale.findUniqueOrThrow({ where: { id: partial.id } })).amountPaid.toString()).toBe("400");
-    expect((await prisma.salePayment.findFirstOrThrow({ where: { saleId: partial.id } })).amount.toString()).toBe("400");
-    await expect(sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PARTIAL", amountPaid: 0 })).rejects.toThrow(/partial payment/i);
-    await expect(sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PARTIAL", amountPaid: 1000 })).rejects.toThrow(/partial payment/i);
-    await expect(sales.createSale(f.emp, { ...base, paymentStatus: "REFUNDED" })).rejects.toThrow(/refunded/i);
-    await expect(sales.createSale(f.emp, { ...base, customerId: customer.id, paymentStatus: "PARTIAL", amountPaid: 1 })).resolves.toBeDefined();
+    const base = { items: [{ productId: p.id, quantity: 1 }] };
+    const cash = await sales.createSale(f.emp, { ...base, paymentMethod: "CASH", amountTendered: 1500 });
+    const row = await prisma.sale.findUniqueOrThrow({ where: { id: cash.id } });
+    expect([row.paymentStatus, row.amountPaid.toString(), row.amountTendered?.toString(), row.changeGiven?.toString()]).toEqual(["PAID", "1000", "1500", "500"]);
+    expect((await prisma.salePayment.findFirstOrThrow({ where: { saleId: cash.id } })).amount.toString()).toBe("1000");
+    await expect(sales.createSale(f.emp, { ...base, paymentMethod: "CASH", amountTendered: 999.99 })).rejects.toThrow(/less than the total/i);
+    const upi = await sales.createSale(f.emp, { ...base, paymentMethod: "UPI", amountTendered: 5000 });
+    const upiRow = await prisma.sale.findUniqueOrThrow({ where: { id: upi.id } });
+    expect([upiRow.amountTendered, upiRow.changeGiven, upiRow.paymentMethod]).toEqual([null, null, "UPI"]);
+    expect(await prisma.sale.count()).toBe(2);
   });
 
-  it("allows zero-total paid and pending sales but rejects a zero-total partial payment", async () => {
+  it("allows zero-total sales", async () => {
     const f = await fixtures();
     const p = await f.mk("FREE", { purchasePrice: "0.00", sellingPrice: "0.00" });
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 3, reason: "test" });
-    const base = { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" as const };
-    const paid = await sales.createSale(f.emp, { ...base, paymentStatus: "PAID" });
-    const pending = await sales.createSale(f.emp, { ...base, paymentStatus: "PENDING" });
-    expect((await prisma.sale.findUniqueOrThrow({ where: { id: paid.id } })).amountPaid.toString()).toBe("0");
-    expect((await prisma.sale.findUniqueOrThrow({ where: { id: pending.id } })).amountPaid.toString()).toBe("0");
-    await expect(sales.createSale(f.emp, { ...base, paymentStatus: "PARTIAL", amountPaid: 0.01 })).rejects.toThrow(/partial payment/i);
+    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).amountPaid.toString()).toBe("0");
   });
 
   it("keeps sale numbers unique and gap-free when a failed sale rolls back", async () => {
@@ -298,7 +288,7 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     const p = await f.mk("SPLIT", { maxDiscountPercent: "25.00" });
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 10, reason: "test" });
     await prisma.setting.create({ data: { key: "employeeMaxTotalDiscountPercent", value: 15 } });
-    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1, discount: { type: "FIXED", value: 20 } }], discount: { type: "FIXED", value: 10 }, paymentMethod: "CASH" });
+    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1, discount: { type: "PERCENT", value: 2 } }], discount: { type: "FIXED", value: 10 }, paymentMethod: "CASH" });
     const saved = await prisma.sale.findUniqueOrThrow({ where: { id: sale.id }, include: { items: true } });
     expect(saved.promoDiscount?.toString()).toBe("0");
     expect(saved.manualDiscount?.toString()).toBe("30");
@@ -330,7 +320,11 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     const p = await f.mk("SETTLE");
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 3, reason: "test" });
     const customer = await prisma.customer.create({ data: { slug: "settle-customer", name: "Settle Customer" } });
-    const sale = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], customerId: customer.id, paymentMethod: "CASH", paymentStatus: "PARTIAL", amountPaid: 400 });
+    const created = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], customerId: customer.id, paymentMethod: "CASH" });
+    // simulate a legacy part-paid sale (the terminal itself now always settles in full)
+    await prisma.sale.update({ where: { id: created.id }, data: { paymentStatus: "PARTIAL", amountPaid: "400.00" } });
+    await prisma.salePayment.updateMany({ where: { saleId: created.id }, data: { amount: "400.00" } });
+    const sale = created;
     const paid = await sales.settleSalePayment(f.emp, { saleId: sale.id, amount: 600, method: "CARD", note: "final balance" });
     expect(paid).toMatchObject({ amountPaid: "1000.00", balance: "0.00", paymentStatus: "PAID" });
     expect(await prisma.salePayment.count({ where: { saleId: sale.id } })).toBe(2);
@@ -397,5 +391,84 @@ describe.skipIf(!TEST_DB)("inventory & sales (PostgreSQL)", () => {
     expect(await prisma.session.count({ where: { userId: f.emp.id } })).toBe(0);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: f.emp.id } })).role).toBe("ADMIN");
     expect(await prisma.auditLog.count({ where: { entityId: f.emp.id, action: "EMPLOYEE_UPDATE" } })).toBe(1);
+  });
+
+  it("stores IMEI 1 + IMEI 2, finds a device by either, and blocks reuse of either number", async () => {
+    const f = await fixtures();
+    const { imeiFromBody } = await import("@/lib/imei");
+    const [a, b, c] = [imeiFromBody("35000000000100"), imeiFromBody("35000000000200"), imeiFromBody("35000000000300")];
+    const phone = await f.mk("DUAL", { trackingType: "IMEI" });
+    const other = await f.mk("DUAL2", { trackingType: "IMEI" });
+    await inv.addStock(f.admin, { productId: phone.id, type: "PURCHASE", serials: [`${a}/${b}`] });
+    expect(await prisma.productSerial.findUniqueOrThrow({ where: { serial: a } })).toMatchObject({ imei2: b });
+    await expect(inv.addStock(f.admin, { productId: other.id, type: "PURCHASE", serials: [b] })).rejects.toThrow(/Already registered/);
+    await expect(inv.addStock(f.admin, { productId: other.id, type: "PURCHASE", serials: [`${c}/${a}`] })).rejects.toThrow(/Already registered/);
+    expect(await products.resolveScan(b)).toMatchObject({ kind: "device", serial: a, imei2: b });
+    expect(await products.resolveScan(a)).toMatchObject({ kind: "device", serial: a });
+    expect(await products.resolveScan("nope-nope")).toEqual({ kind: "not_found" });
+    const sale = await sales.createSale(f.emp, { items: [{ productId: phone.id, quantity: 1, serials: [a] }], paymentMethod: "CASH" });
+    expect(await products.resolveScan(a)).toMatchObject({ kind: "unavailable" });
+    const item = await prisma.saleItem.findFirstOrThrow({ where: { saleId: sale.id } });
+    expect([item.serialSnapshot, item.imei2Snapshot]).toEqual([[a], [b]]);
+  });
+
+  it("issues a warranty tag per sold device, ties it to the customer, voids it with the sale", async () => {
+    const f = await fixtures();
+    const { imeiFromBody } = await import("@/lib/imei");
+    const [a, b] = [imeiFromBody("35000000000400"), imeiFromBody("35000000000500")];
+    const phone = await f.mk("WARR", { trackingType: "IMEI", warrantyMonths: 12 });
+    const cable = await f.mk("NOWARR");
+    await inv.addStock(f.admin, { productId: phone.id, type: "PURCHASE", serials: [a, b] });
+    await inv.addStock(f.admin, { productId: cable.id, type: "PURCHASE", quantity: 2, reason: "t" });
+    const customer = await prisma.customer.create({ data: { slug: "warranty-customer", name: "Warranty Customer", phone: "9800000001" } });
+    const sale = await sales.createSale(f.emp, { items: [{ productId: phone.id, quantity: 2, serials: [a, b] }, { productId: cable.id, quantity: 1 }], customerId: customer.id, paymentMethod: "CASH" });
+    const rows = await prisma.warranty.findMany({ where: { customerId: customer.id }, orderBy: { tag: "asc" }, include: { serial: true } });
+    expect(rows.map((w) => w.tag)).toEqual([`${sale.saleNumber}-W1`, `${sale.saleNumber}-W2`]);
+    expect(rows.map((w) => w.serial?.serial).sort()).toEqual([a, b].sort());
+    const months = (rows[0]!.endsAt.getFullYear() - rows[0]!.startsAt.getFullYear()) * 12 + rows[0]!.endsAt.getMonth() - rows[0]!.startsAt.getMonth();
+    expect(months).toBe(12);
+    const warranties = await import("@/server/warranties.service");
+    expect((await warranties.lookupWarranty(f.emp, a))[0]).toMatchObject({ tag: `${sale.saleNumber}-W${rows.findIndex((w) => w.serial?.serial === a) + 1}`, status: "ACTIVE", expired: false });
+    expect(await warranties.listCustomerWarranties(f.emp, customer.id)).toHaveLength(2);
+    await expect(warranties.markWarrantyClaimed(f.emp, rows[0]!.id, "screen dead")).rejects.toThrow(); // employees can't manage claims
+    await warranties.markWarrantyClaimed(f.admin, rows[0]!.id, "screen dead");
+    await sales.voidSale(f.admin, { saleId: sale.id, reason: "returned" });
+    expect((await prisma.warranty.findMany({ where: { customerId: customer.id }, orderBy: { tag: "asc" } })).map((w) => w.status)).toEqual(["CLAIMED", "VOIDED"]);
+  });
+
+  it("runs the cash register: one open shift, sales attach, expected cash excludes non-cash and voids", async () => {
+    const f = await fixtures();
+    const shifts = await import("@/server/shifts.service");
+    const p = await f.mk("TILL");
+    await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 10, reason: "t" });
+    const before = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: before.id } })).shiftId).toBeNull(); // no open shift yet
+
+    await shifts.openShift(f.emp, { openingBalance: 5000 });
+    await expect(shifts.openShift(f.admin, { openingBalance: 1 })).rejects.toThrow(/already open/i);
+    const cash = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 2 }], paymentMethod: "CASH", amountTendered: 2000 });
+    await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CARD" });
+    const voided = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
+    await sales.voidSale(f.admin, { saleId: voided.id, reason: "wrong phone" });
+    const open = (await shifts.getOpenShift())!;
+    expect([open.cashSales, open.expectedCash, open.salesCount]).toEqual(["2000.00", "7000.00", 2]);
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: cash.id } })).shiftId).toBe(open.id);
+
+    const other = { id: "someone-else", role: "EMPLOYEE" as const };
+    await expect(shifts.closeShift(other, { shiftId: open.id, countedCash: 7000 })).rejects.toThrow();
+    const closed = await shifts.closeShift(f.emp, { shiftId: open.id, countedCash: 6950, notes: "50 short" });
+    expect(closed).toEqual({ expectedCash: "7000.00", countedCash: "6950.00", variance: "-50.00" });
+    await expect(shifts.closeShift(f.emp, { shiftId: open.id, countedCash: 1 })).rejects.toThrow(/already closed/i);
+    expect(await shifts.getOpenShift()).toBeNull();
+    expect((await shifts.listShifts(f.admin))[0]).toMatchObject({ status: "CLOSED", variance: "-50.00", salesCount: 2 });
+    expect(await prisma.auditLog.count({ where: { action: { in: ["SHIFT_OPEN", "SHIFT_CLOSE"] } } })).toBe(2);
+    await shifts.openShift(f.admin, { openingBalance: 0 }); // a new one can open after closing
+  });
+
+  it("migrated schema contains no tax or PAN columns", async () => {
+    const cols = await prisma.$queryRawUnsafe<{ column_name: string }[]>(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema='citypalaza_database' AND (column_name ILIKE '%tax%' OR column_name ILIKE '%vat%' OR column_name ILIKE '%pan%')`,
+    );
+    expect(cols).toEqual([]);
   });
 });

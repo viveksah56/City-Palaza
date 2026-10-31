@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, StockBadge } from "@/components/shared/badges";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
-import { ProductAdminActions } from "@/features/products/product-admin-actions";
-import { ProductModal } from "@/features/products/product-modal";
+import { ProductAdminActions } from "@/features/inventory/product-admin-actions";
+import { ProductModal } from "@/features/inventory/product-modal";
 import { SkuCode } from "@/components/shared/sku-code";
 import { getBrands, getCategories, getProductBySlug } from "@/server/products.service";
 import { listSerialsByProductSlug } from "@/server/inventory.service";
@@ -62,6 +62,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                   barcode: product.barcode ?? "",
                   name: product.name,
                   variantLabel: product.variantLabel ?? "",
+                model: product.model ?? "", ram: product.ram ?? "", storage: product.storage ?? "", color: product.color ?? "", warrantyMonths: product.warrantyMonths,
                   description: product.description ?? "",
                   categoryId: product.categoryId,
                   brandId: product.brandId ?? "",
@@ -98,7 +99,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               {serials.length === 0 ? <p className="text-sm text-muted-foreground">No devices registered yet. Add them from Inventory → Add stock.</p> : (
                 <ul className="max-h-96 divide-y overflow-y-auto text-sm">
                   {serials.map((s) => (
-                    <li key={s.id} className="flex items-center justify-between gap-2 py-2"><span className="font-mono text-[13px]">{s.serial}</span><StatusBadge status={s.status} /></li>
+                    <li key={s.id} className="flex items-center justify-between gap-2 py-2"><span className="font-mono text-[13px]">{s.serial}{s.imei2 ? ` / ${s.imei2}` : ""}</span><StatusBadge status={s.status} /></li>
                   ))}
                 </ul>
               )}

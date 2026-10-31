@@ -28,6 +28,5 @@ INSERT INTO "citypalaza_database"."Setting" ("key", "value", "updatedAt") VALUES
 INSERT INTO "citypalaza_database"."Setting" ("key", "value", "updatedAt") VALUES ('phone', '""'::jsonb, NOW()) ON CONFLICT ("key") DO NOTHING;
 INSERT INTO "citypalaza_database"."Setting" ("key", "value", "updatedAt") VALUES ('email', '""'::jsonb, NOW()) ON CONFLICT ("key") DO NOTHING;
 INSERT INTO "citypalaza_database"."Setting" ("key", "value", "updatedAt") VALUES ('currency', '"NPR"'::jsonb, NOW()) ON CONFLICT ("key") DO NOTHING;
-INSERT INTO "citypalaza_database"."Setting" ("key", "value", "updatedAt") VALUES ('taxRate', '0'::jsonb, NOW()) ON CONFLICT ("key") DO NOTHING;
 INSERT INTO "citypalaza_database"."Setting" ("key", "value", "updatedAt") VALUES ('invoicePrefix', '"CP"'::jsonb, NOW()) ON CONFLICT ("key") DO NOTHING;
 INSERT INTO "citypalaza_database"."Setting" ("key", "value", "updatedAt") VALUES ('employeeDiscountLimit', '5'::jsonb, NOW()) ON CONFLICT ("key") DO NOTHING;

@@ -7,7 +7,10 @@ export type NavItem = { title: string; href: string; icon: string; permission: P
  *  (Dashboard, Sales, Products, Customers). */
 export const NAV_ITEMS: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: "LayoutDashboard", permission: PERMISSION.DASHBOARD_VIEW },
+  { title: "POS", href: "/sales/new", icon: "ScanBarcode", permission: PERMISSION.SALE_CREATE },
   { title: "Sales", href: "/sales", icon: "ShoppingCart", permission: PERMISSION.SALE_VIEW },
+  { title: "Register", href: "/register", icon: "Wallet", permission: PERMISSION.SHIFT_VIEW },
+  { title: "Warranty", href: "/warranties", icon: "ShieldCheck", permission: PERMISSION.WARRANTY_VIEW },
   { title: "Products", href: "/products", icon: "Smartphone", permission: PERMISSION.PRODUCT_VIEW },
   { title: "Inventory", href: "/inventory", icon: "Boxes", permission: PERMISSION.INVENTORY_VIEW },
   { title: "Customers", href: "/customers", icon: "Users", permission: PERMISSION.CUSTOMER_VIEW },

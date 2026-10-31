@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, BarChart3, Bell, Boxes, ChevronRight, LayoutDashboard, MoreHorizontal, ScrollText, Settings, ShoppingCart, Smartphone, UserCog, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Boxes, ChevronRight, LayoutDashboard, MoreHorizontal, ScanBarcode, ScrollText, ShieldCheck, Settings, ShoppingCart, Smartphone, UserCog, Users, Wallet, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { SignOutConfirmation } from "./sign-out-confirmation";
 import Image from "next/image";
 
-const ICONS: Record<string, LucideIcon> = { LayoutDashboard, ShoppingCart, Smartphone, Boxes, Users, BarChart3, UserCog, ScrollText, Settings };
+const ICONS: Record<string, LucideIcon> = { LayoutDashboard, ShoppingCart, Smartphone, Boxes, Users, BarChart3, UserCog, ScrollText, Settings, ScanBarcode, Wallet, ShieldCheck };
 
 export type ShellNavItem = { title: string; href: string; icon: string };
 export type ShellProps = {
@@ -28,7 +28,7 @@ export type ShellProps = {
 };
 
 const LABELS: Record<string, string> = {
-  dashboard: "Dashboard", sales: "Sales", new: "New", products: "Products", categories: "Categories & brands", brands: "Brands",
+  dashboard: "Dashboard", sales: "Sales", new: "POS terminal", register: "Cash register", warranties: "Warranty lookup", products: "Products", categories: "Categories & brands", brands: "Brands",
   inventory: "Inventory", history: "History", customers: "Customers", reports: "Reports", employees: "Employees",
   "audit-logs": "Audit logs", settings: "Settings",
 };

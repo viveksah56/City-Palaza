@@ -53,7 +53,7 @@ export async function searchCustomers(term: string) {
 export async function saveCustomer(actor: Actor, raw: unknown) {
   const v = customerSchema.parse(raw);
   assertRolePermission(actor.role, v.id ? PERMISSION.CUSTOMER_UPDATE : PERMISSION.CUSTOMER_CREATE);
-  const data = { name: v.name.trim(), phone: emptyToNull(v.phone), email: emptyToNull(v.email), address: emptyToNull(v.address) };
+  const data = { name: v.name.trim(), phone: emptyToNull(v.phone), email: emptyToNull(v.email), address: emptyToNull(v.address), notes: emptyToNull(v.notes) };
   return prisma.$transaction(async (tx) => {
     const slug = v.id ? undefined : await uniqueSlug(data.name, async (value) => !!(await tx.customer.findUnique({ where: { slug: value }, select: { id: true } })));
     const c = v.id ? await tx.customer.update({ where: { id: v.id }, data }) : await tx.customer.create({ data: { ...data, slug: slug! } });

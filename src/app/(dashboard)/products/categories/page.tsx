@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requirePermission } from "@/lib/auth/guards";
 import { PERMISSION, hasPermission } from "@/lib/rbac/permission";
 import { PageHeader } from "@/components/shared/page-header";
-import { TaxonomyManager } from "@/features/products/taxonomy-manager";
+import { TaxonomyManager } from "@/features/inventory/taxonomy-manager";
 import { TAXONOMY_KIND } from "@/lib/constants/categories";
 import { getCategories } from "@/server/products.service";
 import { ReportCard } from "@/components/shared/report-card";

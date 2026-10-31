@@ -22,7 +22,20 @@ export const adjustStockSchema = z.object({
 });
 export type AdjustStockValues = z.infer<typeof adjustStockSchema>;
 
-/** Split pasted/scanned text on newlines, commas and spaces. */
+/**
+ * Split pasted/scanned text into device entries. One device per line; a line holding "IMEI1/IMEI2"
+ * (or "IMEI1 | IMEI2") is kept together as a dual-SIM pair. Lines without a separator may still list
+ * several single-IMEI devices separated by commas, semicolons or spaces.
+ */
 export function splitSerials(text: string | undefined): string[] {
-  return (text ?? "").split(/[\n,;\s]+/).map((s) => s.trim()).filter(Boolean);
+  const out: string[] = [];
+  for (const line of (text ?? "").split(/\r?\n/)) {
+    if (/[/|]/.test(line)) {
+      const pair = line.replace(/\s+/g, "").trim();
+      if (pair) out.push(pair);
+      continue;
+    }
+    out.push(...line.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean));
+  }
+  return out;
 }

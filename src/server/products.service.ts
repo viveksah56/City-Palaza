@@ -10,10 +10,12 @@ import { emptyToNull } from "@/validations/common";
 import { parsePage, paged, type PageQuery } from "@/lib/pagination";
 import { first, type SearchParams } from "@/lib/url";
 import { LOW_STOCK_THRESHOLD, stockStatus, type StockStatus } from "@/lib/stock";
+import { splitSerials } from "@/validations/inventory";
 import { productSchema, type ProductFormValues } from "@/validations/product";
 import { addStockTx, type Actor } from "./inventory.service";
 import { PRODUCT_BRAND_SELECTION, PRODUCT_CATEGORY_SELECTION, TAXONOMY_CACHE_TAG, TAXONOMY_KIND } from "@/lib/constants/categories";
 import { slugify } from "@/lib/format";
+import { normalizeSerial } from "@/lib/imei";
 import { uniqueSlug } from "@/lib/slug";
 
 export type ProductRow = {
@@ -23,6 +25,11 @@ export type ProductRow = {
   barcode: string | null;
   name: string;
   variantLabel: string | null;
+  model: string | null;
+  ram: string | null;
+  storage: string | null;
+  color: string | null;
+  warrantyMonths: number;
   category: string;
   categoryId: string;
   brand: string | null;
@@ -75,6 +82,11 @@ export function toProductRow(p: ProductWithRels, canSeeCost: boolean): ProductRo
     barcode: p.barcode,
     name: p.name,
     variantLabel: p.variantLabel,
+    model: p.model,
+    ram: p.ram,
+    storage: p.storage,
+    color: p.color,
+    warrantyMonths: p.warrantyMonths,
     category: p.category.name,
     categoryId: p.categoryId,
     brand: p.brand?.name ?? null,
@@ -97,9 +109,10 @@ export function buildProductWhere(q: Pick<ProductQuery, "search" | "categoryId" 
       OR: [
         { name: { contains: q.search, mode: "insensitive" } },
         { variantLabel: { contains: q.search, mode: "insensitive" } },
+        { model: { contains: q.search, mode: "insensitive" } },
         { sku: { contains: q.search, mode: "insensitive" } },
         { barcode: { contains: q.search } },
-        { serials: { some: { serial: { contains: q.search.toUpperCase() } } } },
+        { serials: { some: { OR: [{ serial: { contains: q.search.toUpperCase() } }, { imei2: { contains: q.search.toUpperCase() } }] } } },
       ],
     });
   }
@@ -133,15 +146,45 @@ export async function listProducts(q: ProductQuery, canSeeCost: boolean, onlyAct
 }
 
 /** Fast typeahead for the sales terminal – active products only, never exposes cost. */
-export async function searchSellableProducts(term: string, limit = 20): Promise<ProductRow[]> {
+export async function searchSellableProducts(term: string, limit = 20, categoryId?: string): Promise<ProductRow[]> {
   const t = term.trim();
   const rows = await prisma.product.findMany({
-    where: buildProductWhere({ search: t || undefined }, true),
+    where: buildProductWhere({ search: t || undefined, categoryId }, true),
     orderBy: [{ quantity: "desc" }, { name: "asc" }],
     take: limit,
     include: { category: { select: { name: true } }, brand: { select: { name: true } } },
   });
   return rows.map((p) => toProductRow(p, false));
+}
+
+export type ScanResult =
+  | { kind: "device"; product: ProductRow; serial: string; imei2: string | null }
+  | { kind: "product"; product: ProductRow }
+  | { kind: "unavailable"; reason: string }
+  | { kind: "not_found" };
+
+/**
+ * Resolves whatever the scanner/keyboard sent: an IMEI 1 / IMEI 2 / serial (→ that exact in-stock device),
+ * or a product barcode / SKU. Never exposes cost prices.
+ */
+export async function resolveScan(code: string): Promise<ScanResult> {
+  const raw = code.trim();
+  if (!raw) return { kind: "not_found" };
+  const normalized = normalizeSerial(raw);
+  const include = { category: { select: { name: true } }, brand: { select: { name: true } } } as const;
+  const device = await prisma.productSerial.findFirst({
+    where: { OR: [{ serial: normalized }, { imei2: normalized }] },
+    include: { product: { include } },
+  });
+  if (device) {
+    if (device.status !== "IN_STOCK") return { kind: "unavailable", reason: `Device ${device.serial} is ${device.status.replace("_", " ").toLowerCase()}, not in stock.` };
+    if (device.product.status !== "ACTIVE") return { kind: "unavailable", reason: `${device.product.name} is not available for sale.` };
+    return { kind: "device", product: toProductRow(device.product, false), serial: device.serial, imei2: device.imei2 };
+  }
+  const product = await prisma.product.findFirst({ where: { status: "ACTIVE", OR: [{ barcode: raw }, { sku: raw.toUpperCase() }] }, include });
+  if (!product) return { kind: "not_found" };
+  if (product.quantity <= 0) return { kind: "unavailable", reason: `${product.name} is out of stock.` };
+  return { kind: "product", product: toProductRow(product, false) };
 }
 
 export async function getProductBySlug(slug: string, canSeeCost: boolean) {
@@ -153,12 +196,23 @@ export async function getProductBySlug(slug: string, canSeeCost: boolean) {
   return { ...toProductRow(p, canSeeCost), description: p.description, createdAt: p.createdAt, updatedAt: p.updatedAt, brandId: p.brandId };
 }
 
+/** "8 GB · 256 GB · Black" built from the structured fields; falls back to a hand-typed label. */
+export function composeVariantLabel(v: Pick<ProductFormValues, "ram" | "storage" | "color" | "variantLabel">): string | null {
+  const parts = [v.ram, v.storage, v.color].map((x) => x?.trim()).filter((x): x is string => !!x);
+  return parts.length ? parts.join(" · ") : v.variantLabel?.trim() || null;
+}
+
 function toData(v: ProductFormValues, fallbackSku?: string) {
   return {
     sku: v.sku.trim().toUpperCase() || fallbackSku || `CP-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
     barcode: emptyToNull(v.barcode),
     name: v.name.trim(),
-    variantLabel: v.variantLabel?.trim() || null,
+    variantLabel: composeVariantLabel(v),
+    model: emptyToNull(v.model),
+    ram: emptyToNull(v.ram),
+    storage: emptyToNull(v.storage),
+    color: emptyToNull(v.color),
+    warrantyMonths: v.warrantyMonths,
     description: emptyToNull(v.description),
     categoryId: v.categoryId,
     brandId: v.brandId === PRODUCT_BRAND_SELECTION.CUSTOM ? null : v.brandId || null,
@@ -248,7 +302,7 @@ export async function createProduct(actor: Actor, raw: unknown) {
     const brandId = await resolveProductBrand(tx, actor, v);
     const slug = await uniqueSlug(v.name, async (value) => !!(await tx.product.findUnique({ where: { slug: value }, select: { id: true } })));
     const product = await tx.product.create({ data: { ...data, slug, categoryId, brandId } });
-    const openingSerials = v.openingSerialsText.trim().split(/[\s,;]+/).filter(Boolean);
+    const openingSerials = splitSerials(v.openingSerialsText);
     if (v.trackingType === "QUANTITY" && v.openingQuantity > 0) {
       await addStockTx(tx, actor, { productId: product.id, type: "INITIAL_STOCK", quantity: v.openingQuantity, reason: "Opening stock" });
     }
@@ -282,7 +336,7 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
     const updated = await tx.product.update({ where: { id }, data, select: { slug: true } });
 
     const changes: string[] = [];
-    const watch = ["name", "variantLabel", "sku", "barcode", "purchasePrice", "sellingPrice", "maxDiscountPercent", "categoryId", "brandId"] as const;
+    const watch = ["name", "model", "variantLabel", "warrantyMonths", "sku", "barcode", "purchasePrice", "sellingPrice", "maxDiscountPercent", "categoryId", "brandId"] as const;
     for (const k of watch) {
       const a = String(before[k] ?? "");
       const b = String(data[k] ?? "");

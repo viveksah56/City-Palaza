@@ -1,7 +1,7 @@
 "use client";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Banknote, CreditCard, Landmark, Smartphone, Wallet, Ellipsis } from "lucide-react";
+import { Banknote, CreditCard, Landmark, QrCode, Smartphone, Wallet, Ellipsis } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
@@ -9,6 +9,7 @@ export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 const PAYMENT_METHOD_ICONS = {
   CASH: Banknote,
   CARD: CreditCard,
+  UPI: QrCode,
   BANK_TRANSFER: Landmark,
   ESEWA: Smartphone,
   KHALTI: Wallet,

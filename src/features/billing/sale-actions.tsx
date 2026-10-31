@@ -2,20 +2,12 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Ban, Download, Printer } from "lucide-react";
+import { Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { voidSaleAction } from "@/server/actions";
-
-export function PrintButton() {
-  return <Button variant="outline" onClick={() => window.print()}><Printer /> Print</Button>;
-}
-
-export function DownloadReceipt({ slug }: { slug: string }) {
-  return <Button asChild variant="outline"><a href={`/api/sales/${slug}/receipt`} download><Download /> Download PDF</a></Button>;
-}
 
 export function VoidSaleDialog({ saleId, saleNumber }: { saleId: string; saleNumber: string }) {
   const router = useRouter();

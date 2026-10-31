@@ -8,15 +8,15 @@ const data: ReportExportData = {
   title: "CityPlaza sales report",
   period: "Last 7 days · 17/10/2026 – 23/10/2026",
   currency: "NPR",
-  business: { name: "CityPlaza", address: "Main Road", city: "Kathmandu", phone: "9800000000", email: "shop@example.com", panNumber: "612865374" },
-  summary: [["Sales total", "NPR 3,132.36"], ["Collected", "NPR 3,132.36"]],
+  business: { name: "CityPlaza", address: "Main Road", city: "Kathmandu", phone: "9800000000", email: "shop@example.com" },
+  summary: [["Sales total", "NPR 2,772.00"], ["Collected", "NPR 2,772.00"]],
   sections: [
     {
       title: "Sold products",
-      columns: ["Sale", "Sold at", "Employee", "Customer", "Phone", "Payment method", "Product", "SKU", "Category at sale", "Quantity", "IMEI / serial numbers", "Unit price (NPR)", "Gross amount (NPR)", "Promotion discount (NPR)", "Product discount (NPR)", "Sale-wide discount allocation (NPR)", "Total line discount (NPR)", "VAT (NPR)", "Line total (NPR)", "Notes"],
+      columns: ["Sale", "Sold at", "Employee", "Customer", "Phone", "Payment method", "Product", "SKU", "Category at sale", "Quantity", "IMEI / serial numbers", "Unit price (NPR)", "Gross amount (NPR)", "Promotion discount (NPR)", "Product discount (NPR)", "Sale-wide discount allocation (NPR)", "Total line discount (NPR)", "Line total (NPR)", "Notes"],
       rows: [
-        ["CP-2026-001", "23/10/2026, 10:00:00", "Store Employee", "Walk-in", "", "CASH", "USB-C Cable", "AN-CBL-C2C", "Cables", 3, "", 1200, 3600, 0, 100, 728, 828, 360.36, 3132.36, "Counter sale"],
-        ["TOTAL", "", "", "", "", "", "", "", "", 3, "", "", 3600, 0, 100, 728, 828, 360.36, 3132.36, ""],
+        ["CP-2026-001", "23/10/2026, 10:00:00", "Store Employee", "Walk-in", "", "CASH", "USB-C Cable", "AN-CBL-C2C", "Cables", 3, "", 1200, 3600, 0, 100, 728, 828, 2772, "Counter sale"],
+        ["TOTAL", "", "", "", "", "", "", "", "", 3, "", "", 3600, 0, 100, 728, 828, 2772, ""],
       ],
     },
   ],
@@ -39,9 +39,9 @@ describe("report documents", () => {
     expect(sheet).toBeDefined();
     expect(sheet?.getRow(3).values).toContain("USB-C Cable");
     expect(sheet?.getRow(3).values).toContain("CP-2026-001");
-    expect(sheet?.getRow(3).values).toContain(3132.36);
+    expect(sheet?.getRow(3).values).toContain(2772);
     expect(sheet?.getRow(4).getCell(10).value).toBe(3);
-    expect(sheet?.getRow(4).getCell(19).value).toBe(3132.36);
+    expect(sheet?.getRow(4).getCell(18).value).toBe(2772);
   });
 
   it("generates a readable PDF document", async () => {

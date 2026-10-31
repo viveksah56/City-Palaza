@@ -16,10 +16,11 @@ const VARIANTS: Record<string, "success" | "warning" | "destructive" | "muted" |
   ACTIVE: "success", INACTIVE: "muted", SUSPENDED: "destructive", DISCONTINUED: "destructive",
   COMPLETED: "success", VOIDED: "destructive",
   PAID: "success", PARTIAL: "warning", PENDING: "warning", REFUNDED: "muted",
+  CLAIMED: "warning", OPEN: "success", CLOSED: "muted",
   IN_STOCK: "success", SOLD: "secondary", RETURNED: "warning", DAMAGED: "destructive", LOST: "destructive",
   [ROLE.ADMIN]: "secondary", [ROLE.EMPLOYEE]: "muted",
 };
-const LABELS: Record<string, string> = { BANK_TRANSFER: "Bank transfer", ESEWA: "eSewa", KHALTI: "Khalti" };
+const LABELS: Record<string, string> = { BANK_TRANSFER: "Bank transfer", ESEWA: "eSewa", KHALTI: "Khalti", UPI: "UPI / QR", CLAIMED: "Claimed" };
 
 export function StatusBadge({ status }: { status: string }) {
   const label = LABELS[status] ?? status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, " ");

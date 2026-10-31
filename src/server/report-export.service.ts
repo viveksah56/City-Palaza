@@ -1,3 +1,4 @@
+import { formatDevice } from "@/lib/imei";
 import { prisma } from "@/lib/db";
 import { D } from "@/lib/money";
 import type { DateRange } from "@/lib/dates";
@@ -17,7 +18,7 @@ export type ReportExportData = {
   title: string;
   period: string;
   currency: string;
-  business: { name: string; address: string; city: string; phone: string; email: string; panNumber: string };
+  business: { name: string; address: string; city: string; phone: string; email: string };
   summary: [string, string | number][];
   sections: ExportSection[];
 };
@@ -47,12 +48,10 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
         paymentMethod: true,
         subtotal: true,
         discount: true,
-        taxRate: true,
-        tax: true,
         total: true,
         amountPaid: true,
         notes: true,
-        items: { select: { productName: true, categoryName: true, sku: true, quantity: true, serialSnapshot: true, unitPrice: true, subtotal: true, discount: true, promoDiscount: true, itemDiscount: true, saleDiscount: true, tax: true, total: true } },
+        items: { select: { productName: true, categoryName: true, sku: true, quantity: true, serialSnapshot: true, imei2Snapshot: true, unitPrice: true, subtotal: true, discount: true, promoDiscount: true, itemDiscount: true, saleDiscount: true, total: true } },
         payments: { select: { amount: true, method: true, receivedAt: true, note: true, receivedBy: { select: { firstName: true, lastName: true } } }, orderBy: { receivedAt: "asc" } },
       },
     }),
@@ -69,14 +68,13 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
     item.sku,
     item.categoryName,
     item.quantity,
-    item.serialSnapshot.join(", "),
+    item.serialSnapshot.map((serial, i) => formatDevice(serial, item.imei2Snapshot[i])).join(", "),
     Number(item.unitPrice.toString()),
     Number(item.subtotal.toString()),
     Number(item.promoDiscount?.toString() ?? "0"),
     item.itemDiscount === null ? "Not split (legacy sale)" : Number(item.itemDiscount.toString()),
     item.itemDiscount === null ? "Not split (legacy sale)" : Number(item.saleDiscount?.toString() ?? "0"),
     Number(item.discount.toString()),
-    Number(item.tax.toString()),
     Number(item.total.toString()),
     sale.notes ?? "",
   ]));
@@ -87,16 +85,15 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
     itemDiscount: total.itemDiscount.plus(typeof row[14] === "number" ? D(row[14]) : D(0)),
     saleDiscount: total.saleDiscount.plus(typeof row[15] === "number" ? D(row[15]) : D(0)),
     discount: total.discount.plus(D(Number(row[16] ?? 0))),
-    tax: total.tax.plus(D(Number(row[17] ?? 0))),
-    lineTotal: total.lineTotal.plus(D(Number(row[18] ?? 0))),
+    lineTotal: total.lineTotal.plus(D(Number(row[17] ?? 0))),
     legacyUnsplit: total.legacyUnsplit || typeof row[14] !== "number",
-  }), { quantity: 0, gross: D(0), promotion: D(0), itemDiscount: D(0), saleDiscount: D(0), discount: D(0), tax: D(0), lineTotal: D(0), legacyUnsplit: false });
+  }), { quantity: 0, gross: D(0), promotion: D(0), itemDiscount: D(0), saleDiscount: D(0), discount: D(0), lineTotal: D(0), legacyUnsplit: false });
   if (soldProductRows.length) soldProductRows.push([
     "TOTAL", "", "", "", "", "", "", "", "", soldTotals.quantity, "", "",
     Number(soldTotals.gross.toFixed(2)), Number(soldTotals.promotion.toFixed(2)),
     soldTotals.legacyUnsplit ? "See legacy rows" : Number(soldTotals.itemDiscount.toFixed(2)),
     soldTotals.legacyUnsplit ? "See legacy rows" : Number(soldTotals.saleDiscount.toFixed(2)),
-    Number(soldTotals.discount.toFixed(2)), Number(soldTotals.tax.toFixed(2)), Number(soldTotals.lineTotal.toFixed(2)), "",
+    Number(soldTotals.discount.toFixed(2)), Number(soldTotals.lineTotal.toFixed(2)), "",
   ]);
   return {
     title: `${business.name || APP_NAME} ${scope.toLowerCase()} report`,
@@ -108,7 +105,6 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
       ["Gross sales", money(sales.grossSales, currency)],
       ["Discounts", money(sales.discounts, currency)],
       ["Net sales", money(sales.netSales, currency)],
-      ["Taxes", money(sales.taxes, currency)],
       ["Sales total", money(sales.total, currency)],
       ["Collected", money(sales.collected, currency)],
       ["Outstanding", money(sales.outstanding, currency)],
@@ -121,7 +117,7 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
       { title: "Payment methods", columns: ["Method", "Payments", `Collected (${currency})`], rows: payments.map((row) => [row.method, row.count, Number(row.total)]) },
       {
         title: "Sale transactions",
-        columns: ["Sale", "Date and time", "Employee", "Customer", "Phone", "Payment status", "Payment method", `Subtotal (${currency})`, `Discount (${currency})`, "VAT rate", `VAT (${currency})`, `Total (${currency})`, `Paid (${currency})`, `Balance (${currency})`, "Notes"],
+        columns: ["Sale", "Date and time", "Employee", "Customer", "Phone", "Payment status", "Payment method", `Subtotal (${currency})`, `Discount (${currency})`, `Total (${currency})`, `Paid (${currency})`, `Balance (${currency})`, "Notes"],
         rows: rows.map((row) => [
           row.saleNumber,
           formatDateTime(row.createdAt),
@@ -132,8 +128,6 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
           row.paymentMethod,
           Number(row.subtotal.toString()),
           Number(row.discount.toString()),
-          Number(row.taxRate.toString()),
-          Number(row.tax.toString()),
           Number(row.total.toString()),
           Number(row.amountPaid.toString()),
           Number(D(row.total).minus(row.amountPaid).toFixed(2)),
@@ -142,7 +136,7 @@ export async function getSalesExportData(user: SessionUser, range: DateRange, cu
       },
       {
         title: "Sold products",
-        columns: ["Sale", "Sold at", "Employee", "Customer", "Phone", "Payment method", "Product", "SKU", "Category at sale", "Quantity", "IMEI / serial numbers", `Unit price (${currency})`, `Gross amount (${currency})`, `Promotion discount (${currency})`, `Product discount (${currency})`, `Sale-wide discount allocation (${currency})`, `Total line discount (${currency})`, `VAT (${currency})`, `Line total (${currency})`, "Notes"],
+        columns: ["Sale", "Sold at", "Employee", "Customer", "Phone", "Payment method", "Product", "SKU", "Category at sale", "Quantity", "IMEI / serial numbers", `Unit price (${currency})`, `Gross amount (${currency})`, `Promotion discount (${currency})`, `Product discount (${currency})`, `Sale-wide discount allocation (${currency})`, `Total line discount (${currency})`, `Line total (${currency})`, "Notes"],
         rows: soldProductRows,
       },
       {

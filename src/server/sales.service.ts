@@ -15,6 +15,7 @@ import { createSaleSchema, settleSalePaymentSchema, voidSaleSchema, type CreateS
 import { changeStock, normalizeSerials, type Actor } from "./inventory.service";
 import { readSettings } from "./settings.service";
 import { uniqueSlug } from "@/lib/slug";
+import { addMonths } from "date-fns";
 
 async function nextCounter(tx: Tx, key: string): Promise<number> {
   const rows = await tx.$queryRaw<{ value: number }[]>`
@@ -29,7 +30,7 @@ type Prepared = { product: Prisma.ProductGetPayload<{ include: { category: { sel
 /**
  * Creates a sale. EVERYTHING happens in one DB transaction:
  * Sale + SaleItems + serial claims + guarded stock deduction + inventory transactions + audit.
- * Prices, discounts, tax and totals are recomputed here – nothing numeric from the browser is trusted.
+ * Prices, discounts and totals are recomputed here – nothing numeric from the browser is trusted.
  */
 export async function createSale(actor: Actor, raw: unknown): Promise<{ id: string; slug: string; saleNumber: string }> {
   assertRolePermission(actor.role, PERMISSION.SALE_CREATE);
@@ -82,7 +83,6 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
           discount: merged.get(x.product.id)?.discount,
         })),
         discount: input.discount && D(input.discount.value).gt(0) ? input.discount : null,
-        taxRatePercent: settings.taxRate,
       });
       assertDiscountAllowed(calc.manualDiscount, calc.netAfterPromo, actor.role, settings.employeeDiscountLimit, settings.currency);
       if (actor.role !== ROLE.ADMIN) {
@@ -122,9 +122,25 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
         throw new DomainError("NOT_FOUND", "Selected customer no longer exists.");
       }
 
-      // payment
+      // payment (a sale is always settled in full at the counter)
       const paymentStatus = "PAID" as const;
       const amountPaid = calc.total;
+      let amountTendered: string | null = null;
+      let changeGiven: string | null = null;
+      if (input.paymentMethod === "CASH" && input.amountTendered !== null && input.amountTendered !== undefined) {
+        const tendered = money(input.amountTendered);
+        if (tendered.lt(calc.total)) throw new DomainError("VALIDATION", `Cash received (${formatCurrency(tendered, settings.currency)}) is less than the total (${formatCurrency(calc.total, settings.currency)}).`);
+        amountTendered = toDb(tendered);
+        changeGiven = toDb(tendered.minus(calc.total));
+      }
+      const openShift = await tx.cashShift.findFirst({ where: { status: "OPEN" }, select: { id: true } });
+
+      // IMEI 2 snapshot (aligned with the IMEI 1 list) – read before the devices flip to SOLD
+      const deviceRows = await tx.productSerial.findMany({
+        where: { productId: { in: ids }, serial: { in: prepared.flatMap((x) => x.serials) }, status: "IN_STOCK" },
+        select: { id: true, productId: true, serial: true, imei2: true },
+      });
+      const imei2For = (productId: string, serial: string) => deviceRows.find((d) => d.productId === productId && d.serial === serial)?.imei2 ?? "";
 
       const seq = await nextCounter(tx, "sale");
       const saleNumber = `${settings.invoicePrefix}-${String(seq).padStart(6, "0")}`;
@@ -140,14 +156,15 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
           discount: toDb(calc.discount),
           promoDiscount: toDb(calc.promoDiscount),
           manualDiscount: toDb(calc.manualDiscount),
-          tax: toDb(calc.tax),
           total: toDb(calc.total),
           discountType: input.discount && D(input.discount.value).gt(0) ? input.discount.type : null,
           discountValue: input.discount && D(input.discount.value).gt(0) ? toDb(input.discount.value) : null,
-          taxRate: D(settings.taxRate).toFixed(2),
           paymentMethod: input.paymentMethod,
           paymentStatus,
           amountPaid: toDb(amountPaid),
+          amountTendered,
+          changeGiven,
+          shiftId: openShift?.id ?? null,
           idempotencyKey: input.idempotencyKey,
           notes: input.notes?.trim() || null,
           items: {
@@ -160,13 +177,13 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
               sku: prepared[i]!.product.sku,
               quantity: l.quantity,
               serialSnapshot: prepared[i]!.serials,
+              imei2Snapshot: prepared[i]!.serials.map((serial) => imei2For(prepared[i]!.product.id, serial)),
               unitPrice: toDb(l.unitPrice),
               unitCost: toDb(l.unitCost),
               discount: toDb(l.discount),
               promoDiscount: toDb(l.promoDiscount),
               itemDiscount: toDb(l.itemManualDiscount),
               saleDiscount: toDb(l.saleDiscount),
-              tax: toDb(l.tax),
               subtotal: toDb(l.subtotal),
               total: toDb(l.total),
             })),
@@ -196,6 +213,23 @@ export async function createSale(actor: Actor, raw: unknown): Promise<{ id: stri
           reason: `Sale ${saleNumber}`,
           userId: actor.id,
         });
+      }
+
+      // warranties: one per sold device (or one per line for non-serialized goods)
+      const soldAt = new Date();
+      let warrantySeq = 0;
+      for (const prep of prepared) {
+        if (prep.product.warrantyMonths <= 0) continue;
+        const item = sale.items.find((i) => i.productId === prep.product.id)!;
+        const endsAt = addMonths(soldAt, prep.product.warrantyMonths);
+        const serialRows = prep.serials.length ? await tx.productSerial.findMany({ where: { saleItemId: item.id }, select: { id: true, serial: true }, orderBy: { serial: "asc" } }) : [];
+        const targets = serialRows.length ? serialRows.map((r) => r.id) : [null];
+        for (const serialId of targets) {
+          warrantySeq += 1;
+          await tx.warranty.create({
+            data: { tag: `${saleNumber}-W${warrantySeq}`, saleItemId: item.id, serialId, customerId, startsAt: soldAt, endsAt, terms: settings.warrantyTerms.trim() || null },
+          });
+        }
       }
 
       if (customerId) await tx.customer.update({ where: { id: customerId }, data: { lastPurchaseAt: new Date() } });
@@ -260,6 +294,7 @@ export async function voidSale(actor: Actor, raw: unknown) {
 
     const itemIds = sale.items.map((i) => i.id);
     await tx.productSerial.updateMany({ where: { saleItemId: { in: itemIds } }, data: { status: "IN_STOCK" } });
+    await tx.warranty.updateMany({ where: { saleItemId: { in: itemIds }, status: "ACTIVE" }, data: { status: "VOIDED", notes: `Sale ${sale.saleNumber} voided` } });
 
     for (const item of [...sale.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
       await changeStock(tx, {
@@ -345,7 +380,8 @@ export async function getSaleForUser(user: { id: string; role: Role }, id: strin
       employee: { select: { firstName: true, lastName: true } },
       voidedBy: { select: { firstName: true, lastName: true } },
       customer: true,
-      items: { include: { serials: { select: { serial: true } } }, orderBy: { productName: "asc" } },
+      shift: { select: { id: true, openedAt: true } },
+      items: { include: { serials: { select: { serial: true, imei2: true } }, warranties: { select: { id: true, tag: true, endsAt: true, status: true, terms: true }, orderBy: { tag: "asc" } } }, orderBy: { productName: "asc" } },
       payments: { include: { receivedBy: { select: { firstName: true, lastName: true } } }, orderBy: { receivedAt: "asc" } },
     },
   });
@@ -362,7 +398,8 @@ export async function getSaleForUserBySlug(user: { id: string; role: Role }, slu
       employee: { select: { firstName: true, lastName: true } },
       voidedBy: { select: { firstName: true, lastName: true } },
       customer: true,
-      items: { include: { serials: { select: { serial: true } } }, orderBy: { productName: "asc" } },
+      shift: { select: { id: true, openedAt: true } },
+      items: { include: { serials: { select: { serial: true, imei2: true } }, warranties: { select: { id: true, tag: true, endsAt: true, status: true, terms: true }, orderBy: { tag: "asc" } } }, orderBy: { productName: "asc" } },
       payments: { include: { receivedBy: { select: { firstName: true, lastName: true } } }, orderBy: { receivedAt: "asc" } },
     },
   });

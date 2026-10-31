@@ -5,7 +5,9 @@ export const DEFAULT_BUSINESS_DETAILS = {
   city: "Sirahah",
   phone: "",
   email: "",
-  panNumber: "612865374",
+  receiptFooter: "Thank you for shopping with us!",
+  warrantyTerms:
+    "Warranty covers manufacturing defects only and is void for physical or liquid damage, tampering or unauthorised repair. Keep this receipt and the original box. Bring the device and IMEI for any claim.",
 } as const;
 export const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Kathmandu";
 export const SESSION_COOKIE = "cp_session";
@@ -28,14 +30,15 @@ export const SESSION_MAX_AGE_HOURS = Number.isInteger(configuredSessionMaxAgeHou
 export const DEFAULT_PAGE_SIZE = 20;
 export const LOW_STOCK_NOTIFICATIONS_CACHE_TAG = "low-stock-notifications";
 
-export const PAYMENT_METHODS = ["CASH", "CARD", "BANK_TRANSFER", "ESEWA", "KHALTI", "OTHER"] as const;
+export const PAYMENT_METHODS = ["CASH", "CARD", "UPI", "ESEWA", "KHALTI", "BANK_TRANSFER", "OTHER"] as const;
 export const PAYMENT_STATUSES = ["PAID", "PARTIAL", "PENDING", "REFUNDED"] as const;
 export const PAYMENT_METHOD_LABELS: Record<(typeof PAYMENT_METHODS)[number], string> = {
   CASH: "Cash",
   CARD: "Card",
+  UPI: "UPI / QR",
+  ESEWA: "eSewa (wallet)",
+  KHALTI: "Khalti (wallet)",
   BANK_TRANSFER: "Bank transfer",
-  ESEWA: "eSewa",
-  KHALTI: "Khalti",
   OTHER: "Other",
 };
 export const TRACKING_LABELS = { QUANTITY: "Quantity", SERIALIZED: "Serial number", IMEI: "IMEI" } as const;

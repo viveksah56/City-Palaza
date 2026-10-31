@@ -7,18 +7,19 @@ import { toast } from "sonner";
 import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { customerSchema, type CustomerValues } from "@/validations/customer";
 import { saveCustomerAction } from "@/server/actions";
 
-export function CustomerFormDialog({ customer }: { customer?: { id: string; name: string; phone: string | null; email: string | null; address: string | null } }) {
+export function CustomerFormDialog({ customer }: { customer?: { id: string; name: string; phone: string | null; email: string | null; address: string | null; notes?: string | null } }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CustomerValues>({
     resolver: zodResolver(customerSchema),
-    defaultValues: { id: customer?.id, name: customer?.name ?? "", phone: customer?.phone ?? "", email: customer?.email ?? "", address: customer?.address ?? "" },
+    defaultValues: { id: customer?.id, name: customer?.name ?? "", phone: customer?.phone ?? "", email: customer?.email ?? "", address: customer?.address ?? "", notes: customer?.notes ?? "" },
   });
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
@@ -38,6 +39,7 @@ export function CustomerFormDialog({ customer }: { customer?: { id: string; name
           <Field label="Phone" htmlFor="c-phone" error={errors.phone?.message}><Input id="c-phone" inputMode="tel" {...register("phone")} /></Field>
           <Field label="Email" htmlFor="c-email" error={errors.email?.message}><Input id="c-email" type="email" {...register("email")} /></Field>
           <Field label="Address" htmlFor="c-address" error={errors.address?.message}><Input id="c-address" {...register("address")} /></Field>
+          <Field label="Notes" htmlFor="c-notes" error={errors.notes?.message} hint="Preferences, alternate contact, credit remarks…"><Textarea id="c-notes" rows={2} {...register("notes")} /></Field>
           <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Save customer"}</Button></DialogFooter>
         </form>
       </DialogContent>

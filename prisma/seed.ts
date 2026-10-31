@@ -87,7 +87,7 @@ async function bootstrap() {
     }
 
     // --- settings ---
-    const settings = { ...DEFAULT_SETTINGS, taxRate: 13 };
+    const settings = { ...DEFAULT_SETTINGS };
     for (const [key, value] of Object.entries(settings)) {
       if (value === null) {
         await prisma.setting.deleteMany({ where: { key } });

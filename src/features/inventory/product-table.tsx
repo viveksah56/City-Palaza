@@ -58,6 +58,7 @@ export function ProductTable({
                 barcode: p.barcode ?? "",
                 name: p.name,
                 variantLabel: p.variantLabel ?? "",
+                model: p.model ?? "", ram: p.ram ?? "", storage: p.storage ?? "", color: p.color ?? "", warrantyMonths: p.warrantyMonths,
                 description: p.description ?? "",
                 categoryId: p.categoryId,
                 brandId: p.brandId ?? "",

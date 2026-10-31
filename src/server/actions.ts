@@ -21,6 +21,8 @@ import * as products from "./products.service";
 import * as taxonomy from "./taxonomy.service";
 import * as inventory from "./inventory.service";
 import * as sales from "./sales.service";
+import * as shifts from "./shifts.service";
+import * as warranties from "./warranties.service";
 import * as customers from "./customers.service";
 import * as employees from "./employees.service";
 import { updateSettings } from "./settings.service";
@@ -202,6 +204,42 @@ export async function settleSalePaymentAction(raw: unknown) {
     revalidatePath("/dashboard");
     revalidatePath("/reports");
     return res;
+  });
+}
+
+// ---------- cash register ----------
+export async function openShiftAction(raw: unknown) {
+  return run(async () => {
+    const actor = await assertPermission(PERMISSION.SHIFT_OPEN);
+    const res = await shifts.openShift(actor, raw);
+    revalidatePath("/register");
+    revalidatePath("/sales/new");
+    return res;
+  });
+}
+export async function closeShiftAction(raw: unknown) {
+  return run(async () => {
+    const actor = await assertPermission(PERMISSION.SHIFT_CLOSE);
+    const res = await shifts.closeShift(actor, raw);
+    revalidatePath("/register");
+    revalidatePath("/sales/new");
+    return res;
+  });
+}
+
+// ---------- warranties ----------
+export async function lookupWarrantyAction(term: string) {
+  return run(async () => {
+    const actor = await assertPermission(PERMISSION.WARRANTY_VIEW);
+    return warranties.lookupWarranty(actor, z.string().trim().max(60).parse(term));
+  });
+}
+export async function claimWarrantyAction(id: string, notes: string) {
+  return run(async () => {
+    const actor = await assertPermission(PERMISSION.WARRANTY_MANAGE);
+    await warranties.markWarrantyClaimed(actor, z.string().min(1).max(64).parse(id), notes);
+    revalidatePath("/customers", "layout");
+    return undefined;
   });
 }
 

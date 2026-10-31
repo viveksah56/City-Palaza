@@ -7,7 +7,8 @@ import { DomainError } from "@/lib/errors";
 import { toDb, money } from "@/lib/money";
 import { uniqueSlug } from "@/lib/slug";
 import { slugify } from "@/lib/format";
-import { normalizeSerials } from "@/lib/imei";
+import { normalizeDevices } from "@/lib/imei";
+import { composeVariantLabel } from "./products.service";
 import { productSchema } from "@/validations/product";
 import { addStockTx, type Actor } from "./inventory.service";
 import { writeAudit } from "@/lib/audit";
@@ -21,6 +22,8 @@ const HEADER_ALIASES: Record<string, string> = {
   price: "sellingPrice", sellingprice: "sellingPrice", openingstock: "quantity",
   stock: "quantity", quantity: "quantity", trackingtype: "trackingType", serialnumbers: "serials",
   discount: "maxDiscountPercent", discountpercent: "maxDiscountPercent", maxdiscountpercent: "maxDiscountPercent", maximumemployeediscount: "maxDiscountPercent", employeediscount: "maxDiscountPercent",
+  model: "model", ram: "ram", memory: "ram", storage: "storage", rom: "storage", color: "color", colour: "color",
+  warranty: "warrantyMonths", warrantymonths: "warrantyMonths",
 };
 
 export type ImportIssue = { row: number; sku?: string; message: string };
@@ -116,6 +119,11 @@ function parseRows(source: string): { products: ParsedProduct[]; issues: ImportI
       barcode: barcode || undefined,
       name: record.name,
       variantLabel: record.variantLabel || undefined,
+      model: record.model || undefined,
+      ram: record.ram || undefined,
+      storage: record.storage || undefined,
+      color: record.color || undefined,
+      warrantyMonths: record.warrantyMonths ? Number(record.warrantyMonths) : 0,
       description: record.description || undefined,
       categoryId: "bulk-import-category",
       brandId: undefined,
@@ -139,8 +147,8 @@ function parseRows(source: string): { products: ParsedProduct[]; issues: ImportI
       continue;
     }
     try {
-      const normalized = normalizeSerials(serials, trackingType);
-      for (const serial of normalized) {
+      const devices = trackingType === "QUANTITY" ? [] : normalizeDevices(serials, trackingType);
+      for (const serial of devices.flatMap((d) => (d.imei2 ? [d.serial, d.imei2] : [d.serial]))) {
         const owner = serialOwners.get(serial);
         if (owner) issues.push({ row: rowNumber, sku, message: `Serial ${serial} is duplicated in rows ${owner} and ${rowNumber}.` });
         else serialOwners.set(serial, rowNumber);
@@ -255,12 +263,18 @@ export async function importProductsCsv(actor: Actor, csv: string) {
           sku,
           barcode: value.barcode?.trim() || null,
           name: value.name.trim(),
-          variantLabel: value.variantLabel?.trim() || null,
+          variantLabel: composeVariantLabel(value),
+          model: value.model?.trim() || null,
+          ram: value.ram?.trim() || null,
+          storage: value.storage?.trim() || null,
+          color: value.color?.trim() || null,
+          warrantyMonths: value.warrantyMonths,
           description: value.description?.trim() || null,
           categoryId: category.id,
           brandId: brand?.id ?? null,
           purchasePrice: toDb(value.purchasePrice),
           sellingPrice: toDb(value.sellingPrice),
+          maxDiscountPercent: money(value.maxDiscountPercent).toFixed(2),
           trackingType: value.trackingType,
           status: "ACTIVE",
         },

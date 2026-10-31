@@ -14,7 +14,7 @@ import { FilterSelect } from "@/components/shared/filter-select";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { EmptyState } from "@/components/shared/states";
 import { Pagination } from "@/components/shared/data-table";
-import { SaleTable } from "@/features/sales/sale-table";
+import { SaleTable } from "@/features/billing/sale-table";
 import { listSales, parseSalesQuery } from "@/server/sales.service";
 import { listEmployeeOptions } from "@/server/employees.service";
 import { getSettings } from "@/server/settings.service";
@@ -50,7 +50,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         <ReportCard label="Booked sales" value={<CurrencyDisplay value={overview.total} currency={settings.currency} />} hint="Completed transactions" accent="blue" />
         <ReportCard label="Collected" value={<CurrencyDisplay value={overview.collected} currency={settings.currency} />} hint="Payments received in period" accent="green" />
         <ReportCard label="Outstanding" value={<CurrencyDisplay value={overview.outstanding} currency={settings.currency} />} hint="Balance due on period sales" accent="orange" />
-        <ReportCard label="Average sale" value={<CurrencyDisplay value={overview.averageSale} currency={settings.currency} />} hint="Net per completed sale, excluding tax" accent="purple" />
+        <ReportCard label="Average sale" value={<CurrencyDisplay value={overview.averageSale} currency={settings.currency} />} hint="Net per completed sale" accent="purple" />
       </div>
       <Card className="gap-0 py-0">
         <div className="flex flex-wrap items-center gap-2 border-b border-border/60 p-4">

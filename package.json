@@ -12,6 +12,8 @@
     "start": "next start",
     "start:prod": "node scripts/next-prod.mjs start",
     "typecheck": "tsc --noEmit",
+    "check:any": "node scripts/check-no-any.mjs",
+    "check": "tsc --noEmit && node scripts/check-no-any.mjs && vitest run",
     "postinstall": "prisma generate",
     "db:push": "PRISMA_ENV_FILE=.env prisma db push",
     "db:migrate:local": "PRISMA_ENV_FILE=.env prisma migrate dev",

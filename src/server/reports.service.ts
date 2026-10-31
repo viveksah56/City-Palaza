@@ -20,20 +20,18 @@ export type SalesSummary = {
   count: number;
   grossSales: string; // before discounts
   discounts: string;
-  netSales: string; // gross − discounts (ex tax)
-  taxes: string;
-  total: string; // booked sale total, including tax
+  netSales: string; // gross − discounts
+  total: string; // booked sale total
   collected: string;
   outstanding: string;
   averageSale: string;
 };
 
 export async function getSalesSummary(p: Period, employeeId?: string): Promise<SalesSummary> {
-  const [r] = await prisma.$queryRaw<{ count: number; subtotal: string; discount: string; tax: string; total: string; collected: string; outstanding: string }[]>`
+  const [r] = await prisma.$queryRaw<{ count: number; subtotal: string; discount: string; total: string; collected: string; outstanding: string }[]>`
     SELECT COUNT(*)::int AS count,
            COALESCE(SUM(s."subtotal"),0)::text AS subtotal,
            COALESCE(SUM(s."discount"),0)::text AS discount,
-           COALESCE(SUM(s."tax"),0)::text AS tax,
            COALESCE(SUM(s."total"),0)::text AS total,
            COALESCE((SELECT SUM(sp."amount") FROM "citypalaza_database"."SalePayment" sp JOIN "citypalaza_database"."Sale" ps ON ps."id" = sp."saleId"
              WHERE ps."status" = 'COMPLETED' AND sp."receivedAt" >= ${p.from} AND sp."receivedAt" < ${p.to} ${employeeId ? Prisma.sql`AND ps."employeeId" = ${employeeId}` : Prisma.empty}),0)::text AS collected,
@@ -45,7 +43,6 @@ export async function getSalesSummary(p: Period, employeeId?: string): Promise<S
     grossSales: row.subtotal,
     discounts: row.discount,
     netSales: D(row.subtotal).minus(row.discount).toFixed(2),
-    taxes: row.tax,
     total: row.total,
     collected: row.collected,
     outstanding: row.outstanding,

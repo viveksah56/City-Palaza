@@ -9,8 +9,7 @@ import { D, money, sum, ZERO, Decimal, type MoneyInput } from "./money";
  *            promo    = no product-level automatic promotion
  * Sale-level discount (percent or fixed) applies to Σ(subtotal − promo) and is allocated
  * proportionally to lines (last line absorbs rounding) so per-line profit stays exact.
- * Tax (exclusive) = (subtotal − line discount) × taxRate / 100.
- * Line total = subtotal − discount + tax.
+ * Line total = subtotal − discount. There is no tax: prices are what the customer pays.
  */
 export type CalcLineInput = {
   productId: string;
@@ -33,7 +32,6 @@ export type CalcLine = {
   itemManualDiscount: Decimal;
   saleDiscount: Decimal;
   discount: Decimal;
-  tax: Decimal;
   total: Decimal;
   profit: Decimal;
 };
@@ -45,7 +43,6 @@ export type SaleCalculation = {
   saleDiscount: Decimal;
   manualDiscount: Decimal;
   discount: Decimal;
-  tax: Decimal;
   total: Decimal;
   profit: Decimal;
   effectiveDiscountPercent: Decimal;
@@ -53,11 +50,8 @@ export type SaleCalculation = {
 };
 
 export function calculateSale(
-  input: { lines: CalcLineInput[]; discount?: DiscountInput; taxRatePercent?: MoneyInput },
+  input: { lines: CalcLineInput[]; discount?: DiscountInput },
 ): SaleCalculation {
-  const taxRate = D(input.taxRatePercent ?? 0);
-  if (taxRate.isNegative() || taxRate.gt(100)) throw new DomainError("VALIDATION", "Invalid tax rate.");
-
   const base = input.lines.map((l) => {
     if (!Number.isInteger(l.quantity) || l.quantity < 1) throw new DomainError("VALIDATION", "Quantity must be a whole number of at least 1.");
     const unitPrice = money(l.unitPrice);
@@ -77,9 +71,7 @@ export function calculateSale(
     const share = shares[i] ?? ZERO;
     const manualDiscount = b.itemManualDiscount.plus(share);
     const discount = b.promoDiscount.plus(manualDiscount);
-    const taxable = b.subtotal.minus(discount);
-    const tax = money(taxable.times(taxRate).div(100));
-    const total = taxable.plus(tax);
+    const total = b.subtotal.minus(discount);
     return {
       productId: b.l.productId,
       quantity: b.l.quantity,
@@ -90,10 +82,9 @@ export function calculateSale(
       itemManualDiscount: b.itemManualDiscount,
       saleDiscount: share,
       discount,
-      tax,
       total,
       // (historical selling price − historical purchase price) × qty, net of discounts given
-      profit: taxable.minus(b.unitCost.times(b.l.quantity)),
+      profit: total.minus(b.unitCost.times(b.l.quantity)),
     };
   });
 
@@ -104,7 +95,6 @@ export function calculateSale(
     saleDiscount: sum(lines.map((l) => l.saleDiscount)),
     manualDiscount: sum(lines.map((l) => l.saleDiscount.plus(l.itemManualDiscount))),
     discount: sum(lines.map((l) => l.discount)),
-    tax: sum(lines.map((l) => l.tax)),
     total: sum(lines.map((l) => l.total)),
     profit: sum(lines.map((l) => l.profit)),
     effectiveDiscountPercent: sum(lines.map((l) => l.subtotal)).isZero() ? ZERO : sum(lines.map((l) => l.discount)).div(sum(lines.map((l) => l.subtotal))).times(100),

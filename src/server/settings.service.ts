@@ -12,10 +12,11 @@ export type Settings = {
   city: string;
   phone: string;
   email: string;
-  panNumber: string;
   currency: string;
-  /** percent, tax-exclusive, e.g. 13 */
-  taxRate: number;
+  /** printed at the bottom of every receipt */
+  receiptFooter: string;
+  /** default warranty terms printed under warranted devices */
+  warrantyTerms: string;
   invoicePrefix: string;
   /** max manual discount (%) an employee may give */
   employeeDiscountLimit: number;
@@ -28,9 +29,9 @@ export const DEFAULT_SETTINGS: Settings = {
   city: DEFAULT_BUSINESS_DETAILS.city,
   phone: DEFAULT_BUSINESS_DETAILS.phone,
   email: DEFAULT_BUSINESS_DETAILS.email,
-  panNumber: DEFAULT_BUSINESS_DETAILS.panNumber,
   currency: "NPR",
-  taxRate: 13,
+  receiptFooter: DEFAULT_BUSINESS_DETAILS.receiptFooter,
+  warrantyTerms: DEFAULT_BUSINESS_DETAILS.warrantyTerms,
   invoicePrefix: "CP",
   employeeDiscountLimit: 5,
   employeeMaxTotalDiscountPercent: null,

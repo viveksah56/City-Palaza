@@ -5,10 +5,12 @@ import { formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/states";
-import { SaleTable } from "@/features/sales/sale-table";
+import { SaleTable } from "@/features/billing/sale-table";
 import { getCustomerBySlug } from "@/server/customers.service";
 import { listSales, parseSalesQuery } from "@/server/sales.service";
 import { getSettings } from "@/server/settings.service";
+import { listCustomerWarranties } from "@/server/warranties.service";
+import { WarrantyTable } from "@/features/warranties/warranty-table";
 
 export default async function CustomerPage({ params }: { params: Promise<{ slug: string }> }) {
   const user = await requirePermission(PERMISSION.CUSTOMER_VIEW);
@@ -16,7 +18,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ slug:
   const customer = await getCustomerBySlug(slug);
   if (!customer) notFound();
   const q = { ...parseSalesQuery({ range: "thisYear" }), customerId: customer.id, pageSize: 50, take: 50 };
-  const [sales, settings] = await Promise.all([listSales(user, q), getSettings()]);
+  const [sales, settings, warranties] = await Promise.all([listSales(user, q), getSettings(), hasPermission(user.role, PERMISSION.WARRANTY_VIEW) ? listCustomerWarranties(user, customer.id) : Promise.resolve([])]);
   return (
     <>
       <PageHeader title={customer.name} description={customer.lastPurchaseAt ? `Last purchase ${formatDate(customer.lastPurchaseAt)}` : "No purchases yet"} />
@@ -25,11 +27,18 @@ export default async function CustomerPage({ params }: { params: Promise<{ slug:
           <p><span className="text-muted-foreground">Phone: </span>{customer.phone ?? "—"}</p>
           <p><span className="text-muted-foreground">Email: </span>{customer.email ?? "—"}</p>
           <p><span className="text-muted-foreground">Address: </span>{customer.address ?? "—"}</p>
+          {customer.notes && <p><span className="text-muted-foreground">Notes: </span>{customer.notes}</p>}
         </CardContent></Card>
         <Card className="gap-0 py-0">
           <CardHeader className="p-4"><CardTitle>Purchase history{!hasPermission(user.role, PERMISSION.SALE_VIEW_ALL) ? " (your sales)" : ""}</CardTitle></CardHeader>
           <SaleTable rows={sales.rows} currency={settings.currency} showEmployee={hasPermission(user.role, PERMISSION.SALE_VIEW_ALL)} empty={<EmptyState title="No purchases this year" />} />
         </Card>
+        {warranties.length > 0 && (
+          <Card className="gap-0 overflow-x-auto py-0 lg:col-span-2">
+            <CardHeader className="p-4"><CardTitle>Device warranties</CardTitle></CardHeader>
+            <WarrantyTable rows={warranties} showCustomer={false} canClaim={hasPermission(user.role, PERMISSION.WARRANTY_MANAGE)} />
+          </Card>
+        )}
       </div>
     </>
   );

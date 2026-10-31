@@ -51,3 +51,36 @@ export function normalizeSerials(input: string[], tracking: "QUANTITY" | "SERIAL
   }
   return out;
 }
+
+export type DeviceEntry = { serial: string; imei2: string | null };
+
+/**
+ * Accepts the strings produced by `splitSerials`: either a single IMEI/serial ("356938035643809")
+ * or a dual-SIM pair joined by "/" or "|" ("356938035643809/356938035643817").
+ * Validates, normalises and rejects duplicates across IMEI 1 and IMEI 2.
+ */
+export function normalizeDevices(input: string[], tracking: "QUANTITY" | "SERIALIZED" | "IMEI"): DeviceEntry[] {
+  const devices: DeviceEntry[] = [];
+  for (const raw of input) {
+    const parts = raw.split(/[/|]/).map(normalizeSerial).filter(Boolean);
+    if (parts.length === 0) continue;
+    if (parts.length > 2) throw new DomainError("VALIDATION", `"${raw}" has more than two IMEIs.`);
+    const [serial, imei2] = parts as [string, string | undefined];
+    if (imei2 && tracking !== "IMEI") throw new DomainError("VALIDATION", "A second IMEI is only allowed for IMEI-tracked products.");
+    if (imei2 && imei2 === serial) throw new DomainError("VALIDATION", `IMEI 1 and IMEI 2 are the same (${serial}).`);
+    devices.push({ serial, imei2: imei2 ?? null });
+  }
+  const flat = devices.flatMap((d) => (d.imei2 ? [d.serial, d.imei2] : [d.serial]));
+  const dupes = flat.filter((s, i) => flat.indexOf(s) !== i);
+  if (dupes.length) throw new DomainError("DUPLICATE", `Duplicate in your list: ${[...new Set(dupes)].join(", ")}`);
+  for (const s of flat) {
+    if (tracking === "IMEI" && !isValidImei(s)) throw new DomainError("VALIDATION", `"${s}" is not a valid 15-digit IMEI.`);
+    if (tracking === "SERIALIZED" && !isValidSerial(s)) throw new DomainError("VALIDATION", `"${s}" is not a valid serial number (4-40 letters/digits).`);
+  }
+  return devices;
+}
+
+/** "IMEI 1 / IMEI 2" display helper used on receipts and cart lines. */
+export function formatDevice(serial: string, imei2?: string | null): string {
+  return imei2 ? `${serial} / ${imei2}` : serial;
+}

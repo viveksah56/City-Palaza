@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     if (range.to.getTime() - range.from.getTime() > 366 * 86_400_000) return NextResponse.json({ error: "Choose a period of one year or less." }, { status: 400 });
     const user = await assertPermission(scope === "sales" ? PERMISSION.SALE_VIEW : PERMISSION.REPORT_VIEW);
     const settings = await getSettings();
-    const business = { name: settings.shopName, address: settings.address, city: settings.city, phone: settings.phone, email: settings.email, panNumber: settings.panNumber };
+    const business = { name: settings.shopName, address: settings.address, city: settings.city, phone: settings.phone, email: settings.email };
     const data = scope === "sales"
       ? await getSalesExportData(user, range, settings.currency, business)
       : await getReportExportData(user, range, settings.currency, tabValue as ReportTab, business);

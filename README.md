@@ -1,6 +1,6 @@
-# CityPlaza — Inventory & Sales Management
+# CityPlaza — Mobile Shop POS & Billing
 
-Inventory, sales, and role-based staff management for CityPlaza’s mobile and electronics store, built with Next.js App Router, TypeScript, Prisma, and PostgreSQL.
+Single-store POS, billing, IMEI-tracked inventory, warranties and cash-register shifts for CityPlaza’s mobile shop, built with Next.js App Router, TypeScript, Prisma, and PostgreSQL.
 
 CityPlaza is a single-store operations app for administrators and employees. It models the real shop workflow:
 
@@ -9,6 +9,31 @@ CityPlaza is a single-store operations app for administrators and employees. It 
 **Stack:** Next.js 16 (App Router, Server Components, Server Actions, Route Handlers and Proxy) · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui · Lucide · React Hook Form + Zod · PostgreSQL + Prisma · Recharts · date-fns · Sonner · Zustand (cart only) · decimal.js · jose + bcryptjs.
 
 ---
+
+## Mobile shop POS (single store, no tax)
+
+One organization, one register. There are no branches, tenants, PAN or VAT fields anywhere: the price on the tag is the price the customer pays, and `total = subtotal − discount`.
+
+| Area | Where | Notes |
+| --- | --- | --- |
+| POS terminal | `src/features/pos/` · `/sales/new` | Split screen: scan/search/categories on the left; cart, customer lookup, discount manager and **Charge** on the right. Barcode **or IMEI 1 / IMEI 2** scans add the exact device. Cash tender dialog with quick amounts and live change. |
+| Inventory | `src/features/inventory/` | Brand, Model, RAM / Storage / Color, cost & selling price, stock, warranty months, IMEI tracking. Enter dual-SIM phones as `IMEI1/IMEI2` (one device per line). CSV import supports the same columns. |
+| Billing | `src/features/billing/` | A4 invoice and **80 mm thermal** receipt (screen print + PDF via `/api/sales/[slug]/receipt?format=a4\|thermal`) showing IMEIs, warranty tags and terms. |
+| Customers & warranties | `/customers`, `/warranties` | Contact ledger, purchase history, one warranty tag per sold device (`CP-000123-W1`), lookup by IMEI or tag, admin-recorded claims. |
+| Cash register | `/register` | Opening balance, auto-attached sales, expected vs counted cash and variance at close. Only one shift can be open (enforced by a partial unique index). |
+
+Payment modes: Cash, Card, UPI / QR, eSewa & Khalti (digital wallets), bank transfer, other.
+
+### Upgrading an existing database
+
+`prisma/migrations/20261030000000_single_store_pos` drops `Sale.tax`, `Sale.taxRate`, `SaleItem.tax` and the `taxRate` / `panNumber` settings, and adds the handset, IMEI 2, warranty and shift schema. Legacy sales that carried VAT keep the amount the customer actually paid; they get a note and print an “Adjustment (legacy)” line so old receipts still add up. Profit reports are unaffected (they never included tax).
+
+### Quality gates
+
+```bash
+npm run check        # tsc --noEmit + zero-`any` guard + unit tests
+TEST_DATABASE_URL=postgresql://… npm run test:integration
+```
 
 ## Quick start
 

@@ -25,7 +25,6 @@ export function createReportCsv(data: ReportExportData): Buffer {
     ["Address", [data.business.address, data.business.city].filter(Boolean).join(", ")],
     ["Phone", data.business.phone],
     ["Email", data.business.email],
-    ["PAN", data.business.panNumber],
     [],
     ["Summary"],
     ["Metric", "Value"],
@@ -54,7 +53,6 @@ export async function createReportWorkbook(data: ReportExportData): Promise<Buff
   summary.addRow(["Address", [data.business.address, data.business.city].filter(Boolean).join(", ")]);
   summary.addRow(["Phone", data.business.phone]);
   summary.addRow(["Email", data.business.email]);
-  summary.addRow(["PAN", data.business.panNumber]);
   summary.addRow([]);
   summary.addRow(["Metric", "Value"]);
   data.summary.forEach((row) => summary.addRow(row.map(safeCell)));
@@ -101,7 +99,7 @@ export async function createReportWorkbook(data: ReportExportData): Promise<Buff
       row.alignment = { vertical: "top", wrapText: true };
       for (let columnIndex = 1; columnIndex <= section.columns.length; columnIndex += 1) {
         const header = section.columns[columnIndex - 1]?.toLowerCase() ?? "";
-        if (/\b(price|subtotal|discount|vat|tax|total|paid|balance|amount|revenue|profit|cost|sales \(|collected|gross amount)\b/.test(header)) {
+        if (/\b(price|subtotal|discount|total|paid|balance|amount|revenue|profit|cost|sales \(|collected|gross amount)\b/.test(header)) {
           row.getCell(columnIndex).numFmt = `"${data.currency}" #,##0.00;[Red]("${data.currency}" #,##0.00)`;
         }
       }
@@ -150,11 +148,11 @@ export async function createReportPdf(data: ReportExportData): Promise<Buffer> {
         }];
       }
       if (section.title === "Sold products") {
-        const indexes = [0, 1, 6, 7, 9, 11, 14, 15, 17, 18];
+        const indexes = [0, 1, 6, 7, 9, 11, 14, 15, 17];
         return [{
           ...section,
           title: "Sold products · detailed",
-          columns: ["Sale", "Date", "Product", "SKU", "Qty", "Unit price", "Item disc.", "Sale disc.", "VAT", "Line total"],
+          columns: ["Sale", "Date", "Product", "SKU", "Qty", "Unit price", "Item disc.", "Sale disc.", "Line total"],
           rows: section.rows.map((row) => indexes.map((index) => row[index] ?? "")),
         }];
       }
@@ -178,7 +176,7 @@ export async function createReportPdf(data: ReportExportData): Promise<Buffer> {
     doc.font("Helvetica-Bold").fontSize(9).fillColor("#1683d8").text(`${data.business.name || APP_NAME}  /  BUSINESS REPORT`, margin, 28, { characterSpacing: 1.1 });
     doc.font("Helvetica-Bold").fontSize(23).fillColor("#14263d").text(data.title, margin, 51, { width: doc.page.width - margin * 2 });
     doc.font("Helvetica").fontSize(10).fillColor("#64748b").text(data.period, margin, 83);
-    const businessDetails = [data.business.address, data.business.city, data.business.phone, data.business.email, data.business.panNumber ? `PAN ${data.business.panNumber}` : ""].filter(Boolean).join("  ·  ");
+    const businessDetails = [data.business.address, data.business.city, data.business.phone, data.business.email].filter(Boolean).join("  ·  ");
     if (businessDetails) doc.font("Helvetica").fontSize(8).fillColor("#64748b").text(businessDetails, margin, 99, { width: doc.page.width - margin * 2, ellipsis: true });
     doc.font("Helvetica").fontSize(8).fillColor("#64748b").text(`Generated ${formatDateTime(new Date())} · Currency: ${data.currency}`, margin, businessDetails ? 111 : 99);
     doc.y = businessDetails ? 132 : 123;

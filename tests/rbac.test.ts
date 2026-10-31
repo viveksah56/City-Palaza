@@ -25,13 +25,13 @@ describe("RBAC", () => {
     expect(hasPermission(undefined, "PRODUCT_VIEW")).toBe(false);
   });
 
-  it("employee navigation is exactly Dashboard, Sales, Products, Customers", () => {
+  it("employee navigation is exactly Dashboard, POS, Sales, Register, Warranty, Products, Customers", () => {
     const titles = NAV_ITEMS.filter((n) => hasPermission("EMPLOYEE", n.permission)).map((n) => n.title);
-    expect(titles).toEqual(["Dashboard", "Sales", "Products", "Customers"]);
+    expect(titles).toEqual(["Dashboard", "POS", "Sales", "Register", "Warranty", "Products", "Customers"]);
   });
 
-  it("admin navigation shows all nine sections", () => {
-    expect(NAV_ITEMS.filter((n) => hasPermission("ADMIN", n.permission))).toHaveLength(9);
+  it("admin navigation shows all twelve sections", () => {
+    expect(NAV_ITEMS.filter((n) => hasPermission("ADMIN", n.permission))).toHaveLength(12);
   });
 
   it("employee permissions are a strict subset of admin's", () => {
@@ -41,6 +41,7 @@ describe("RBAC", () => {
   it("defines the complete permission matrix for both application roles", () => {
     const expectedEmployeePermissions = new Set([
       "DASHBOARD_VIEW", "PRODUCT_VIEW", "CATEGORY_VIEW", "BRAND_VIEW", "SALE_CREATE", "SALE_VIEW", "SALE_SETTLE",
+      "SHIFT_VIEW", "SHIFT_OPEN", "SHIFT_CLOSE", "WARRANTY_VIEW",
       "CUSTOMER_VIEW", "CUSTOMER_CREATE", "CUSTOMER_UPDATE",
     ]);
     expect([...ROLE_PERMISSIONS.ADMIN]).toHaveLength(PERMISSIONS.length);

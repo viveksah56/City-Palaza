@@ -1,4 +1,5 @@
-// CityPlaza – single-store stock & sales management.
+// CityPlaza – single-store mobile shop POS & billing (one organization, one register).
+// No tax/PAN/VAT fields exist by design: prices are what the customer pays.
 // Money = Decimal(12,2). Stock lives in Product.quantity but is ONLY changed through
 // src/server/inventory.service.ts, which writes an InventoryTransaction for every change.
 
@@ -71,6 +72,7 @@ enum PaymentMethod {
   BANK_TRANSFER
   ESEWA
   KHALTI
+  UPI
   OTHER
 
   @@schema("citypalaza_database")
@@ -88,6 +90,21 @@ enum PaymentStatus {
 enum SaleStatus {
   COMPLETED
   VOIDED
+
+  @@schema("citypalaza_database")
+}
+
+enum WarrantyStatus {
+  ACTIVE
+  CLAIMED
+  VOIDED
+
+  @@schema("citypalaza_database")
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
 
   @@schema("citypalaza_database")
 }
@@ -153,6 +170,8 @@ model User {
   auditLogs             AuditLog[]
   passwordResetTokens   PasswordResetToken[]
   receivedPayments      SalePayment[]          @relation("PaymentReceivedBy")
+  openedShifts          CashShift[]            @relation("ShiftOpenedBy")
+  closedShifts          CashShift[]            @relation("ShiftClosedBy")
 
   @@index([status])
   @@index([role])
@@ -160,18 +179,18 @@ model User {
 }
 
 model Session {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  refreshTokenId String?  @unique
+  id                     String    @id @default(cuid())
+  userId                 String
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenId         String?   @unique
   // Previous refresh token id + rotation time: lets us tell a harmless concurrent refresh
   // (within a few seconds) from a replayed, possibly stolen, token.
   previousRefreshTokenId String?
   refreshRotatedAt       DateTime?
-  expiresAt      DateTime
-  ipAddress      String?
-  userAgent      String?
-  createdAt      DateTime @default(now())
+  expiresAt              DateTime
+  ipAddress              String?
+  userAgent              String?
+  createdAt              DateTime  @default(now())
 
   @@unique([userId])
   @@index([expiresAt])
@@ -220,27 +239,35 @@ model Brand {
 }
 
 model Product {
-  id              String        @id @default(cuid())
-  slug            String        @unique
-  sku             String        @unique
-  barcode         String?       @unique
-  name            String
+  id                 String        @id @default(cuid())
+  slug               String        @unique
+  sku                String        @unique
+  barcode            String?       @unique
+  name               String
   /// Human-readable sellable variant, e.g. "Black · 256 GB". Each variant is its own Product/SKU/stock ledger.
-  variantLabel    String?
-  description     String?
-  categoryId      String
-  category        Category      @relation(fields: [categoryId], references: [id])
-  brandId         String?
-  brand           Brand?        @relation(fields: [brandId], references: [id])
-  purchasePrice   Decimal       @db.Decimal(12, 2)
-  sellingPrice    Decimal       @db.Decimal(12, 2)
-  maxDiscountPercent Decimal    @default(5) @db.Decimal(5, 2)
+  variantLabel       String?
+  /// Handset model, e.g. "Galaxy S24" (Brand is the manufacturer).
+  model              String?
+  ram                String?
+  storage            String?
+  color              String?
+  /// 0 = no warranty. A Warranty row (with tag) is issued per sold device when > 0.
+  warrantyMonths     Int           @default(0)
+  description        String?
+  categoryId         String
+  category           Category      @relation(fields: [categoryId], references: [id])
+  brandId            String?
+  brand              Brand?        @relation(fields: [brandId], references: [id])
+  /// Cost price
+  purchasePrice      Decimal       @db.Decimal(12, 2)
+  sellingPrice       Decimal       @db.Decimal(12, 2)
+  maxDiscountPercent Decimal       @default(5) @db.Decimal(5, 2)
   /// Current stock. Never negative (CHECK constraint + atomic guarded updates).
-  quantity        Int           @default(0)
-  trackingType    TrackingType  @default(QUANTITY)
-  status          ProductStatus @default(ACTIVE)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  quantity           Int           @default(0)
+  trackingType       TrackingType  @default(QUANTITY)
+  status             ProductStatus @default(ACTIVE)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   serials               ProductSerial[]
   saleItems             SaleItem[]
@@ -248,6 +275,7 @@ model Product {
 
   @@index([name])
   @@index([variantLabel])
+  @@index([model])
   @@index([categoryId])
   @@index([brandId])
   @@index([status])
@@ -261,11 +289,15 @@ model ProductSerial {
   id         String       @id @default(cuid())
   productId  String
   product    Product      @relation(fields: [productId], references: [id])
+  /// IMEI 1 (or serial number for SERIALIZED products)
   serial     String       @unique
+  /// IMEI 2 of dual-SIM handsets
+  imei2      String?      @unique
   status     SerialStatus @default(IN_STOCK)
   saleItemId String?
   saleItem   SaleItem?    @relation(fields: [saleItemId], references: [id])
   notes      String?
+  warranties Warranty[]
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
@@ -301,15 +333,17 @@ model InventoryTransaction {
 
 // ---------- Sales ----------
 model Customer {
-  id             String    @id @default(cuid())
-  slug           String    @unique
+  id             String     @id @default(cuid())
+  slug           String     @unique
   name           String
-  phone          String?   @unique
+  phone          String?    @unique
   email          String?
   address        String?
+  notes          String?
   lastPurchaseAt DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  warranties     Warranty[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
   sales          Sale[]
 
   @@index([name])
@@ -329,14 +363,17 @@ model Sale {
   discount       Decimal       @default(0) @db.Decimal(12, 2)
   promoDiscount  Decimal?      @db.Decimal(12, 2)
   manualDiscount Decimal?      @db.Decimal(12, 2)
-  tax            Decimal       @default(0) @db.Decimal(12, 2)
   total          Decimal       @db.Decimal(12, 2)
   discountType   DiscountType?
   discountValue  Decimal?      @db.Decimal(12, 2)
-  taxRate        Decimal       @default(0) @db.Decimal(5, 2)
   paymentMethod  PaymentMethod
   paymentStatus  PaymentStatus @default(PAID)
   amountPaid     Decimal       @default(0) @db.Decimal(12, 2)
+  /// Cash handed over by the customer (CASH sales only) and the change returned.
+  amountTendered Decimal?      @db.Decimal(12, 2)
+  changeGiven    Decimal?      @db.Decimal(12, 2)
+  shiftId        String?
+  shift          CashShift?    @relation(fields: [shiftId], references: [id])
   idempotencyKey String?       @unique
   status         SaleStatus    @default(COMPLETED)
   notes          String?
@@ -354,32 +391,35 @@ model Sale {
   @@index([createdAt])
   @@index([status, createdAt])
   @@index([paymentMethod])
+  @@index([shiftId])
   @@schema("citypalaza_database")
 }
 
 /// Historical snapshot: later price changes never alter past sales or profit.
 model SaleItem {
-  id            String          @id @default(cuid())
-  saleId        String
-  sale          Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  productId     String
-  product       Product         @relation(fields: [productId], references: [id])
-  productName   String
-  categoryName  String
-  sku           String
-  quantity      Int
+  id             String          @id @default(cuid())
+  saleId         String
+  sale           Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id])
+  productName    String
+  categoryName   String
+  sku            String
+  quantity       Int
   serialSnapshot String[]        @default([])
-  unitPrice     Decimal         @db.Decimal(12, 2) // historical selling price
-  unitCost      Decimal         @db.Decimal(12, 2) // historical purchase price
-  discount      Decimal         @default(0) @db.Decimal(12, 2) // total line discount (promo + allocated sale discount)
-  promoDiscount Decimal?        @db.Decimal(12, 2)
+  /// Aligned by index with serialSnapshot ("" when the device has no IMEI 2).
+  imei2Snapshot  String[]        @default([])
+  unitPrice      Decimal         @db.Decimal(12, 2) // historical selling price
+  unitCost       Decimal         @db.Decimal(12, 2) // historical purchase price
+  discount       Decimal         @default(0) @db.Decimal(12, 2) // total line discount (promo + allocated sale discount)
+  promoDiscount  Decimal?        @db.Decimal(12, 2)
   /// Product-level manual discount captured when this sale was created; null on legacy lines where it was not stored separately.
-  itemDiscount  Decimal?        @db.Decimal(12, 2)
-  saleDiscount  Decimal?        @db.Decimal(12, 2)
-  tax           Decimal         @default(0) @db.Decimal(12, 2)
-  subtotal      Decimal         @db.Decimal(12, 2) // unitPrice * quantity
-  total         Decimal         @db.Decimal(12, 2) // subtotal - discount + tax
-  serials       ProductSerial[]
+  itemDiscount   Decimal?        @db.Decimal(12, 2)
+  saleDiscount   Decimal?        @db.Decimal(12, 2)
+  subtotal       Decimal         @db.Decimal(12, 2) // unitPrice * quantity
+  total          Decimal         @db.Decimal(12, 2) // subtotal - discount
+  serials        ProductSerial[]
+  warranties     Warranty[]
 
   @@index([saleId])
   @@index([productId])
@@ -387,18 +427,70 @@ model SaleItem {
 }
 
 model SalePayment {
-  id           String       @id @default(cuid())
+  id           String        @id @default(cuid())
   saleId       String
-  sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  amount       Decimal      @db.Decimal(12, 2)
+  sale         Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  amount       Decimal       @db.Decimal(12, 2)
   method       PaymentMethod
   receivedById String
-  receivedBy   User         @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
-  receivedAt   DateTime     @default(now())
+  receivedBy   User          @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+  receivedAt   DateTime      @default(now())
   note         String?
 
   @@index([saleId, receivedAt])
   @@index([receivedAt])
+  @@schema("citypalaza_database")
+}
+
+// ---------- Warranty ----------
+/// One row per sold device (or per quantity line for non-serialized goods). `tag` is the short code
+/// printed on the receipt and used for warranty lookups at the counter.
+model Warranty {
+  id         String         @id @default(cuid())
+  tag        String         @unique
+  saleItemId String
+  saleItem   SaleItem       @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  serialId   String?
+  serial     ProductSerial? @relation(fields: [serialId], references: [id])
+  customerId String?
+  customer   Customer?      @relation(fields: [customerId], references: [id])
+  startsAt   DateTime
+  endsAt     DateTime
+  terms      String?
+  status     WarrantyStatus @default(ACTIVE)
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([saleItemId])
+  @@index([customerId])
+  @@index([serialId])
+  @@index([endsAt])
+  @@schema("citypalaza_database")
+}
+
+// ---------- Cash register ----------
+/// One physical till. At most one shift may be OPEN at a time (partial unique index in the migration).
+model CashShift {
+  id             String      @id @default(cuid())
+  status         ShiftStatus @default(OPEN)
+  openedById     String
+  openedBy       User        @relation("ShiftOpenedBy", fields: [openedById], references: [id])
+  openedAt       DateTime    @default(now())
+  openingBalance Decimal     @db.Decimal(12, 2)
+  closedById     String?
+  closedBy       User?       @relation("ShiftClosedBy", fields: [closedById], references: [id])
+  closedAt       DateTime?
+  /// Snapshots written at close
+  cashSales      Decimal?    @db.Decimal(12, 2)
+  expectedCash   Decimal?    @db.Decimal(12, 2)
+  countedCash    Decimal?    @db.Decimal(12, 2)
+  variance       Decimal?    @db.Decimal(12, 2)
+  notes          String?
+  sales          Sale[]
+
+  @@index([status])
+  @@index([openedAt])
   @@schema("citypalaza_database")
 }
 

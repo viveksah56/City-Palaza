@@ -22,25 +22,24 @@ describe.skipIf(!TEST_DB)("admin rules, settings and reports (PostgreSQL)", () =
 
   afterAll(() => prisma.$disconnect());
 
-  it("reports completed unpaid sales as sales revenue and excludes voided sales", async () => {
+  it("reports completed sales as revenue with no tax and excludes voided sales", async () => {
     const f = await fixtures();
     const p = await f.mk("REPORT");
     await inv.addStock(f.admin, { productId: p.id, type: "PURCHASE", quantity: 5, reason: "test" });
-    await prisma.setting.create({ data: { key: "taxRate", value: 13 } });
     const paid = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
-    const customer = await prisma.customer.create({ data: { slug: "credit-customer", name: "Credit Customer" } });
-    const pending = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], customerId: customer.id, paymentMethod: "CASH", paymentStatus: "PENDING" });
+    const second = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CARD" });
     const voided = await sales.createSale(f.emp, { items: [{ productId: p.id, quantity: 1 }], paymentMethod: "CASH" });
     await sales.voidSale(f.admin, { saleId: voided.id, reason: "incorrect sale" });
     const range = { from: new Date(Date.now() - 60_000), to: new Date(Date.now() + 60_000) };
     const summary = await reports.getSalesSummary(range);
-    expect(summary).toMatchObject({ count: 2, grossSales: "2000.00", discounts: "0.00", netSales: "2000.00", taxes: "260.00", total: "2260.00", collected: "1130.00", outstanding: "1130.00", averageSale: "1000.00" });
+    expect(summary).toMatchObject({ count: 2, grossSales: "2000.00", discounts: "0.00", netSales: "2000.00", total: "2000.00", collected: "2000.00", outstanding: "0.00", averageSale: "1000.00" });
+    expect(summary).not.toHaveProperty("taxes");
     expect(await reports.getProfitSummary(range)).toMatchObject({ revenue: "2000.00", cost: "1600.00", profit: "400.00", marginPercent: "20.0" });
     expect(await reports.getSalesByCategory(range)).toEqual([{ name: "Phones", revenue: "2000.00", units: 2 }]);
-    expect(await reports.getPaymentDistribution(range)).toEqual([{ method: "CASH", count: 1, total: "1130.00" }]);
+    expect(await reports.getPaymentDistribution(range)).toEqual(expect.arrayContaining([{ method: "CASH", count: 1, total: "1000.00" }, { method: "CARD", count: 1, total: "1000.00" }]));
     expect(await reports.getEmployeePerformance(range)).toEqual([expect.objectContaining({ id: f.emp.id, sales: 2, units: 2, revenue: "2000.00", profit: "400.00", average: "1000.00" })]);
-    expect((await prisma.sale.findUniqueOrThrow({ where: { id: paid.id } })).amountPaid.toString()).toBe("1130");
-    expect((await prisma.sale.findUniqueOrThrow({ where: { id: pending.id } })).amountPaid.toString()).toBe("0");
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: paid.id } })).amountPaid.toString()).toBe("1000");
+    expect(second.id).toBeTruthy();
   });
 
   it("reports only active inventory and records setting changes in audit", async () => {
@@ -51,11 +50,12 @@ describe.skipIf(!TEST_DB)("admin rules, settings and reports (PostgreSQL)", () =
     await inv.addStock(f.admin, { productId: inactive.id, type: "PURCHASE", quantity: 4, reason: "test" });
     const summary = await reports.getInventorySummary();
     expect(summary).toMatchObject({ products: 1, units: 2, costValue: "200.00", sellingValue: "300.00", potentialProfit: "100.00" });
-    await settings.updateSettings(f.admin, { ...settings.DEFAULT_SETTINGS, taxRate: 13 });
-    expect(await prisma.setting.findUniqueOrThrow({ where: { key: "taxRate" } })).toMatchObject({ value: 13 });
+    await settings.updateSettings(f.admin, { ...settings.DEFAULT_SETTINGS, receiptFooter: "See you again!" });
+    expect(await prisma.setting.findUniqueOrThrow({ where: { key: "receiptFooter" } })).toMatchObject({ value: "See you again!" });
+    expect(await prisma.setting.count({ where: { key: { in: ["taxRate", "panNumber"] } } })).toBe(0);
     expect(await prisma.auditLog.count({ where: { action: "SETTINGS_UPDATE" } })).toBe(1);
     const sale = await sales.createSale(f.emp, { items: [{ productId: active.id, quantity: 1 }], paymentMethod: "CASH" });
-    expect((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).tax.toString()).toBe("19.5");
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).total.toString()).toBe("150");
   });
 
   it("recomputes a customer's last purchase timestamp when the newest sale is voided", async () => {

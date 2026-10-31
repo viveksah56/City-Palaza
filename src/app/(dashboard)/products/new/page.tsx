@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import {PERMISSION} from "@/lib/rbac/permission";
 import { requirePermission } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/shared/page-header";
-import { ProductModal } from "@/features/products/product-modal";
+import { ProductModal } from "@/features/inventory/product-modal";
 import { getBrands, getCategories } from "@/server/products.service";
 
 export const metadata: Metadata = { title: "Add product" };

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ReportCard } from "@/components/shared/report-card";
 import { TAXONOMY_KIND } from "@/lib/constants/categories";
 import { getBrands } from "@/server/products.service";
-import { TaxonomyManager } from "@/features/products/taxonomy-manager";
+import { TaxonomyManager } from "@/features/inventory/taxonomy-manager";
 
 export const metadata: Metadata = { title: "Brands" };
 

@@ -55,7 +55,7 @@ function AddForm({ product, onClose }: { product: StockProduct; onClose: () => v
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Field label="Unit cost" htmlFor="unitCost" hint="Leave blank to use the product's current cost." error={errors.unitCost?.message}><Input id="unitCost" type="number" min="0" step="0.01" inputMode="decimal" {...register("unitCost", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} /></Field>
         {serialized ? (
-          <Field label={product.trackingType === "IMEI" ? "IMEI numbers" : "Serial numbers"} htmlFor="serialsText" required hint="One per line or comma-separated. A scanner works too." error={errors.serialsText?.message} className="md:col-span-2">
+          <Field label={product.trackingType === "IMEI" ? "IMEI numbers" : "Serial numbers"} htmlFor="serialsText" required hint={product.trackingType === "IMEI" ? "One phone per line. Dual-SIM: IMEI1/IMEI2 on the same line. A scanner works too." : "One per line or comma-separated. A scanner works too."} error={errors.serialsText?.message} className="md:col-span-2">
             <Textarea id="serialsText" rows={5} className="font-mono" autoFocus {...register("serialsText")} />
           </Field>
         ) : (

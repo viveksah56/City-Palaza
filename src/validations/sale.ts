@@ -28,6 +28,8 @@ export const createSaleSchema = z.object({
     .nullish(),
   discount: discountSchema.nullish(),
   paymentMethod: z.enum(PAYMENT_METHODS),
+  /** CASH only: what the customer handed over. Must cover the total; change is computed server-side. */
+  amountTendered: moneyField("Cash tendered").nullish(),
   notes: z.string().trim().max(500).nullish(),
   idempotencyKey: z.string().uuid().optional(),
 });

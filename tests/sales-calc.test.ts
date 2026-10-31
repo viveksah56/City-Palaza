@@ -6,23 +6,23 @@ import { DomainError } from "@/lib/errors";
 const line = (o: Partial<Parameters<typeof calculateSale>[0]["lines"][number]> = {}) => ({ productId: "p1", unitPrice: "1000.00", unitCost: "800.00", quantity: 2, ...o });
 
 describe("sale totals", () => {
-  it("computes subtotal, tax and total with exact decimals", () => {
-    const c = calculateSale({ lines: [line({ unitPrice: "0.10", unitCost: "0.05", quantity: 3 })], taxRatePercent: 13 });
+  it("computes subtotal and total with exact decimals", () => {
+    const c = calculateSale({ lines: [line({ unitPrice: "0.10", unitCost: "0.05", quantity: 3 })] });
     expect(c.subtotal.toFixed(2)).toBe("0.30"); // never 0.30000000000000004
-    expect(c.tax.toFixed(2)).toBe("0.04");
-    expect(c.total.toFixed(2)).toBe("0.34");
+    expect(c.total.toFixed(2)).toBe("0.30");
   });
 
-  it("applies tax to the discounted amount", () => {
-    const c = calculateSale({ lines: [line()], discount: { type: "PERCENT", value: 10 }, taxRatePercent: 13 });
+  it("charges exactly subtotal minus discount — there is no tax", () => {
+    const c = calculateSale({ lines: [line()], discount: { type: "PERCENT", value: 10 } });
     expect(c.subtotal.toFixed(2)).toBe("2000.00");
     expect(c.discount.toFixed(2)).toBe("200.00");
-    expect(c.tax.toFixed(2)).toBe("234.00");
-    expect(c.total.toFixed(2)).toBe("2034.00");
+    expect(c.total.toFixed(2)).toBe("1800.00");
+    expect(Object.keys(c)).not.toContain("tax");
+    expect(Object.keys(c.lines[0]!)).not.toContain("tax");
   });
 
   it("applies a product's standing promo discount", () => {
-    const c = calculateSale({ lines: [line({ promoPercent: 5 })], taxRatePercent: 0 });
+    const c = calculateSale({ lines: [line({ promoPercent: 5 })] });
     expect(c.promoDiscount.toFixed(2)).toBe("100.00");
     expect(c.total.toFixed(2)).toBe("1900.00");
   });
@@ -64,7 +64,6 @@ describe("sale totals", () => {
     for (const item of c.lines) {
       expect(item.saleDiscount.gte(0)).toBe(true);
       expect(item.discount.lte(item.subtotal)).toBe(true);
-      expect(item.tax.gte(0)).toBe(true);
       expect(item.total.gte(0)).toBe(true);
     }
   });
@@ -115,7 +114,7 @@ describe("employee discount limit", () => {
       const base = calculateSale({ lines });
       const cartCents = base.netAfterPromo.minus(base.manualDiscount).times(100).toNumber();
       const discount = random(2) ? { type: "PERCENT" as const, value: random(10_001) / 100 } : { type: "FIXED" as const, value: (Math.floor(cartCents * random(101) / 100) / 100).toFixed(2) };
-      const result = calculateSale({ lines, discount, taxRatePercent: random(2) ? 0 : 13 });
+      const result = calculateSale({ lines, discount });
       const allocated = result.lines.reduce((sum, item) => sum.plus(item.saleDiscount), result.lines[0]!.saleDiscount.minus(result.lines[0]!.saleDiscount));
       expect(allocated.toFixed(2)).toBe(result.saleDiscount.toFixed(2));
       const lineTotal = result.lines.reduce((sum, item) => sum.plus(item.total), result.lines[0]!.total.minus(result.lines[0]!.total));
@@ -123,8 +122,7 @@ describe("employee discount limit", () => {
       for (const item of result.lines) {
         expect(item.discount.gte(0)).toBe(true);
         expect(item.discount.lte(item.subtotal)).toBe(true);
-        expect(item.tax.gte(0)).toBe(true);
-        expect(item.total.gte(0)).toBe(true);
+          expect(item.total.gte(0)).toBe(true);
         if (item.subtotal.minus(item.promoDiscount).minus(item.itemManualDiscount).isZero()) expect(item.saleDiscount.isZero()).toBe(true);
       }
     }
