@@ -25,7 +25,7 @@ export function SearchInput({ placeholder = "Search…", param = "search", label
   }, [value]);
 
   return (
-    <div className="relative w-full sm:w-72 lg:w-80">
+    <div className="relative min-w-0 max-w-full w-full sm:w-72 lg:w-80">
       <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input type="search" aria-label={label} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} className="h-9 rounded-md border-border bg-background pl-9 shadow-none placeholder:text-muted-foreground/80" />
     </div>

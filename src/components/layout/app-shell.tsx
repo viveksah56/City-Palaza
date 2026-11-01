@@ -118,14 +118,14 @@ function AppShellContent({ nav, user, shopName, notifications, logoutAction, chi
       </Sidebar>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-6 lg:px-8 print:hidden">
+        <header className="sticky top-0 z-30 flex min-h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-6 lg:px-8 print:hidden">
           <Tooltip>
             <TooltipTrigger asChild><SidebarTrigger /></TooltipTrigger>
             <TooltipContent>Toggle navigation</TooltipContent>
           </Tooltip>
-          <div className="lg:hidden"><Brand name={shopName} /></div>
+          <div className="min-w-0 lg:hidden"><Brand name={shopName} /></div>
           <div className="hidden min-w-0 lg:block"><Breadcrumbs /></div>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <ThemeToggle />
             <DropdownMenu>
               <Tooltip>
@@ -166,14 +166,14 @@ function AppShellContent({ nav, user, shopName, notifications, logoutAction, chi
             const Icon = ICONS[item.icon] ?? LayoutDashboard;
             const active = isActive(item.href);
             return (
-              <li key={item.href} className="flex-1">
-                <Link href={item.href} aria-current={active ? "page" : undefined} className={cn("flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10.5px] font-medium transition-colors active:scale-95", active ? "text-primary" : "text-muted-foreground")}>
+              <li key={item.href} className="min-w-0 flex-1">
+                <Link href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-12 flex-col items-center justify-center gap-0.5 px-1 text-center leading-tight rounded-xl py-1.5 text-[10.5px] font-medium transition-colors active:scale-95", active ? "text-primary" : "text-muted-foreground")}>
                   <Icon className="size-[23px]" strokeWidth={active ? 2.1 : 1.6} aria-hidden />{item.title}
                 </Link>
               </li>
             );
           })}
-          {hasMore && <li className="flex-1"><button type="button" onClick={() => setOpenMobile(true)} className="flex w-full flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10.5px] font-medium text-muted-foreground transition-colors active:scale-95"><MoreHorizontal className="size-[23px]" strokeWidth={1.6} aria-hidden />More</button></li>}
+          {hasMore && <li className="min-w-0 flex-1"><button type="button" onClick={() => setOpenMobile(true)} className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10.5px] font-medium text-muted-foreground transition-colors active:scale-95"><MoreHorizontal className="size-[23px]" strokeWidth={1.6} aria-hidden />More</button></li>}
         </ul>
       </nav>
     </div>

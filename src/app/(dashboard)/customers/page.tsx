@@ -34,7 +34,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title="Customers" description="Optional for walk-ins, handy for repeat buyers." actions={hasPermission(user.role, PERMISSION.CUSTOMER_CREATE) ? <CustomerFormDialog /> : undefined} />
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         <ReportCard label="All customers" value={overview.customers} hint="Saved customer profiles" />
         <ReportCard label="Customers with purchases" value={overview.purchasingCustomers} hint="At least one completed sale" accent="green" />
         <ReportCard label="Matching this search" value={result.total} hint="Results in the current view" accent="purple" />

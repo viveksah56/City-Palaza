@@ -28,7 +28,7 @@ export function TaxonomyManager({ kind, items, canCreate, canUpdate, canDelete }
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-heading text-base font-semibold">{title}</h2>
         {canCreate && <Button size="sm" onClick={() => setEditing("new")}><Plus data-icon="inline-start" /> Add {kind}</Button>}
       </div>

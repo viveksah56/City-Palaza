@@ -18,12 +18,12 @@ export function ReportCard({
   label: string; value: React.ReactNode; hint?: string; icon?: React.ReactNode; tone?: "default" | "warning" | "danger"; accent?: keyof typeof ACCENTS;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-card sm:p-5">
-      <div className="flex items-center justify-between gap-3">
+    <div className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-card sm:p-5">
+      <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground sm:text-[13px]">{label}</p>
-        {icon && <span aria-hidden className={cn("grid size-8 place-items-center rounded-lg", ACCENTS[tone === "danger" ? "red" : tone === "warning" ? "orange" : accent])}>{icon}</span>}
+        {icon && <span aria-hidden className={cn("grid size-8 shrink-0 place-items-center rounded-lg", ACCENTS[tone === "danger" ? "red" : tone === "warning" ? "orange" : accent])}>{icon}</span>}
       </div>
-      <p className={cn("mt-3 truncate font-heading text-[1.55rem] leading-none font-semibold tracking-[-0.025em] num sm:text-[1.8rem]", tone === "warning" && "text-warning-foreground", tone === "danger" && "text-destructive")}>{value}</p>
+      <p className={cn("mt-3 [overflow-wrap:anywhere] font-heading text-[1.55rem] leading-tight font-semibold tracking-[-0.025em] num sm:text-[1.8rem]", tone === "warning" && "text-warning-foreground", tone === "danger" && "text-destructive")}>{value}</p>
       {hint && <p className="mt-2 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );

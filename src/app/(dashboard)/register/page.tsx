@@ -26,7 +26,7 @@ export default async function RegisterPage() {
         <Card className="mb-6">
           <CardHeader><CardTitle className="flex items-center gap-2">Current shift <StatusBadge status="OPEN" /></CardTitle></CardHeader>
           <CardContent className="grid gap-4">
-            <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            <dl className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4 text-sm sm:grid-cols-4">
               <div><dt className="text-muted-foreground">Opened</dt><dd className="font-medium">{formatDateTime(open.openedAt)}<br />by {open.openedBy}</dd></div>
               <div><dt className="text-muted-foreground">Opening balance</dt><dd className="num text-lg font-semibold">{money(open.openingBalance)}</dd></div>
               <div><dt className="text-muted-foreground">Cash sales ({open.salesCount} sales)</dt><dd className="num text-lg font-semibold">{money(open.cashSales)}</dd></div>

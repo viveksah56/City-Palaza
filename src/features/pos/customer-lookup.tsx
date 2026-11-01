@@ -38,8 +38,8 @@ export function CustomerLookup({ customer, newCustomer, onSelect, onCreate }: {
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</p>
       {chosen ? (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-medium">
-          <span className="truncate">{chosen}</span>
-          <IconButton label="Remove customer" variant="ghost" className="size-7" onClick={() => { onSelect(null); onCreate(null); }}><X /></IconButton>
+          <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{chosen}</span>
+          <IconButton label="Remove customer" variant="ghost" className="size-9 shrink-0" onClick={() => { onSelect(null); onCreate(null); }}><X /></IconButton>
         </div>
       ) : (
         <>

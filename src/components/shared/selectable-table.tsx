@@ -76,17 +76,17 @@ export function SelectableTable({ headers, rows }: { headers: Header[]; rows: Ro
       </div>
       <ul className="divide-y divide-border/60 md:hidden">
         {rows.map((row) => (
-          <li key={row.id} data-state={selected.has(row.id) ? "selected" : undefined} className="grid gap-2.5 px-4 py-4 data-[state=selected]:bg-muted/55">
+          <li key={row.id} data-state={selected.has(row.id) ? "selected" : undefined} className="grid min-w-0 gap-2.5 px-4 py-4 data-[state=selected]:bg-muted/55">
             <div className="flex min-w-0 items-start gap-3">
               <SelectBox label={`Select row ${row.id}`} checked={selected.has(row.id)} onChange={(checked) => selectRow(row.id, checked)} />
-              <div className="min-w-0 text-[15px] font-medium">{row.title}</div>
+              <div className="min-w-0 [overflow-wrap:anywhere] text-[15px] font-medium">{row.title}</div>
             </div>
             {row.details.length > 0 && (
               <dl className="grid gap-1.5 pl-7 text-sm">
-                {row.details.map((detail) => <div key={detail.id} className="flex items-center justify-between gap-4"><dt className="text-muted-foreground">{detail.label}</dt><dd className="min-w-0 text-right">{detail.value}</dd></div>)}
+                {row.details.map((detail) => <div key={detail.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-start gap-3"><dt className="text-muted-foreground">{detail.label}</dt><dd className="min-w-0 [overflow-wrap:anywhere] text-right">{detail.value}</dd></div>)}
               </dl>
             )}
-            {row.actions.length > 0 && <div className="flex justify-end gap-2 pt-1">{row.actions.map((action, index) => <React.Fragment key={index}>{action}</React.Fragment>)}</div>}
+            {row.actions.length > 0 && <div className="flex flex-wrap justify-end gap-2 pt-1">{row.actions.map((action, index) => <React.Fragment key={index}>{action}</React.Fragment>)}</div>}
           </li>
         ))}
       </ul>

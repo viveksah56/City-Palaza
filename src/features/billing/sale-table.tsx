@@ -12,7 +12,7 @@ type Row = Awaited<ReturnType<typeof listSales>>["rows"][number];
 export function SaleTable({ rows, currency, showEmployee, empty, url, sort, order }: { rows: Row[]; currency: string; showEmployee: boolean; empty?: React.ReactNode; url?: { basePath: string; params: Record<string, string | undefined> }; sort?: string; order?: SortOrder }) {
   const columns: Column<Row>[] = [
     { key: "no", header: "Sale", sortKey: "saleNumber", cell: (s) => <Link href={`/sales/${s.slug}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{s.saleNumber}</Link> },
-    { key: "when", header: "Date", sortKey: "createdAt", cell: (s) => <span className="whitespace-nowrap text-muted-foreground">{formatDateTime(s.createdAt)}</span> },
+    { key: "when", header: "Date", sortKey: "createdAt", cell: (s) => <span className="md:whitespace-nowrap text-muted-foreground">{formatDateTime(s.createdAt)}</span> },
     { key: "cust", header: "Customer", cell: (s) => s.customer?.name ?? <span className="text-muted-foreground">Walk-in</span> },
     ...(showEmployee ? [{ key: "emp", header: "Employee", cell: (s: Row) => fullName(s.employee) }] : []),
     { key: "items", header: "Items", align: "right" as const, cell: (s: Row) => <span className="num">{s._count.items}</span> },

@@ -83,7 +83,7 @@ export function DataTable<T>({ data, columns, getRowId, getRowLabel = getRowId, 
   };
 
   return (
-    <section className="overflow-hidden rounded-xl border border-border/70 bg-card">
+    <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border/70 bg-card">
       <div className="flex flex-col gap-3 border-b border-border/70 p-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="relative w-full sm:max-w-sm">
           <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -95,7 +95,7 @@ export function DataTable<T>({ data, columns, getRowId, getRowLabel = getRowId, 
       {selectedIds.length > 0 && onBulkDelete && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-muted/35 px-4 py-2.5">
           <p className="text-sm font-medium" aria-live="polite">{selectedIds.length} selected</p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" variant="ghost" onClick={() => setRowSelection({})}>Clear selection</Button>
             <Button type="button" size="sm" variant="destructive" onClick={() => setConfirmOpen(true)}><Trash2 data-icon="inline-start" />{bulkDeleteLabel} ({selectedIds.length})</Button>
           </div>
@@ -136,7 +136,7 @@ export function DataTable<T>({ data, columns, getRowId, getRowLabel = getRowId, 
 
       <div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground">{table.getFilteredRowModel().rows.length === 0 ? "0 records" : `${table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–${Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of ${table.getFilteredRowModel().rows.length}`}</p>
-        <div className="flex items-center justify-between gap-3 sm:justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
           <label className="flex items-center gap-2 text-muted-foreground">Rows <select className="h-8 rounded-md border border-input bg-background px-2 text-foreground" value={table.getState().pagination.pageSize} onChange={(event) => table.setPageSize(Number(event.target.value))} aria-label="Rows per page"><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select></label>
           <div className="flex items-center gap-1">
             <Button type="button" variant="ghost" size="icon" aria-label="Previous page" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}><ChevronLeft /></Button>

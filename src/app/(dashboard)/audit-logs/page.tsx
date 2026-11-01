@@ -29,13 +29,13 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     { key: "w", header: "When", sortKey: "createdAt", cell: (a) => <span className="whitespace-nowrap text-muted-foreground">{formatDateTime(a.createdAt)}</span> },
     { key: "a", header: "Who", cell: (a) => (a.actor ? fullName(a.actor) : "System") },
     { key: "x", header: "Action", sortKey: "action", cell: (a) => <Badge variant="secondary">{a.action.replace(/_/g, " ").toLowerCase()}</Badge> },
-    { key: "d", header: "What happened", cell: (a) => <span className="block min-w-64 text-sm">{a.description}<span className="block font-mono text-xs text-muted-foreground">{a.entityType}{a.entityId ? ` · ${a.entityId}` : ""}</span></span> },
+    { key: "d", header: "What happened", cell: (a) => <span className="block min-w-0 md:min-w-64 text-sm">{a.description}<span className="block font-mono text-xs text-muted-foreground">{a.entityType}{a.entityId ? ` · ${a.entityId}` : ""}</span></span> },
     { key: "i", header: "IP / device", cell: (a) => <span className="block max-w-48 truncate text-xs text-muted-foreground" title={a.userAgent ?? ""}>{a.ipAddress ?? "—"}</span> },
   ];
   return (
     <>
       <PageHeader title="Audit logs" description="A permanent record of important actions. Only admins can see this." />
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         <ReportCard label="Matching events" value={result.total} hint="For the selected filters" />
         <ReportCard label="Team accounts" value={staff.length} hint="Available in the person filter" accent="purple" />
         <ReportCard label="Current page" value={`${result.rows.length} of ${result.pageSize}`} hint={`Page ${result.page} of ${result.totalPages}`} accent="teal" />

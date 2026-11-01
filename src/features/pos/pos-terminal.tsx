@@ -94,16 +94,16 @@ export function PosTerminal({ currency, categories, discountLimit, totalDiscount
   }
 
   return (
-    <div className="grid min-h-0 gap-4 lg:h-[calc(100dvh-10.5rem)] lg:grid-cols-[minmax(0,1fr)_26rem] xl:grid-cols-[minmax(0,1fr)_28rem]">
+    <div className="grid min-h-0 min-w-0 gap-4 pb-16 xl:grid-cols-[minmax(0,1fr)_24rem] xl:pb-0 2xl:grid-cols-[minmax(0,1fr)_28rem]">
       <ProductPanel currency={currency} categories={categories} onAdd={addProduct} />
 
-      <aside id="cart" aria-label="Current sale" className="flex min-h-0 scroll-mt-20 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="flex items-center gap-2 text-base font-semibold"><ShoppingCart className="size-4" aria-hidden /> Current sale <span className="text-sm font-normal text-muted-foreground">({unitCount} item{unitCount === 1 ? "" : "s"})</span></h2>
+      <aside id="cart" aria-label="Current sale" className="flex min-h-0 min-w-0 scroll-mt-20 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold"><ShoppingCart className="size-4" aria-hidden /> Current sale <span className="text-sm font-normal text-muted-foreground">({unitCount} item{unitCount === 1 ? "" : "s"})</span></h2>
           <Button type="button" variant="ghost" size="sm" disabled={cart.items.length === 0} onClick={() => { cart.clear(); setDiscount(null); }}><Trash2 /> Clear</Button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="min-h-0 flex-1 p-3">
           <CartLines currency={currency} isAdmin={isAdmin} calcLines={calc?.lines ?? []} />
         </div>
 
@@ -123,7 +123,7 @@ export function PosTerminal({ currency, categories, discountLimit, totalDiscount
       )}
 
       {cart.items.length > 0 && (
-        <a href="#cart" className="glass fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex items-center justify-between rounded-full border border-border/60 px-5 py-3 text-sm font-medium shadow-pop transition-transform active:scale-[0.98] lg:hidden">
+        <a href="#cart" className="glass fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex items-center justify-between rounded-full border border-border/60 px-5 py-3 text-sm font-medium shadow-pop transition-transform active:scale-[0.98] xl:hidden">
           <span>{unitCount} item{unitCount === 1 ? "" : "s"} in sale</span>
           <span className="num text-primary">{calc ? formatCurrency(calc.total, currency) : "Review"} →</span>
         </a>

@@ -47,7 +47,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         description="Record stock received and stock removed. Product details are managed in Products."
         actions={<Button asChild variant="outline"><Link href="/inventory/history"><History /> Stock history</Link></Button>}
       />
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <ReportCard label="Products" value={summary.products} hint="In the catalogue" />
         <ReportCard label="Units on hand" value={summary.units} hint="Current stock" accent="green" />
         <ReportCard label="Low stock" value={summary.lowStock} hint="At or below minimum" tone={summary.lowStock ? "warning" : "default"} />

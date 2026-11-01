@@ -26,7 +26,7 @@ export async function SalesReport({ range }: { range: DateRange }) {
       <section aria-label="Sales summary" className="space-y-5">
         <div>
           <h2 className="mb-3 text-sm font-semibold text-muted-foreground">At a glance</h2>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
             <ReportCard label="Net sales" value={summaryMoney(s.netSales)} hint="Gross − discounts" />
             <ReportCard label="Number of sales" value={s.count} />
             <ReportCard label="Average sale" value={summaryMoney(s.averageSale)} hint="Net per completed sale" />
@@ -35,14 +35,14 @@ export async function SalesReport({ range }: { range: DateRange }) {
         </div>
         <div>
           <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Sales breakdown</h2>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-2">
             <ReportCard label="Gross sales" value={summaryMoney(s.grossSales)} hint="Before discounts" />
             <ReportCard label="Discounts" value={summaryMoney(s.discounts)} />
           </div>
         </div>
         <div>
           <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Receivables</h2>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
             <ReportCard label="Outstanding" value={summaryMoney(s.outstanding)} hint="Balance due on completed sales" accent="orange" />
           </div>
         </div>
@@ -75,7 +75,7 @@ export async function ProfitReport({ range }: { range: DateRange }) {
   const summaryMoney = (v: string) => <CurrencyDisplay value={v} currency={c} variant="compact" />;
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <ReportCard label="Revenue (after discounts)" value={summaryMoney(p.revenue)} />
         <ReportCard label="Cost of goods sold" value={summaryMoney(p.cost)} hint="Purchase prices at time of sale" />
         <ReportCard label="Gross profit" value={summaryMoney(p.profit)} />
@@ -99,7 +99,7 @@ export async function InventoryReport() {
   const summaryMoney = (v: string) => <CurrencyDisplay value={v} currency={c} variant="compact" />;
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-12">
+      <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-3"><ReportCard label="Active products" value={s.products} /></div>
         <div className="min-w-0 xl:col-span-3"><ReportCard label="Units in stock" value={s.units} /></div>
         <div className="min-w-0 xl:col-span-3"><ReportCard label="Inventory cost value" value={summaryMoney(s.costValue)} /></div>

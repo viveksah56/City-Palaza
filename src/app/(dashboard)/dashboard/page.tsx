@@ -43,7 +43,7 @@ async function DashboardServerView({ range }: { range: ReturnType<typeof resolve
   return (
     <div className="grid min-w-0 items-start gap-5 min-[1440px]:grid-cols-[minmax(0,1fr)_19rem] min-[1440px]:gap-6">
       <div className="min-w-0 space-y-5 sm:space-y-6">
-      <section aria-label="Key figures" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <section aria-label="Key figures" className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <ReportCard label="Today’s sales" value={<CurrencyDisplay value={d.kpis.todaySales} currency={c} variant="compact" />} icon={<Banknote className="size-5" />} />
         <ReportCard label="Today’s orders" value={d.kpis.todayOrders} icon={<Receipt className="size-5" />} />
         <ReportCard label="Today’s profit" value={<CurrencyDisplay value={d.kpis.todayProfit} currency={c} variant="compact" />} icon={<TrendingUp className="size-5" />} />
@@ -52,7 +52,7 @@ async function DashboardServerView({ range }: { range: ReturnType<typeof resolve
 
       <Card>
         <CardHeader className="pb-1"><CardTitle>Store overview</CardTitle><CardDescription>Current product and team totals.</CardDescription></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 pt-2 sm:grid-cols-4">
+        <CardContent className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4 pt-2 sm:grid-cols-4">
           <div><p className="text-xs text-muted-foreground">Active products</p><p className="mt-1 text-xl font-semibold num">{d.kpis.totalProducts}</p></div>
           <div><p className="text-xs text-muted-foreground">Low stock</p><p className="mt-1 text-xl font-semibold text-warning-foreground num">{d.kpis.lowStock}</p></div>
           <div><p className="text-xs text-muted-foreground">Out of stock</p><p className="mt-1 text-xl font-semibold text-destructive num">{d.kpis.outOfStock}</p></div>
@@ -117,7 +117,7 @@ async function EmployeeDashboard({ userId, name }: { userId: string; name: strin
       <PageHeader title={`Hello, ${name}`} description="Your day at the counter." actions={<Button asChild><Link href="/sales/new"><ShoppingBag /> New sale</Link></Button>} />
       <div className="grid min-w-0 items-start gap-5 min-[1440px]:grid-cols-[minmax(0,1fr)_19rem] min-[1440px]:gap-6">
       <div className="min-w-0 space-y-5">
-        <section aria-label="My performance today" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <section aria-label="My performance today" className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <ReportCard label="My sales today" value={<CurrencyDisplay value={d.todaySales} currency={s.currency} variant="compact" />} icon={<Banknote className="size-5" />} />
         <ReportCard label="My orders today" value={d.todayOrders} icon={<Receipt className="size-5" />} />
         <ReportCard label="Products available" value={d.availableProducts} icon={<Boxes className="size-5" />} />

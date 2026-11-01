@@ -22,8 +22,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ slug:
   return (
     <>
       <PageHeader title={customer.name} description={customer.lastPurchaseAt ? `Last purchase ${formatDate(customer.lastPurchaseAt)}` : "No purchases yet"} />
-      <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-        <Card className="h-fit"><CardHeader><CardTitle>Contact</CardTitle></CardHeader><CardContent className="grid gap-2 text-sm">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <Card className="h-fit"><CardHeader><CardTitle>Contact</CardTitle></CardHeader><CardContent className="grid gap-2 text-sm [overflow-wrap:anywhere]">
           <p><span className="text-muted-foreground">Phone: </span>{customer.phone ?? "—"}</p>
           <p><span className="text-muted-foreground">Email: </span>{customer.email ?? "—"}</p>
           <p><span className="text-muted-foreground">Address: </span>{customer.address ?? "—"}</p>
@@ -34,7 +34,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ slug:
           <SaleTable rows={sales.rows} currency={settings.currency} showEmployee={hasPermission(user.role, PERMISSION.SALE_VIEW_ALL)} empty={<EmptyState title="No purchases this year" />} />
         </Card>
         {warranties.length > 0 && (
-          <Card className="gap-0 overflow-x-auto py-0 lg:col-span-2">
+          <Card className="gap-0 overflow-x-auto py-0 xl:col-span-2">
             <CardHeader className="p-4"><CardTitle>Device warranties</CardTitle></CardHeader>
             <WarrantyTable rows={warranties} showCustomer={false} canClaim={hasPermission(user.role, PERMISSION.WARRANTY_MANAGE)} />
           </Card>

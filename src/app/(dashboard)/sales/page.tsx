@@ -45,7 +45,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         description={all ? "Every sale across the shop." : "Sales you’ve made."}
         actions={<><ReportExports range={range} scope="sales" />{hasPermission(user.role, PERMISSION.SALE_CREATE) && <Button asChild><Link href="/sales/new"><Plus /> New sale</Link></Button>}</>}
       />
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
+      <div className="mb-4 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-5">
         <ReportCard label="Completed sales" value={overview.count} hint="In the selected period" />
         <ReportCard label="Booked sales" value={<CurrencyDisplay value={overview.total} currency={settings.currency} />} hint="Completed transactions" accent="blue" />
         <ReportCard label="Collected" value={<CurrencyDisplay value={overview.collected} currency={settings.currency} />} hint="Payments received in period" accent="green" />

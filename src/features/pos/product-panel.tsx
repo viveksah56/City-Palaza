@@ -46,8 +46,8 @@ export function ProductPanel({ currency, categories, onAdd }: { currency: string
         })}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy={search.isFetching}>
+      <div className="min-h-0 flex-1 pr-1 xl:max-h-[max(24rem,calc(100dvh-18rem))] xl:overflow-y-auto">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3" aria-busy={search.isFetching}>
           {results.map((p) => {
             const out = p.quantity <= 0;
             return (
@@ -63,10 +63,10 @@ export function ProductPanel({ currency, categories, onAdd }: { currency: string
                       {p.trackingType === "IMEI" && <Smartphone aria-label="IMEI tracked" className="size-3.5" />}
                       <span className="truncate">{[p.brand, p.category].filter(Boolean).join(" · ")}</span>
                     </span>
-                    <span className="mt-0.5 block text-sm font-semibold leading-snug">{displayName(p)}</span>
+                    <span className="mt-0.5 block text-sm font-semibold leading-snug [overflow-wrap:anywhere]">{displayName(p)}</span>
                     <span className="block truncate font-mono text-[11px] text-muted-foreground">{p.sku}</span>
                   </span>
-                  <span className="flex items-end justify-between gap-2">
+                  <span className="flex flex-wrap items-end justify-between gap-2">
                     <span className="grid">
                       <span className="num text-base font-bold">{formatCurrency(p.sellingPrice, currency)}</span>
                       {p.warrantyMonths > 0 && <span className="flex items-center gap-1 text-[11px] text-muted-foreground"><ShieldCheck className="size-3" aria-hidden />{p.warrantyMonths} mo warranty</span>}

@@ -17,6 +17,8 @@ import type { WarrantyRow } from "@/server/warranties.service";
 
 export function WarrantyTable({ rows, canClaim, showCustomer = true }: { rows: WarrantyRow[]; canClaim: boolean; showCustomer?: boolean }) {
   return (
+    <>
+    <div className="hidden min-w-0 md:block">
     <Table>
       <TableHeader>
         <TableRow>
@@ -37,6 +39,25 @@ export function WarrantyTable({ rows, canClaim, showCustomer = true }: { rows: W
         ))}
       </TableBody>
     </Table>
+    </div>
+    <ul className="divide-y divide-border/60 md:hidden">
+      {rows.map((w) => (
+        <li key={w.id} className="grid min-w-0 gap-3 p-4 [overflow-wrap:anywhere]">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0"><p className="font-medium">{w.productName}</p><p className="font-mono text-xs text-muted-foreground">{w.tag}</p></div>
+            {w.expired ? <Badge variant="destructive">Expired</Badge> : <StatusBadge status={w.status} />}
+          </div>
+          <dl className="grid gap-2 text-sm">
+            {w.imei1 && <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3"><dt className="text-muted-foreground">Device</dt><dd className="text-right font-mono text-xs">{formatDevice(w.imei1, w.imei2)}</dd></div>}
+            {showCustomer && <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3"><dt className="text-muted-foreground">Customer</dt><dd className="text-right">{w.customerName ?? "Walk-in"}{w.customerPhone && <span className="block text-xs text-muted-foreground">{w.customerPhone}</span>}</dd></div>}
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3"><dt className="text-muted-foreground">Sale</dt><dd className="text-right"><Link href={`/sales/${w.saleSlug}`} className="text-primary hover:underline">{w.saleNumber}</Link></dd></div>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3"><dt className="text-muted-foreground">Valid until</dt><dd className="num text-right">{formatDate(w.endsAt)}</dd></div>
+          </dl>
+          {canClaim && w.status === "ACTIVE" && !w.expired && <div className="flex justify-end"><ClaimDialog warranty={w} /></div>}
+        </li>
+      ))}
+    </ul>
+    </>
   );
 }
 

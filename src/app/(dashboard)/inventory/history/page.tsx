@@ -39,7 +39,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Stock history" description="Every stock movement: who, when, how many and why." />
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         <ReportCard label="Matching movements" value={result.total} hint="For the selected filters" />
         <ReportCard label="Units moved on this page" value={result.rows.reduce((sum, row) => sum + row.quantity, 0)} hint="Net change across visible entries" accent="purple" />
         <ReportCard label="Page" value={`${result.page} of ${result.totalPages}`} hint={`${result.rows.length} entries shown`} accent="teal" />

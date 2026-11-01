@@ -29,7 +29,7 @@ export function CartLines({ currency, isAdmin, calcLines }: { currency: string; 
             </div>
 
             {i.trackingType === "QUANTITY" ? (
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-1">
                   <IconButton label="Decrease quantity" variant="secondary" className="size-9" onClick={() => setQuantity(i.productId, i.quantity - 1)} disabled={i.quantity <= 1}><Minus /></IconButton>
                   <Input aria-label={`Quantity for ${i.name}`} type="number" min={1} max={i.available} value={i.quantity} onChange={(e) => setQuantity(i.productId, Number(e.target.value))} className="h-9 w-14 rounded-lg px-1 text-center" />
@@ -41,8 +41,8 @@ export function CartLines({ currency, isAdmin, calcLines }: { currency: string; 
               <DevicePicker item={i} />
             )}
 
-            <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
-              <label htmlFor={`discount-${i.productId}`} className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+              <label htmlFor={`discount-${i.productId}`} className="flex flex-wrap items-center gap-2">
                 Item discount
                 <span className="relative w-20">
                   <Input id={`discount-${i.productId}`} aria-label={`Item discount percentage for ${i.name}`} type="number" min="0" max={!isAdmin ? i.maxDiscountPercent : 100} step="0.01" inputMode="decimal" value={i.discount?.value ?? ""} onChange={(event) => setDiscount(i.productId, event.target.value === "" ? undefined : { type: "PERCENT", value: event.target.value })} placeholder="0" className="h-8 pr-6 text-sm" />
@@ -82,7 +82,7 @@ function DevicePicker({ item }: { item: CartItem }) {
       {selected.length > 0 && (
         <ul className="grid gap-1" aria-label="Selected devices">
           {selected.map((d) => (
-            <li key={d.serial} className="rounded-md bg-primary/10 px-2 py-1 font-mono text-[12px] leading-tight text-foreground">
+            <li key={d.serial} className="rounded-md bg-primary/10 px-2 py-1 font-mono text-[12px] leading-tight [overflow-wrap:anywhere] text-foreground">
               <span className="text-muted-foreground">IMEI 1</span> {d.serial}{d.imei2 && <><br /><span className="text-muted-foreground">IMEI 2</span> {d.imei2}</>}
             </li>
           ))}
@@ -93,7 +93,7 @@ function DevicePicker({ item }: { item: CartItem }) {
         {error ? <p role="alert" className="mt-1 text-xs text-destructive">Could not load devices. Remove and add this product again.</p> : list === null ? <p className="mt-1 text-xs text-muted-foreground">Loading devices…</p> : list.length === 0 ? <p className="mt-1 text-xs text-destructive">No devices in stock.</p> : (
           <div className="mt-1 grid max-h-32 gap-0.5 overflow-y-auto">
             {list.map((d) => (
-              <label key={d.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 font-mono text-[12px] hover:bg-secondary">
+              <label key={d.id} className="flex cursor-pointer items-start gap-2 [overflow-wrap:anywhere] rounded px-1 py-0.5 font-mono text-[12px] hover:bg-secondary">
                 <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={item.serials.includes(d.serial)} onChange={() => toggle(d)} />
                 {d.serial}{d.imei2 ? ` / ${d.imei2}` : ""}
               </label>

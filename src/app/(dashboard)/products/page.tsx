@@ -50,7 +50,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           </>
         }
       />
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <ReportCard label="Active products" value={overview.products} hint="In the catalogue" />
         <ReportCard label="Units in stock" value={overview.units} hint="Across active products" accent="green" />
         <ReportCard label="Low stock" value={overview.lowStock} hint="At or below minimum" tone={overview.lowStock ? "warning" : "default"} />

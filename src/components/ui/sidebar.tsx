@@ -46,7 +46,7 @@ function Sidebar({ children, className }: React.HTMLAttributes<HTMLElement>) {
         {content}
       </aside>
       <Dialog open={openMobile} onOpenChange={setOpenMobile}>
-        <DialogContent className="!top-0 !bottom-0 !left-0 !right-auto !h-dvh !max-h-dvh !w-[18rem] !max-w-none !translate-x-0 !translate-y-0 !rounded-none p-0">
+        <DialogContent className="!top-0 !bottom-0 !left-0 !right-auto !h-dvh !max-h-dvh !w-[min(18rem,100vw)] !max-w-none !translate-x-0 !translate-y-0 !rounded-none p-0">
           <DialogTitle className="sr-only">Main navigation</DialogTitle>
           <aside className="group/sidebar flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">{content}</aside>
         </DialogContent>

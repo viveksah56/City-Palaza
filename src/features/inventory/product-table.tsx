@@ -30,7 +30,7 @@ export function ProductTable({
     {
       key: "name", header: "Product", sortKey: "name",
       cell: (p) => (
-        <div className="min-w-48">
+        <div className="min-w-0 md:min-w-48">
           <Link href={`/products/${p.slug}`} className="font-medium hover:text-primary hover:underline">{p.name}</Link>
           <p className="text-xs text-muted-foreground">{p.variantLabel ? `${p.variantLabel} · ` : ""}{p.category}{p.brand ? ` · ${p.brand}` : ""} · {TRACKING_LABELS[p.trackingType]}</p>
         </div>

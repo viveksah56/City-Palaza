@@ -99,7 +99,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               {serials.length === 0 ? <p className="text-sm text-muted-foreground">No devices registered yet. Add them from Inventory → Add stock.</p> : (
                 <ul className="max-h-96 divide-y overflow-y-auto text-sm">
                   {serials.map((s) => (
-                    <li key={s.id} className="flex items-center justify-between gap-2 py-2"><span className="font-mono text-[13px]">{s.serial}{s.imei2 ? ` / ${s.imei2}` : ""}</span><StatusBadge status={s.status} /></li>
+                    <li key={s.id} className="flex flex-wrap items-start justify-between gap-2 py-2"><span className="min-w-0 font-mono text-[13px] [overflow-wrap:anywhere]">{s.serial}{s.imei2 ? ` / ${s.imei2}` : ""}</span><StatusBadge status={s.status} /></li>
                   ))}
                 </ul>
               )}

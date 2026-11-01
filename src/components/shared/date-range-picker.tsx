@@ -23,7 +23,7 @@ export function DateRangePicker({ defaultPreset = "last7" }: { defaultPreset?: s
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex min-w-0 w-full flex-wrap items-center gap-2 sm:w-auto">
       <div className="w-full sm:w-44">
         <Select value={preset} onValueChange={(value) => push((p) => { p.set("range", value); if (value !== "custom") { p.delete("from"); p.delete("to"); } })}>
           <SelectTrigger aria-label="Date range"><SelectValue /></SelectTrigger>

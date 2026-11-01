@@ -1,5 +1,6 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { cn } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/native-select";
 
 export type FilterOption = { value: string; label: string };
@@ -10,7 +11,7 @@ export function FilterSelect({ param, label, options, allLabel = "All", classNam
   const pathname = usePathname();
   const sp = useSearchParams();
   return (
-    <div className={className ?? "w-full sm:w-48"}>
+    <div className={cn("min-w-0 max-w-full w-full sm:w-48", className)}>
       <NativeSelect
         className="h-9 rounded-md border-border bg-background shadow-none"
         aria-label={label}

@@ -32,7 +32,7 @@ export function LoadingSkeleton({ rows = 6, cards = 0 }: { rows?: number; cards?
       <span role="status" className="sr-only">Loading page content</span>
       <div className="space-y-3"><Skeleton className="h-10 w-56 sm:h-12" /><Skeleton className="h-4 w-80 max-w-full" /></div>
       {cards > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 min-[400px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
           {Array.from({ length: cards }).map((_, i) => <Skeleton key={i} className="h-[118px] rounded-2xl" />)}
         </div>
       )}
